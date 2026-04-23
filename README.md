@@ -273,8 +273,8 @@ itself" option, so that's what the repo is pre-configured for.
 | **0. Scaffold** | Next.js + Tailwind + TS strict + CI + read-only contract test | ✅ done |
 | **1. Auth** | Sign in with Autodesk (PKCE), sign out, silent refresh, hub + project picker | ✅ done |
 | **2. Scrape** | RFI list with full pagination, custom-attribute resolver, raw table view with text filter | ✅ done |
-| **3. Builder** | Field picker, multi-field filter builder, sort, group-by, save/load templates in localStorage | 🔜 next |
-| **4. Export** | PDF (`@react-pdf/renderer`) and CSV (`papaparse`) with correct typography and pagination | pending |
+| **3. Builder** | Field picker, multi-field filter builder, sort, group-by, save/load templates in localStorage, import/export as JSON | ✅ done |
+| **4. Export** | PDF (`@react-pdf/renderer`) and CSV (`papaparse`) with correct typography and pagination | 🔜 next |
 | **5. Brand** | `Brand` context, Bailey Partnership brand pack (logo, colours, fonts, cover page), brand switcher | pending |
 | **6. Polish** | Multi-project batch reports, shareable template JSON, optional BFF for long-lived sessions, better empty/error states | pending |
 
