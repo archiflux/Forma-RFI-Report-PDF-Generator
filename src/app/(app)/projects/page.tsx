@@ -39,7 +39,7 @@ function ProjectsList() {
           {(q.data ?? []).map((project) => (
             <li key={project.id}>
               <Link
-                href={`/builder?hubId=${encodeURIComponent(hubId)}&projectId=${encodeURIComponent(project.id)}`}
+                href={`/rfis?hubId=${encodeURIComponent(hubId)}&projectId=${encodeURIComponent(project.id)}`}
                 className="block rounded-xl bg-white p-5 shadow-sm ring-1 ring-neutral-200 transition hover:ring-[color:var(--brand-primary)]"
               >
                 <p className="font-medium">{project.name}</p>

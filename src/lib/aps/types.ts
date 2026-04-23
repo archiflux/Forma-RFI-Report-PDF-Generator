@@ -79,6 +79,11 @@ export interface RfiSearchResponse {
   };
 }
 
+export interface RfiScrapeProgress {
+  loaded: number;
+  total?: number;
+}
+
 export class ApsError extends Error {
   constructor(
     message: string,

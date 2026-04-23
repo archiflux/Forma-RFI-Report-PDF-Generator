@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+# Deploys a static export of the Next.js app to GitHub Pages.
+# Only runs on pushes to main (NOT on PRs, to avoid wasted minutes).
+#
+# Before this will work you must:
+#   1. Go to Settings → Pages → set "Build and deployment → Source" to "GitHub Actions".
+#   2. Set the repository secret (Settings → Secrets and variables → Actions → "New repository secret"):
+#        Name:  NEXT_PUBLIC_APS_CLIENT_ID
+#        Value: <your APS app's Client ID>
+#   3. Register a callback URL in your APS app matching:
+#        https://<org>.github.io/Forma-RFI-Report-PDF-Generator/auth/callback/
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build static export
+        env:
+          NEXT_PUBLIC_APS_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_APS_CLIENT_ID }}
+          NEXT_PUBLIC_APS_REDIRECT_URI: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/auth/callback/
+        run: pnpm build:pages
+
+      - name: Add .nojekyll so _next/ assets aren't stripped
+        run: touch out/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

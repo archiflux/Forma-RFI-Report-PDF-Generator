@@ -3,6 +3,7 @@ import { normaliseProjectIdForRfi } from "./projects";
 import type {
   CustomAttributeDef,
   Rfi,
+  RfiScrapeProgress,
   RfiSearchRequest,
   RfiSearchResponse,
 } from "./types";
@@ -37,11 +38,6 @@ export async function searchRfisPage(
       ...(request.sort ? { sort: request.sort } : {}),
     },
   });
-}
-
-export interface RfiScrapeProgress {
-  loaded: number;
-  total?: number;
 }
 
 // Walk every page of search:rfis until exhausted or MAX_TOTAL hit.

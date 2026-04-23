@@ -131,47 +131,152 @@ Rationale for each pick lives in `SKILL.md` §3.
 If you ever spot a code change that would weaken any of the above, block the
 PR.
 
-## Getting started (for contributors)
+## Getting started — the plain-English version
 
-The repo currently contains planning docs only. Once scaffolded:
+You need three things: (1) Node.js installed, (2) a free Autodesk APS developer
+app (this takes ~5 minutes), and (3) this repo cloned. You already have (3)
+via GitHub Desktop.
 
-```bash
-# prerequisites: Node 20+, pnpm
+### Step 1 — Install Node.js and pnpm (one time)
 
-pnpm install
-cp .env.example .env.local
-# edit .env.local and set NEXT_PUBLIC_APS_CLIENT_ID to your APS app's client id
-pnpm dev
-# open http://localhost:3000
-```
+- Download and install **Node.js 20 or newer**: <https://nodejs.org> (pick the
+  "LTS" button).
+- Open **Terminal** (macOS) or **PowerShell** (Windows) and run:
+  ```bash
+  npm install -g pnpm
+  ```
+  That installs the package manager this project uses.
 
-**Setting up an APS app** (one-off, per developer or per environment):
+### Step 2 — Register a free Autodesk APS developer app
 
-1. Go to <https://aps.autodesk.com/myapps> and create a new app.
-2. Application type: **Traditional Web App** (with PKCE) or **SPA**, whichever
-   the portal surfaces for public-client PKCE at the time.
-3. APIs to enable:
+APS (Autodesk Platform Services) is Autodesk's developer portal. Creating an
+app there gives you a **Client ID** — a non-secret string the app uses to
+politely identify itself to Autodesk when a user signs in. You will sign in
+to your **own** Autodesk account that already has Forma access.
+
+1. Go to <https://aps.autodesk.com/myapps> and sign in with your Autodesk
+   account.
+2. Click **Create Application**.
+3. Choose application type **"Traditional Web App"** (PKCE). If the portal
+   only offers "Server-to-Server" and "Desktop, Mobile, Single-Page App",
+   pick the latter — both support PKCE.
+4. Give it a name (e.g. *"Bailey Partnership RFI Reports — dev"*) and
+   description.
+5. Under **APIs**, tick:
    - Authentication
    - Data Management API
-   - Autodesk Construction Cloud API (includes RFIs)
-4. Callback URL: `http://localhost:3000/auth/callback` for dev and your
-   production URL.
-5. Copy the **Client ID** into `.env.local`. There is **no client secret** —
-   if the portal shows one, ignore it; PKCE doesn't use it.
-6. Hand the app's Client ID to anyone doing Forma integration at Bailey
-   Partnership; they can't extract anything sensitive from it.
+   - Autodesk Construction Cloud API (this is where RFIs live, regardless of
+     the "Forma" rebrand)
+6. Set the **Callback URL**. You will add one or two:
+   - For local development: `http://localhost:3000/auth/callback`
+   - For GitHub Pages hosting (optional, see below):
+     `https://<your-github-org>.github.io/Forma-RFI-Report-PDF-Generator/auth/callback/`
+     (note the trailing slash — it matters)
+
+   You can add multiple callback URLs on the same app; click **Add URL** to
+   add a second one.
+7. Click **Create**. On the app's page, copy the **Client ID**. Ignore the
+   Client Secret — this app doesn't use one (that's the whole point of PKCE).
+
+### Step 3 — Run it on your machine
+
+Open Terminal/PowerShell, navigate to the folder you cloned
+(e.g. `cd ~/Documents/GitHub/Forma-RFI-Report-PDF-Generator`), and:
+
+```bash
+pnpm install
+cp .env.example .env.local
+```
+
+(On Windows PowerShell use `copy .env.example .env.local` instead.)
+
+Open `.env.local` in a text editor and paste your Client ID:
+
+```
+NEXT_PUBLIC_APS_CLIENT_ID=paste-your-client-id-here
+NEXT_PUBLIC_APS_SCOPES=data:read account:read viewables:read user-profile:read
+NEXT_PUBLIC_APS_REDIRECT_URI=http://localhost:3000/auth/callback
+```
+
+Then:
+
+```bash
+pnpm dev
+```
+
+Open <http://localhost:3000> in your browser, click **Sign in with Autodesk**,
+approve the permissions, and you'll land on the hub/project picker.
+
+### Step 4 — Where does this actually run when deployed?
+
+You have three choices, in increasing order of "it just works":
+
+| Option | Cost | Custom domain | Setup effort |
+|---|---|---|---|
+| **GitHub Pages** | Free | Yes, but extra config | Built-in workflow, takes ~10 min |
+| **Vercel** | Free for personal / small | Yes, trivial | `git push` and it's live |
+| **Cloudflare Pages** | Free | Yes, trivial | Connect repo in dashboard |
+
+**All three work** — the app is 100% client-side once signed in, so anywhere
+that serves static files is fine. GitHub Pages is the simplest "our repo hosts
+itself" option, so that's what the repo is pre-configured for.
+
+#### Deploying to GitHub Pages (recommended for a no-extra-accounts setup)
+
+1. Register a **second** callback URL on your APS app:
+   `https://<your-org>.github.io/Forma-RFI-Report-PDF-Generator/auth/callback/`
+   (mind the trailing slash). Replace `<your-org>` with the GitHub org or user
+   that owns the repo — e.g. `archiflux`.
+2. In the repo on GitHub, go to **Settings → Pages** and set
+   **"Build and deployment → Source"** to **"GitHub Actions"**.
+3. In **Settings → Secrets and variables → Actions**, click **New repository
+   secret** and add:
+   - Name: `NEXT_PUBLIC_APS_CLIENT_ID`
+   - Value: the same Client ID you used locally
+4. Push a commit to the `main` branch (or run the **"Deploy to GitHub Pages"**
+   workflow manually from the Actions tab). The included workflow
+   (`.github/workflows/pages.yml`) will build a static export and publish it.
+5. Visit `https://<your-org>.github.io/Forma-RFI-Report-PDF-Generator/`.
+
+> **Note on private repos.** GitHub Pages for private repos requires a
+> **GitHub Enterprise** plan. If the repo stays private on a normal plan,
+> deploy to **Vercel** or **Cloudflare Pages** instead — both support private
+> GitHub repos on free tiers.
+
+#### Deploying to Vercel (simplest)
+
+1. Sign up at <https://vercel.com> with your GitHub account.
+2. Click **Add New → Project**, pick the repo, and click **Import**.
+3. Under **Environment Variables**, add `NEXT_PUBLIC_APS_CLIENT_ID` with your
+   Client ID.
+4. Click **Deploy**. Register the Vercel URL
+   (`https://<project>.vercel.app/auth/callback`) as another callback on
+   your APS app.
+
+### Troubleshooting
+
+- **"Autodesk declined sign-in: invalid_redirect_uri"** — the callback URL
+  the app is sending does not exactly match one registered on your APS app.
+  Common culprits: missing/extra trailing slash, `http` vs `https`, mismatched
+  port.
+- **"No projects in this hub that you have access to"** — your Autodesk
+  account isn't a member of any projects in that hub. Ask a hub admin to add
+  you, or pick a different hub.
+- **CORS errors in the browser console** — very occasionally an APS endpoint
+  returns a CORS preflight failure; the fix is a small proxy route, not
+  disabling CORS. Open an issue and we'll add a proxy for that endpoint only.
 
 ## Roadmap
 
-| Phase | Goal | Ships |
+| Phase | Goal | Status |
 |---|---|---|
-| **0. Scaffold** | Next.js + Tailwind + shadcn + TS strict + CI + read-only contract test | empty app boots, lint + tests green |
-| **1. Auth** | Sign in with Autodesk (PKCE), sign out, silent refresh | working login flow, hub + project picker |
-| **2. Scrape** | RFI list with full pagination, custom-attribute resolver, raw table view | readable RFI grid with every field |
-| **3. Builder** | Field picker, multi-field filter builder, sort, group-by, save/load templates in localStorage | users can design a report in the UI |
-| **4. Export** | PDF (`@react-pdf/renderer`) and CSV (`papaparse`) with correct typography and pagination | downloadable branded deliverables |
-| **5. Brand** | `Brand` context, Bailey Partnership brand pack (logo, colours, fonts, cover page), brand switcher | client-ready reports |
-| **6. Polish** | Multi-project batch reports, shareable template JSON, optional BFF for long-lived sessions, better empty/error states | v1.0 |
+| **0. Scaffold** | Next.js + Tailwind + TS strict + CI + read-only contract test | ✅ done |
+| **1. Auth** | Sign in with Autodesk (PKCE), sign out, silent refresh, hub + project picker | ✅ done |
+| **2. Scrape** | RFI list with full pagination, custom-attribute resolver, raw table view with text filter | ✅ done |
+| **3. Builder** | Field picker, multi-field filter builder, sort, group-by, save/load templates in localStorage | 🔜 next |
+| **4. Export** | PDF (`@react-pdf/renderer`) and CSV (`papaparse`) with correct typography and pagination | pending |
+| **5. Brand** | `Brand` context, Bailey Partnership brand pack (logo, colours, fonts, cover page), brand switcher | pending |
+| **6. Polish** | Multi-project batch reports, shareable template JSON, optional BFF for long-lived sessions, better empty/error states | pending |
 
 We'll cut a release at the end of each phase and dogfood it on a real project
 before starting the next one.
