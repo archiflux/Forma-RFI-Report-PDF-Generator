@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { buildStatusLabelMap } from "@/lib/aps/workflow";
 import { useRfiData } from "@/lib/aps/use-rfi-data";
 import { applyTemplate } from "@/lib/report/apply";
+import { exportReport } from "@/lib/report/export";
 import { emptyTemplate, type ReportTemplate } from "@/lib/report/types";
 import { FieldPicker } from "@/components/builder/field-picker";
 import { FilterBuilder } from "@/components/builder/filter-builder";
@@ -22,14 +23,13 @@ function BuilderInner() {
 
   const { rfis, attrs, workflow, isLoading, isError, error } = useRfiData(projectId);
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
 
-  // Initialise once we have a project.
   useEffect(() => {
     if (projectId && !template) setTemplate(emptyTemplate(projectId));
   }, [projectId, template]);
 
-  // Resolve raw status ids → human labels on the RFIs so filters that test
-  // the label (rather than the id) work intuitively.
   const rfisWithLabels = useMemo(() => {
     if (!workflow.length) return rfis;
     const map = buildStatusLabelMap(workflow);
@@ -42,6 +42,24 @@ function BuilderInner() {
     if (!template) return null;
     return applyTemplate(rfisWithLabels, template, attrs);
   }, [rfisWithLabels, template, attrs]);
+
+  async function onExport() {
+    if (!template) return;
+    setExporting(true);
+    setExportErr(null);
+    try {
+      await exportReport({
+        template,
+        rfis: rfisWithLabels,
+        customAttributes: attrs,
+        projectName: projectId, // replaced with real project name in Phase 5/6
+      });
+    } catch (e) {
+      setExportErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (!projectId) {
     return (
@@ -58,6 +76,8 @@ function BuilderInner() {
   if (!template) {
     return <p className="text-sm text-neutral-500">Preparing builder…</p>;
   }
+
+  const exportReady = !isLoading && !isError && template.fields.length > 0 && rfis.length > 0;
 
   return (
     <section className="space-y-6">
@@ -79,13 +99,19 @@ function BuilderInner() {
           </Link>
           <Button
             size="md"
-            disabled
-            title="Export lands in Phase 4 (PDF + CSV)"
+            disabled={!exportReady || exporting}
+            onClick={onExport}
           >
-            Export → {template.output.toUpperCase()}
+            {exporting ? "Generating…" : `Export → ${template.output.toUpperCase()}`}
           </Button>
         </div>
       </div>
+
+      {exportErr ? (
+        <p role="alert" className="text-sm text-red-600">
+          Export failed: {exportErr}
+        </p>
+      ) : null}
 
       {isError ? (
         <p role="alert" className="text-sm text-red-600">
@@ -132,11 +158,6 @@ function BuilderInner() {
           totalAfterFilter={applied.filtered.length}
         />
       ) : null}
-
-      <p className="text-xs text-neutral-500">
-        Export is disabled until Phase 4 ships. Templates you save here will be
-        ready to export as soon as it does.
-      </p>
     </section>
   );
 }
