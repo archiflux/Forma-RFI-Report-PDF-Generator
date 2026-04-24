@@ -1,5 +1,11 @@
 export const APS_BASE_URL = "https://developer.api.autodesk.com";
 
+// Same-origin proxy that forwards to APS_BASE_URL. The ApsClient hits this
+// from the browser to sidestep CORS on the RFI v3 endpoints. The proxy
+// enforces the same read-only verb allow-list server-side (see
+// src/lib/aps/proxy.ts and src/app/api/aps/[...path]/route.ts).
+export const APS_BROWSER_BASE = "/api/aps";
+
 export const APS_OAUTH = {
   authorizeUrl: `${APS_BASE_URL}/authentication/v2/authorize`,
   tokenUrl: `${APS_BASE_URL}/authentication/v2/token`,

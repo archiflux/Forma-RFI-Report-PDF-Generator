@@ -224,9 +224,14 @@ You have three choices, in increasing order of "it just works":
 | **Vercel** | Free for personal / small | Yes, trivial | `git push` and it's live |
 | **Cloudflare Pages** | Free | Yes, trivial | Connect repo in dashboard |
 
-**All three work** — the app is 100% client-side once signed in, so anywhere
-that serves static files is fine. GitHub Pages is the simplest "our repo hosts
-itself" option, so that's what the repo is pre-configured for.
+**Vercel and Cloudflare Pages work out of the box.** GitHub Pages has a caveat
+worth knowing up front: the Forma RFI endpoints don't send CORS headers, so
+the app routes them through a tiny same-origin proxy at `/api/aps/*`. That
+proxy is a Next.js route handler — it needs a host that can run server code.
+**Vercel runs it automatically; Cloudflare Pages runs it via Pages Functions;
+GitHub Pages cannot run it at all.** If you deploy to GitHub Pages, sign-in
+and the hub/project pickers will work, but the RFI list will fail with a
+network error. For production hosting, pick Vercel or Cloudflare Pages.
 
 #### Deploying to GitHub Pages (recommended for a no-extra-accounts setup)
 

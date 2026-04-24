@@ -1,4 +1,4 @@
-import { APS_BASE_URL } from "./config";
+import { APS_BROWSER_BASE } from "./config";
 import { ApsError } from "./types";
 
 export type HttpMethod = "GET" | "POST";
@@ -31,14 +31,32 @@ export interface ApsRequestInit {
 }
 
 function buildUrl(baseUrl: string, path: string, query?: ApsRequestInit["query"]): string {
-  const url = new URL(path, baseUrl);
+  const isAbsolute = /^https?:/i.test(baseUrl);
+  if (isAbsolute) {
+    const url = new URL(path, baseUrl);
+    if (query) {
+      for (const [k, v] of Object.entries(query)) {
+        if (v === undefined) continue;
+        url.searchParams.set(k, String(v));
+      }
+    }
+    return url.toString();
+  }
+  // Relative base (e.g. "/api/aps") — keep the URL relative so fetch picks
+  // the browser's own origin and works in both dev and Vercel preview deploys.
+  const trimmedBase = baseUrl.replace(/\/$/, "");
+  const joinedPath = path.startsWith("/") ? path : `/${path}`;
+  let full = `${trimmedBase}${joinedPath}`;
   if (query) {
+    const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
       if (v === undefined) continue;
-      url.searchParams.set(k, String(v));
+      qs.set(k, String(v));
     }
+    const qstr = qs.toString();
+    if (qstr) full += `?${qstr}`;
   }
-  return url.toString();
+  return full;
 }
 
 export class ApsClient {
@@ -47,7 +65,7 @@ export class ApsClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(opts: ApsClientOptions) {
-    this.baseUrl = opts.baseUrl ?? APS_BASE_URL;
+    this.baseUrl = opts.baseUrl ?? APS_BROWSER_BASE;
     this.getAccessToken = opts.getAccessToken;
     // Bind to globalThis so Safari/WebKit doesn't throw
     // "Can only call Window.fetch on instances of Window" when we call
@@ -81,12 +99,30 @@ export class ApsClient {
       headers["Content-Type"] = "application/json";
     }
 
-    const res = await this.fetchImpl(url, {
-      method,
-      headers,
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      signal: init.signal,
-    });
+    let res: Response;
+    try {
+      res = await this.fetchImpl(url, {
+        method,
+        headers,
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+        signal: init.signal,
+      });
+    } catch (e) {
+      // DOMException AbortError propagates — caller opted into cancellation.
+      if ((e as { name?: string })?.name === "AbortError") throw e;
+      // Everything else caught here is a network/CORS TypeError thrown before
+      // a response arrived. Safari says "Load failed", Chromium says
+      // "Failed to fetch" — neither helps the user. Surface something actionable.
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new ApsError(
+        `Network error calling ${method} ${init.path}: ${reason}. ` +
+          `If this is a Forma RFI endpoint, the CORS proxy at ${APS_BROWSER_BASE} ` +
+          `may be unreachable — check that the app was deployed to a host that ` +
+          `runs Next.js route handlers (Vercel / Cloudflare Pages Functions), ` +
+          `not a pure-static host.`,
+        0,
+      );
+    }
 
     if (!res.ok) {
       let bodyText: string | undefined;
