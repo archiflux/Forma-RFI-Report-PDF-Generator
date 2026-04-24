@@ -20,7 +20,9 @@ function dateInRange(iso: string | undefined, range: { gte?: string; lte?: strin
 }
 
 function valueOfCustomAttr(rfi: Rfi, attrId: string): unknown {
-  return rfi.customAttributes[attrId];
+  const ca = rfi.customAttributes;
+  if (!ca || typeof ca !== "object") return undefined;
+  return ca[attrId];
 }
 
 function customAttrMatches(

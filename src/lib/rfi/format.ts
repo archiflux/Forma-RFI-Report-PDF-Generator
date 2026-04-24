@@ -104,7 +104,8 @@ export function getFieldValue(
   if (isCustomField(field)) {
     const def = customAttributes.find((a) => a.id === customAttrId(field));
     if (!def) return null;
-    const raw = rfi.customAttributes[def.id];
+    const ca = rfi.customAttributes;
+    const raw = ca && typeof ca === "object" ? ca[def.id] : undefined;
     if (raw === undefined || raw === null) return null;
     if (def.dataType === "numeric" && typeof raw === "number") return raw;
     const formatted = formatCustomAttributeValue(def, raw);
