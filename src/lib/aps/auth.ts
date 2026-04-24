@@ -83,6 +83,19 @@ export async function completeSignIn(params: URLSearchParams): Promise<TokenSet>
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    // Autodesk returns 401 invalid_credentials when an APS app registered as
+    // a confidential client (Traditional Web App / Server-to-Server) is used
+    // via the PKCE-only flow. Point the user at the real fix instead of
+    // surfacing an opaque 401.
+    if (res.status === 401 && /invalid_credentials/i.test(text)) {
+      throw new Error(
+        "Token exchange failed: your APS app is registered as a confidential " +
+          "client (Traditional Web App or Server-to-Server) which requires a " +
+          "client secret. This app uses PKCE and needs a public client. " +
+          "Create a new APS app with type \"Desktop, Mobile, Single-Page App\" " +
+          "and update NEXT_PUBLIC_APS_CLIENT_ID. See README → Troubleshooting.",
+      );
+    }
     throw new Error(`Token exchange failed: ${res.status} ${res.statusText} ${text}`);
   }
 

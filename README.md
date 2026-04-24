@@ -157,9 +157,14 @@ to your **own** Autodesk account that already has Forma access.
 1. Go to <https://aps.autodesk.com/myapps> and sign in with your Autodesk
    account.
 2. Click **Create Application**.
-3. Choose application type **"Traditional Web App"** (PKCE). If the portal
-   only offers "Server-to-Server" and "Desktop, Mobile, Single-Page App",
-   pick the latter — both support PKCE.
+3. **Application type — pick "Desktop, Mobile, Single-Page App"**. This is the
+   critical choice. Do **NOT** pick "Traditional Web App" or "Server-to-Server"
+   — those are confidential clients that require a `client_secret`, and this
+   app is deliberately built as a **public** client with PKCE so no secret ever
+   needs to live in the codebase or anywhere else. If you pick the wrong type,
+   sign-in will get past the Autodesk consent screen and then fail at the
+   token exchange with `401 invalid_credentials: "The client credentials are
+   invalid."` — that's the tell-tale sign of the wrong app type.
 4. Give it a name (e.g. *"Bailey Partnership RFI Reports — dev"*) and
    description.
 5. Under **APIs**, tick:
@@ -169,14 +174,16 @@ to your **own** Autodesk account that already has Forma access.
      the "Forma" rebrand)
 6. Set the **Callback URL**. You will add one or two:
    - For local development: `http://localhost:3000/auth/callback`
+   - For Vercel hosting: `https://<your-project>.vercel.app/auth/callback`
    - For GitHub Pages hosting (optional, see below):
      `https://<your-github-org>.github.io/Forma-RFI-Report-PDF-Generator/auth/callback/`
      (note the trailing slash — it matters)
 
    You can add multiple callback URLs on the same app; click **Add URL** to
    add a second one.
-7. Click **Create**. On the app's page, copy the **Client ID**. Ignore the
-   Client Secret — this app doesn't use one (that's the whole point of PKCE).
+7. Click **Create**. On the app's page, copy the **Client ID**. If the portal
+   also shows a Client Secret, **ignore it** — public clients don't use one.
+   If you don't see a Client Secret at all, that's correct and expected.
 
 ### Step 3 — Run it on your machine
 
@@ -255,6 +262,13 @@ itself" option, so that's what the repo is pre-configured for.
 
 ### Troubleshooting
 
+- **"Token exchange failed: 401 invalid_credentials — The client credentials
+  are invalid"** (shown AFTER you successfully click "Allow" on the Autodesk
+  consent screen) — your APS app was registered as a confidential client
+  (Traditional Web App / Server-to-Server) which requires a client secret.
+  This app is public-client/PKCE and doesn't send one. **Fix**: create a new
+  APS app with type **"Desktop, Mobile, Single-Page App"** and put the new
+  Client ID into `.env.local` (or Vercel env vars) — see Step 2.
 - **"Autodesk declined sign-in: invalid_redirect_uri"** — the callback URL
   the app is sending does not exactly match one registered on your APS app.
   Common culprits: missing/extra trailing slash, `http` vs `https`, mismatched
