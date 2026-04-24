@@ -49,7 +49,11 @@ export class ApsClient {
   constructor(opts: ApsClientOptions) {
     this.baseUrl = opts.baseUrl ?? APS_BASE_URL;
     this.getAccessToken = opts.getAccessToken;
-    this.fetchImpl = opts.fetchImpl ?? fetch;
+    // Bind to globalThis so Safari/WebKit doesn't throw
+    // "Can only call Window.fetch on instances of Window" when we call
+    // this.fetchImpl(...) — invoking via a method reference sets `this`
+    // to the ApsClient instance, which WebKit's receiver check rejects.
+    this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
   }
 
   async request<T>(init: ApsRequestInit): Promise<T> {

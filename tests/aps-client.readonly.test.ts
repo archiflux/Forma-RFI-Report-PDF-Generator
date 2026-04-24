@@ -84,6 +84,25 @@ describe("read-only contract (SKILL.md §2)", () => {
         client.request({ path: "/project/v1/hubs" }),
       ).rejects.toMatchObject({ name: "ApsError", status: 403 });
     });
+
+    // Regression: Safari/WebKit throws "Can only call Window.fetch on
+    // instances of Window" when fetch is invoked via a method on a non-Window
+    // object. Binding fetch to globalThis in the default ctor avoids it.
+    it("default fetchImpl is bound so Safari's receiver check passes", async () => {
+      const originalFetch = globalThis.fetch;
+      let capturedThis: unknown = "__unset__";
+      globalThis.fetch = function (this: unknown) {
+        capturedThis = this;
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      } as unknown as typeof fetch;
+      try {
+        const c = new ApsClient({ getAccessToken: () => "t" });
+        await c.request({ path: "/project/v1/hubs" });
+        expect(capturedThis).toBe(globalThis);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
   });
 
   describe("assertReadOnlyScopes", () => {
