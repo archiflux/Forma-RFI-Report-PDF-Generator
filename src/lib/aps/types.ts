@@ -1,8 +1,11 @@
+export type HubKind = "acc" | "personal" | "unknown";
+
 export interface Hub {
   id: string;
   name: string;
   region?: string;
   extensionType?: string;
+  kind: HubKind;
 }
 
 export interface Project {
