@@ -21,7 +21,16 @@ function BuilderInner() {
   const hubId = params.get("hubId") ?? "";
   const projectId = params.get("projectId") ?? "";
 
-  const { rfis, attrs, workflow, isLoading, isError, error } = useRfiData(projectId);
+  const {
+    rfis,
+    attrs,
+    workflow,
+    isLoading,
+    isError,
+    error,
+    attrsInferred,
+    workflowMissing,
+  } = useRfiData(projectId);
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
@@ -117,6 +126,25 @@ function BuilderInner() {
         <p role="alert" className="text-sm text-red-600">
           {error instanceof Error ? error.message : "Failed to load project data."}
         </p>
+      ) : null}
+
+      {attrsInferred || workflowMissing ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Limited project metadata</p>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            {attrsInferred ? (
+              <li>
+                Custom-attribute definitions are hidden by Forma. Custom fields
+                appear with raw IDs and values, and choice filters aren&apos;t
+                available. Ask a project admin to grant <em>Manage Custom
+                Attributes</em> permission if you need full labels.
+              </li>
+            ) : null}
+            {workflowMissing ? (
+              <li>Workflow labels unavailable — status columns show raw IDs.</li>
+            ) : null}
+          </ul>
+        </div>
       ) : null}
 
       <TemplatePanel

@@ -1,60 +1,65 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { useApsClient } from "@/lib/aps/use-client";
-import { listCustomAttributes, scrapeAllRfis } from "@/lib/aps/rfis";
-import { buildStatusLabelMap, getWorkflow } from "@/lib/aps/workflow";
-import type { Rfi, RfiScrapeProgress } from "@/lib/aps/types";
+import { buildStatusLabelMap } from "@/lib/aps/workflow";
+import { useRfiData } from "@/lib/aps/use-rfi-data";
 import { RfiGrid } from "@/components/rfi-grid";
 import { Button } from "@/components/ui/button";
+
+function MetadataBanner({
+  attrsInferred,
+  workflowMissing,
+}: {
+  attrsInferred: boolean;
+  workflowMissing: boolean;
+}) {
+  if (!attrsInferred && !workflowMissing) return null;
+  return (
+    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <p className="font-medium">Limited project metadata</p>
+      <ul className="mt-1 list-disc pl-5 text-xs">
+        {attrsInferred ? (
+          <li>
+            Custom-attribute <strong>definitions</strong> are hidden by Forma
+            (usually because you don&apos;t have <em>Manage Custom Attributes</em>
+            permission on this project). Columns for custom fields show their
+            raw IDs and values instead of friendly names. RFIs, custom values,
+            and export all still work.
+          </li>
+        ) : null}
+        {workflowMissing ? (
+          <li>
+            The RFI workflow couldn&apos;t be loaded. Status columns show the
+            raw status id rather than its label.
+          </li>
+        ) : null}
+      </ul>
+    </div>
+  );
+}
 
 function RfisInner() {
   const params = useSearchParams();
   const hubId = params.get("hubId") ?? "";
   const projectId = params.get("projectId") ?? "";
-  const client = useApsClient();
 
-  const attrsQ = useQuery({
-    queryKey: ["attrs", projectId],
-    queryFn: () => listCustomAttributes(client, projectId),
-    enabled: Boolean(projectId),
-  });
+  const {
+    rfis,
+    attrs,
+    workflow,
+    isLoading,
+    isError,
+    error,
+    attrsInferred,
+    workflowMissing,
+  } = useRfiData(projectId);
 
-  const workflowQ = useQuery({
-    queryKey: ["workflow", projectId],
-    queryFn: () => getWorkflow(client, projectId),
-    enabled: Boolean(projectId),
-  });
-
-  const [progress, setProgress] = useState<RfiScrapeProgress | null>(null);
-  const [rfis, setRfis] = useState<Rfi[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-
-  useEffect(() => {
-    if (!projectId) return;
-    const ac = new AbortController();
-    setRunning(true);
-    setErr(null);
-    setProgress(null);
-    setRfis(null);
-
-    scrapeAllRfis(client, projectId, undefined, undefined, (p) => setProgress(p), ac.signal)
-      .then((all) => {
-        setRfis(all);
-        setRunning(false);
-      })
-      .catch((e: unknown) => {
-        if ((e as { name?: string })?.name === "AbortError") return;
-        setErr(e instanceof Error ? e.message : String(e));
-        setRunning(false);
-      });
-
-    return () => ac.abort();
-  }, [client, projectId]);
+  const statusLabels = useMemo(
+    () => (workflow.length ? buildStatusLabelMap(workflow) : undefined),
+    [workflow],
+  );
 
   if (!projectId) {
     return (
@@ -67,9 +72,6 @@ function RfisInner() {
       </p>
     );
   }
-
-  const statusLabels = workflowQ.data ? buildStatusLabelMap(workflowQ.data) : undefined;
-  const attrs = attrsQ.data ?? [];
 
   return (
     <section>
@@ -89,7 +91,7 @@ function RfisInner() {
             Change project
           </Link>
           <Button
-            disabled={!rfis || running}
+            disabled={isLoading || rfis.length === 0}
             onClick={() => {
               const qs = new URLSearchParams({ hubId, projectId }).toString();
               window.location.assign(`/builder?${qs}`);
@@ -100,39 +102,25 @@ function RfisInner() {
         </div>
       </div>
 
-      {running ? (
+      <MetadataBanner attrsInferred={attrsInferred} workflowMissing={workflowMissing} />
+
+      {isLoading ? (
         <div className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-neutral-200">
           <p className="text-sm font-medium">Loading RFIs…</p>
-          <p className="mt-1 text-xs text-neutral-500">
-            {progress?.loaded.toLocaleString() ?? 0}
-            {progress?.total ? ` of ${progress.total.toLocaleString()}` : ""} fetched
-          </p>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded bg-neutral-100">
-            <div
-              className="h-full bg-[color:var(--brand-primary)] transition-[width]"
-              style={{
-                width:
-                  progress?.total && progress.loaded
-                    ? `${Math.min(100, (progress.loaded / progress.total) * 100)}%`
-                    : "15%",
-              }}
-            />
+            <div className="h-full w-1/4 animate-pulse bg-[color:var(--brand-primary)]" />
           </div>
         </div>
       ) : null}
 
-      {err ? (
+      {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-600">
-          {err}
+          {error instanceof Error ? error.message : String(error)}
         </p>
       ) : null}
 
-      {rfis ? (
-        <RfiGrid
-          rfis={rfis}
-          customAttributes={attrs}
-          statusLabels={statusLabels}
-        />
+      {!isLoading && !isError ? (
+        <RfiGrid rfis={rfis} customAttributes={attrs} statusLabels={statusLabels} />
       ) : null}
     </section>
   );

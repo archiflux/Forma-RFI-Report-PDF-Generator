@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { listCustomAttributes, scrapeAllRfis } from "./rfis";
+import { listCustomAttributes, mergeCustomAttributes, scrapeAllRfis } from "./rfis";
 import { getWorkflow } from "./workflow";
 import { useApsClient } from "./use-client";
 
@@ -33,12 +34,27 @@ export function useRfiData(projectId: string) {
     staleTime: STALE_MS,
   });
 
+  // Merge fetched attr defs (full fidelity — real names, choice labels)
+  // with inferred defs (id-only, derived from RFI payloads). The merge
+  // returns something useful even when /attributes was blocked by a 403.
+  const mergedAttrs = useMemo(
+    () => mergeCustomAttributes(attrsQ.data ?? [], rfisQ.data ?? []),
+    [attrsQ.data, rfisQ.data],
+  );
+
+  const attrsInferred = mergedAttrs.some((a) => a.inferred);
+  const workflowMissing = (workflowQ.data ?? []).length === 0 && Boolean(rfisQ.data?.length);
+
   return {
     rfis: rfisQ.data ?? [],
-    attrs: attrsQ.data ?? [],
+    attrs: mergedAttrs,
     workflow: workflowQ.data ?? [],
     isLoading: rfisQ.isLoading || attrsQ.isLoading || workflowQ.isLoading,
-    isError: rfisQ.isError || attrsQ.isError || workflowQ.isError,
-    error: rfisQ.error ?? attrsQ.error ?? workflowQ.error,
+    // RFI scrape is the only hard failure. Attrs/workflow degrading is
+    // deliberately tolerated — see the flags below.
+    isError: rfisQ.isError,
+    error: rfisQ.error,
+    attrsInferred,
+    workflowMissing,
   };
 }

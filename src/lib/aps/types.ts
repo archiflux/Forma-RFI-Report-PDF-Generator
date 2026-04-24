@@ -30,6 +30,11 @@ export interface CustomAttributeDef {
   name: string;
   dataType: CustomAttributeType;
   values?: CustomAttributeChoice[];
+  // True when this definition was derived from RFI payloads rather than
+  // fetched from /attributes (e.g. because the user lacks "Manage Custom
+  // Attributes" permission). Inferred defs only have an id + a best-guess
+  // dataType — names default to the id and choice values are unresolved.
+  inferred?: boolean;
 }
 
 export interface RfiParty {

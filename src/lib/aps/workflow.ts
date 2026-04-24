@@ -1,5 +1,6 @@
 import type { ApsClient } from "./client";
 import { normaliseProjectIdForRfi } from "./projects";
+import { ApsError } from "./types";
 
 export interface WorkflowStatus {
   id: string;
@@ -26,16 +27,25 @@ export async function getWorkflow(
   projectId: string,
 ): Promise<WorkflowStatus[]> {
   const p = normaliseProjectIdForRfi(projectId);
-  const res = await client.request<RawWorkflowResponse>({
-    path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/workflow`,
-  });
-  const rows = res.states ?? res.statuses ?? [];
-  return rows
-    .map((r) => ({
-      id: r.id ?? "",
-      label: r.label ?? r.stepName ?? r.name ?? r.id ?? "",
-    }))
-    .filter((s) => s.id);
+  try {
+    const res = await client.request<RawWorkflowResponse>({
+      path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/workflow`,
+    });
+    const rows = res.states ?? res.statuses ?? [];
+    return rows
+      .map((r) => ({
+        id: r.id ?? "",
+        label: r.label ?? r.stepName ?? r.name ?? r.id ?? "",
+      }))
+      .filter((s) => s.id);
+  } catch (e) {
+    // /workflow can 403 for non-admin users in some ACC configurations.
+    // Fall back to no labels — the raw status id is still shown on the RFI.
+    if (e instanceof ApsError && (e.status === 401 || e.status === 403)) {
+      return [];
+    }
+    throw e;
+  }
 }
 
 export function buildStatusLabelMap(workflow: WorkflowStatus[]): Map<string, string> {
