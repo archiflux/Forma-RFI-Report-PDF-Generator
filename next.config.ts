@@ -16,7 +16,15 @@ const headers: NextConfig["headers"] = async () => [
         key: "Content-Security-Policy",
         value: [
           "default-src 'self'",
-          "script-src 'self' 'unsafe-inline'",
+          // 'wasm-unsafe-eval' is required by @react-pdf/renderer, which
+          // compiles a small WebAssembly module for font shaping / image
+          // processing on Export. It permits WebAssembly.compile only — NOT
+          // arbitrary eval() — so the read-only / no-injection posture is
+          // preserved. Supported in Chrome/Edge/Safari/Firefox.
+          "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+          // Workers default to script-src, but @react-pdf/renderer can spin
+          // up blob:-backed workers for parallel rendering. Keep this tight.
+          "worker-src 'self' blob:",
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: blob: https:",
           "font-src 'self' data:",
