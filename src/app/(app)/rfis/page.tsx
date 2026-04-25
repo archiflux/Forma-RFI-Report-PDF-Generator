@@ -54,6 +54,12 @@ function RfisInner() {
     error,
     attrsInferred,
     workflowMissing,
+    shouldHydrate,
+    hydrating,
+    hydrationProgress,
+    hydrateError,
+    hydrated,
+    hydrate,
   } = useRfiData(projectId);
 
   const statusLabels = useMemo(
@@ -103,6 +109,56 @@ function RfisInner() {
       </div>
 
       <MetadataBanner attrsInferred={attrsInferred} workflowMissing={workflowMissing} />
+
+      {!isLoading && !isError && (shouldHydrate || hydrating || hydrated) ? (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          {hydrated ? (
+            <p className="font-medium">
+              Loaded full RFI detail — custom fields are now populated.
+            </p>
+          ) : hydrating ? (
+            <>
+              <p className="font-medium">
+                Loading full RFI detail (
+                {hydrationProgress?.hydrated ?? 0} / {hydrationProgress?.total ?? rfis.length})
+              </p>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-blue-100">
+                <div
+                  className="h-full bg-blue-600 transition-[width]"
+                  style={{
+                    width: `${
+                      hydrationProgress && hydrationProgress.total > 0
+                        ? (hydrationProgress.hydrated / hydrationProgress.total) * 100
+                        : 5
+                    }%`,
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium">Custom fields not in the search response</p>
+                <p className="mt-1 text-xs">
+                  Forma&apos;s search endpoint didn&apos;t include custom-attribute
+                  values for this project. Click below to fetch each RFI&apos;s
+                  full detail individually — slower, but the only way to surface
+                  custom fields when search omits them. Hundreds of RFIs typically
+                  finish in 5–15 seconds.
+                </p>
+              </div>
+              <Button size="sm" onClick={hydrate}>
+                Load full RFI detail
+              </Button>
+            </div>
+          )}
+          {hydrateError ? (
+            <p role="alert" className="mt-2 text-xs text-red-700">
+              {hydrateError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-neutral-200">

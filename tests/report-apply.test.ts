@@ -30,6 +30,19 @@ const ATTRS: CustomAttributeDef[] = [
   },
 ];
 
+// Wrap scalar/array test values into the on-the-wire normalised shape:
+// `customAttributes` is always Record<attrId, unknown[]>. Each scalar becomes
+// a 1-element array; arrays pass through; null/undefined drop the key.
+function asValuesRecord(custom: Record<string, unknown> | undefined): Record<string, unknown[]> {
+  const out: Record<string, unknown[]> = {};
+  if (!custom) return out;
+  for (const [k, v] of Object.entries(custom)) {
+    if (v === null || v === undefined) continue;
+    out[k] = Array.isArray(v) ? v : [v];
+  }
+  return out;
+}
+
 function rfi(
   i: number,
   overrides: Partial<Rfi> & { custom?: Record<string, unknown> } = {},
@@ -43,7 +56,7 @@ function rfi(
     statusLabel: "Open",
     createdAt: `2026-0${(i % 9) + 1}-0${(i % 9) + 1}T00:00:00Z`,
     dueDate: `2026-0${(i % 9) + 1}-15`,
-    customAttributes: custom ?? {},
+    customAttributes: asValuesRecord(custom),
     attachmentCount: 0,
     assignee: { id: `u${i}`, name: `User ${i}` },
     ...rest,

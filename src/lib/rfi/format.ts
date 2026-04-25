@@ -13,29 +13,46 @@ export function formatDate(iso: string | undefined): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Format a custom-attribute value for display. After src/lib/aps/rfis.ts
+// normalisation, `raw` should be the values array (unknown[]) lifted from
+// APS's { id, values: [...] } shape — but we tolerate scalars + null too
+// in case something slips past the normaliser.
 export function formatCustomAttributeValue(
   def: CustomAttributeDef,
   raw: unknown,
 ): string {
   if (raw === undefined || raw === null) return "";
+  const items: unknown[] = Array.isArray(raw) ? raw : [raw];
+  if (items.length === 0) return "";
 
-  if (def.dataType === "singleChoice") {
-    const id = typeof raw === "string" ? raw : (raw as { id?: string }).id;
-    return def.values?.find((v) => v.id === id)?.label ?? String(id ?? "");
+  return items
+    .map((v) => formatChoiceOrScalar(def, v))
+    .filter((s) => s !== "")
+    .join(" | ");
+}
+
+function formatChoiceOrScalar(def: CustomAttributeDef, v: unknown): string {
+  if (v === null || v === undefined) return "";
+  // Choice values come through as either an id string ("uuid…") or as
+  // { id, label, value } objects. When def.values is populated (i.e. we
+  // fetched the schema), resolve the id to its human label.
+  let id: string | undefined;
+  if (typeof v === "string") id = v;
+  else if (typeof v === "object") id = (v as { id?: string }).id;
+
+  if (def.values && id) {
+    const choice = def.values.find((c) => c.id === id);
+    if (choice) return choice.label;
   }
-  if (def.dataType === "multiChoice") {
-    const ids = Array.isArray(raw)
-      ? raw.map((r) => (typeof r === "string" ? r : (r as { id?: string }).id))
-      : [];
-    return ids
-      .map((id) => def.values?.find((v) => v.id === id)?.label ?? id ?? "")
-      .filter(Boolean)
-      .join(" | ");
+  // Fall back to the value's own label/value, then to a stringification.
+  if (typeof v === "object") {
+    const obj = v as { label?: string; value?: unknown; id?: string };
+    if (typeof obj.label === "string") return obj.label;
+    if (obj.value !== undefined && obj.value !== null) return String(obj.value);
+    if (typeof obj.id === "string") return obj.id;
+    return "";
   }
-  if (def.dataType === "numeric") {
-    return typeof raw === "number" ? String(raw) : String(raw ?? "");
-  }
-  return String(raw);
+  return String(v);
 }
 
 export interface BuiltinColumnMeta {
@@ -105,10 +122,18 @@ export function getFieldValue(
     const def = customAttributes.find((a) => a.id === customAttrId(field));
     if (!def) return null;
     const ca = rfi.customAttributes;
-    const raw = ca && typeof ca === "object" ? ca[def.id] : undefined;
-    if (raw === undefined || raw === null) return null;
-    if (def.dataType === "numeric" && typeof raw === "number") return raw;
-    const formatted = formatCustomAttributeValue(def, raw);
+    const values = ca && typeof ca === "object" ? ca[def.id] : undefined;
+    if (!values || values.length === 0) return null;
+
+    // Numeric attributes have a single number in their values array.
+    if (def.dataType === "numeric") {
+      const first = values[0];
+      if (typeof first === "number") return first;
+      const n = Number(first);
+      return Number.isNaN(n) ? null : n;
+    }
+
+    const formatted = formatCustomAttributeValue(def, values);
     return formatted === "" ? null : formatted;
   }
   switch (field) {

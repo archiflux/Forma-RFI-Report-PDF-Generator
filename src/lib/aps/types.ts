@@ -54,7 +54,12 @@ export interface Rfi {
   manager?: RfiParty;
   question?: string;
   officialResponse?: string;
-  customAttributes: Record<string, unknown>;
+  // APS v3 returns each custom attribute as { id, values: [...] }, where `values`
+  // is always an array — single-element for text/numeric/single-choice and
+  // multi-element for multi-choice. We collapse the wire format into a record
+  // keyed by attribute id, but keep `unknown[]` so display/filter logic doesn't
+  // have to special-case scalars vs arrays.
+  customAttributes: Record<string, unknown[]>;
   attachmentCount: number;
 }
 

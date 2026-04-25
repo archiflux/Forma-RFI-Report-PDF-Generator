@@ -25,6 +25,16 @@ const ATTRS: CustomAttributeDef[] = [
   },
 ];
 
+function asValuesRecord(custom: Record<string, unknown> | undefined): Record<string, unknown[]> {
+  const out: Record<string, unknown[]> = {};
+  if (!custom) return out;
+  for (const [k, v] of Object.entries(custom)) {
+    if (v === null || v === undefined) continue;
+    out[k] = Array.isArray(v) ? v : [v];
+  }
+  return out;
+}
+
 function rfi(overrides: Partial<Rfi> & { custom?: Record<string, unknown> } = {}): Rfi {
   const { custom, ...rest } = overrides;
   return {
@@ -35,7 +45,7 @@ function rfi(overrides: Partial<Rfi> & { custom?: Record<string, unknown> } = {}
     statusLabel: "Open",
     createdAt: "2026-01-15T00:00:00Z",
     dueDate: "2026-02-01",
-    customAttributes: custom ?? {},
+    customAttributes: asValuesRecord(custom),
     attachmentCount: 0,
     assignee: { id: "u", name: "Alice" },
     ...rest,

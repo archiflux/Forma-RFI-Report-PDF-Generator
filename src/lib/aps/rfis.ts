@@ -46,19 +46,30 @@ export function inferCustomAttributesFromRfis(rfis: Rfi[]): CustomAttributeDef[]
     // Defensive: should always be an object after normalizeRfi, but guard
     // against a stale cache or a future shape change anyway.
     if (!ca || typeof ca !== "object") continue;
-    for (const [id, raw] of Object.entries(ca)) {
+    for (const [id, values] of Object.entries(ca)) {
       if (out.has(id)) continue;
-      out.set(id, { id, name: id, dataType: guessDataType(raw), inferred: true });
+      const arr = Array.isArray(values) ? values : [values];
+      out.set(id, { id, name: id, dataType: guessDataType(arr), inferred: true });
     }
   }
   return [...out.values()];
 }
 
-function guessDataType(raw: unknown): CustomAttributeType {
-  if (typeof raw === "number") return "numeric";
-  if (Array.isArray(raw)) return "multiChoice";
-  // APS returns single-choice as either an id string or { id, label } object.
-  if (raw && typeof raw === "object") return "singleChoice";
+// `values` in our normalised shape is always an array. Guess the dataType
+// from the cardinality + element type of a sample.
+//   length > 1                        → multiChoice
+//   length 1 + number                 → numeric
+//   length 1 + UUID-shaped string     → singleChoice
+//   length 1 + free string / object   → text (safe default — display still works)
+const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+function guessDataType(values: unknown[]): CustomAttributeType {
+  if (!Array.isArray(values) || values.length === 0) return "text";
+  if (values.length > 1) return "multiChoice";
+  const first = values[0];
+  if (typeof first === "number") return "numeric";
+  if (typeof first === "string" && UUID_RE.test(first)) return "singleChoice";
+  if (first && typeof first === "object" && "id" in (first as object)) return "singleChoice";
   return "text";
 }
 
@@ -128,28 +139,54 @@ interface RawRfiSearchResponse {
   pagination?: { limit?: number; offset?: number; totalResults?: number };
 }
 
-// APS has shipped at least two shapes for `customAttributes` on an RFI:
-//   object: { "<attrId>": <value> }
-//   array:  [{ "attributeDefinitionId": "<attrId>", "value": <value> }, ...]
-// and at times also null/omitted. Collapse every case to a plain record
-// so downstream code (filter/sort/group/inference) has a single shape.
+// APS v3 ships custom attributes on an RFI as an array of objects:
+//
+//   "customAttributes": [
+//     { "id": "<attrId>", "values": ["text or choice-id or number"] },
+//     ...
+//   ]
+//
+// `values` is always an array — text/numeric/single-choice carry one element,
+// multi-choice carry many. We collapse every observed shape (array, legacy
+// record, null, junk) to a single Record<attrId, unknown[]> so display and
+// filter code never has to branch on scalar vs array. APS has occasionally
+// also used `attributeDefinitionId` instead of `id` and `value` instead of
+// `values`, so we accept both spellings defensively.
 export function normalizeCustomAttributes(
   raw: RawRfiCustomAttributes | unknown,
-): Record<string, unknown> {
+): Record<string, unknown[]> {
   if (raw === null || raw === undefined) return {};
+
   if (Array.isArray(raw)) {
-    const out: Record<string, unknown> = {};
+    const out: Record<string, unknown[]> = {};
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
       const it = item as RawRfiCustomAttr;
-      const id = it.attributeDefinitionId ?? it.id;
+      const id = it.id ?? it.attributeDefinitionId;
       if (typeof id !== "string" || !id) continue;
-      out[id] = it.value ?? it.values ?? null;
+      out[id] = toValuesArray(it.values ?? it.value);
     }
     return out;
   }
-  if (typeof raw === "object") return raw as Record<string, unknown>;
+
+  // Legacy / fallback: a plain record. Wrap every value as a single-element
+  // array so consumers see a uniform shape.
+  if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    const out: Record<string, unknown[]> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[k] = toValuesArray(v);
+    }
+    return out;
+  }
+
   return {};
+}
+
+function toValuesArray(v: unknown): unknown[] {
+  if (v === null || v === undefined) return [];
+  if (Array.isArray(v)) return v.filter((x) => x !== null && x !== undefined);
+  return [v];
 }
 
 function normalizeParty(
@@ -213,6 +250,22 @@ export async function searchRfisPage(
   };
 }
 
+// Fetch a single RFI's full detail. The search:rfis endpoint sometimes
+// returns a slim view of each RFI (no customAttributes); GET /rfis/:id
+// returns the full payload, which we then run through the same normaliser
+// as search results so downstream code sees one shape.
+export async function getRfiById(
+  client: ApsClient,
+  projectId: string,
+  rfiId: string,
+): Promise<Rfi> {
+  const p = normaliseProjectIdForRfi(projectId);
+  const raw = await client.request<unknown>({
+    path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/rfis/${encodeURIComponent(rfiId)}`,
+  });
+  return normalizeRfi(raw);
+}
+
 // Walk every page of search:rfis until exhausted or MAX_TOTAL hit.
 // onProgress lets the UI render a progress bar without waiting for the full set.
 export async function scrapeAllRfis(
@@ -237,4 +290,69 @@ export async function scrapeAllRfis(
     if (out.length >= MAX_TOTAL) break;
   }
   return out;
+}
+
+const HYDRATE_CONCURRENCY = 8;
+
+export interface HydrationProgress {
+  hydrated: number;
+  total: number;
+}
+
+// Some APS configurations return RFIs from /search:rfis with no customAttributes
+// — the schema is right but the field is absent or empty even when values exist.
+// Hydrate by fetching each RFI's full detail individually with bounded
+// concurrency. Replaces every input RFI with its full-detail counterpart in
+// place, preserving order.
+export async function hydrateRfis(
+  client: ApsClient,
+  projectId: string,
+  rfis: Rfi[],
+  onProgress?: (p: HydrationProgress) => void,
+  signal?: AbortSignal,
+): Promise<Rfi[]> {
+  const total = rfis.length;
+  if (total === 0) return rfis;
+
+  const out: Rfi[] = new Array<Rfi>(total);
+  let cursor = 0;
+  let done = 0;
+
+  async function worker() {
+    for (;;) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const i = cursor++;
+      if (i >= total) return;
+      const original = rfis[i];
+      if (!original) continue;
+      try {
+        out[i] = await getRfiById(client, projectId, original.id);
+      } catch {
+        // If a single RFI fails to hydrate (deleted, permissions on this
+        // particular item, transient), keep the slim version we already had
+        // rather than losing the whole batch.
+        out[i] = original;
+      }
+      done++;
+      onProgress?.({ hydrated: done, total });
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(HYDRATE_CONCURRENCY, total) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return out;
+}
+
+// True when at least one RFI in the batch carries customAttribute values —
+// used by the UI to decide whether hydration would actually add anything,
+// since some projects genuinely have no custom fields.
+export function rfisHaveCustomAttributes(rfis: Rfi[]): boolean {
+  for (const r of rfis) {
+    const ca = r.customAttributes;
+    if (ca && typeof ca === "object" && Object.keys(ca).length > 0) return true;
+  }
+  return false;
 }

@@ -7,6 +7,14 @@ import {
 } from "@/lib/aps/rfis";
 import type { Rfi } from "@/lib/aps/types";
 
+function asValuesRecord(custom: Record<string, unknown>): Record<string, unknown[]> {
+  const out: Record<string, unknown[]> = {};
+  for (const [k, v] of Object.entries(custom)) {
+    out[k] = Array.isArray(v) ? v : [v];
+  }
+  return out;
+}
+
 function rfi(custom: Record<string, unknown>): Rfi {
   return {
     id: `r-${Math.random()}`,
@@ -14,7 +22,7 @@ function rfi(custom: Record<string, unknown>): Rfi {
     title: "",
     status: "open",
     createdAt: "2026-01-01T00:00:00Z",
-    customAttributes: custom,
+    customAttributes: asValuesRecord(custom),
     attachmentCount: 0,
   };
 }
@@ -85,13 +93,13 @@ describe("inferCustomAttributesFromRfis", () => {
     expect(out.every((a) => a.name === a.id)).toBe(true);
   });
 
-  it("guesses dataType from sample shape", () => {
+  it("guesses dataType from sample shape (length + element type)", () => {
     const out = inferCustomAttributesFromRfis([
       rfi({
         txt: "hello",
         num: 3.14,
-        multi: ["a"],
-        single: { id: "choice", label: "C" },
+        multi: ["a", "b"], // 2+ elements → multiChoice
+        single: ["12345678-1234-1234-1234-123456789012"], // 1 UUID → singleChoice
       }),
     ]);
     const by = Object.fromEntries(out.map((a) => [a.id, a.dataType]));

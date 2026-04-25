@@ -19,41 +19,59 @@ function dateInRange(iso: string | undefined, range: { gte?: string; lte?: strin
   return true;
 }
 
-function valueOfCustomAttr(rfi: Rfi, attrId: string): unknown {
+function valueOfCustomAttr(rfi: Rfi, attrId: string): unknown[] {
   const ca = rfi.customAttributes;
-  if (!ca || typeof ca !== "object") return undefined;
-  return ca[attrId];
+  if (!ca || typeof ca !== "object") return [];
+  const v = ca[attrId];
+  if (Array.isArray(v)) return v;
+  if (v === undefined || v === null) return [];
+  return [v];
+}
+
+// Pull the choice id out of a value entry. APS sends choice values as either
+// the bare id string or as { id, label, value } — handle both.
+function asChoiceId(v: unknown): string | undefined {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object" && "id" in v) {
+    const id = (v as { id?: unknown }).id;
+    if (typeof id === "string") return id;
+  }
+  return undefined;
 }
 
 function customAttrMatches(
   def: CustomAttributeDef,
-  raw: unknown,
+  values: unknown[],
   clause: { contains?: string; range?: { gte?: number; lte?: number }; values?: string[] },
 ): boolean {
   if (clause.contains && typeof clause.contains === "string") {
-    const v = raw === null || raw === undefined ? "" : String(raw);
-    if (!v.toLowerCase().includes(clause.contains.toLowerCase())) return false;
+    // Search across the joined string form (covers text + choice labels post-resolve).
+    const haystack = values
+      .map((v) => (typeof v === "string" ? v : asChoiceId(v) ?? String(v ?? "")))
+      .join(" ")
+      .toLowerCase();
+    if (!haystack.includes(clause.contains.toLowerCase())) return false;
   }
-  if (clause.range && def.dataType === "numeric") {
-    const n = typeof raw === "number" ? raw : Number(raw);
+  if (clause.range && (clause.range.gte !== undefined || clause.range.lte !== undefined)) {
+    const first = values[0];
+    const n = typeof first === "number" ? first : Number(first);
     if (Number.isNaN(n)) return false;
     if (clause.range.gte !== undefined && n < clause.range.gte) return false;
     if (clause.range.lte !== undefined && n > clause.range.lte) return false;
   }
   if (clause.values && clause.values.length > 0) {
-    if (def.dataType === "singleChoice") {
-      const id = typeof raw === "string" ? raw : (raw as { id?: string } | null)?.id;
-      if (!id || !clause.values.includes(id)) return false;
-    } else if (def.dataType === "multiChoice") {
-      const ids = Array.isArray(raw)
-        ? raw
-            .map((r) => (typeof r === "string" ? r : (r as { id?: string }).id))
-            .filter((x): x is string => Boolean(x))
-        : [];
-      // "any of" semantics: at least one selected value must be present on the RFI.
-      if (!ids.some((id) => clause.values!.includes(id))) return false;
-    }
+    // Any-of semantics — match if at least one of the selected ids is present
+    // on the RFI. Works for both single-choice (1-element values array) and
+    // multi-choice (n-element values array) without needing to know which.
+    const ids = values
+      .map(asChoiceId)
+      .filter((id): id is string => Boolean(id));
+    if (!ids.some((id) => clause.values!.includes(id))) return false;
   }
+  // def is intentionally unused here — values arrays carry enough info to
+  // filter without consulting the schema, which is critical when the schema
+  // wasn't fetchable (403 on /attributes).
+  void def;
   return true;
 }
 
