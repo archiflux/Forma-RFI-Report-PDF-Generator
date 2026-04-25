@@ -64,7 +64,12 @@ export function useRfiData(projectId: string) {
     [attrsQ.data, rfis],
   );
 
-  const attrsInferred = mergedAttrs.some((a) => a.inferred);
+  // True when at least one custom attribute couldn't be resolved to a
+  // friendly title — i.e. its display name fell back to the raw id because
+  // /attributes was forbidden AND the per-RFI metadata didn't carry a name.
+  // This is the only signal worth showing the user; "inferred" alone is now
+  // expected for any non-admin and isn't actionable.
+  const attrsMissingTitles = mergedAttrs.some((a) => a.inferred && a.name === a.id);
   const workflowMissing = (workflowQ.data ?? []).length === 0 && Boolean(baseRfis.length);
 
   // True when search:rfis returned RFIs but none carry customAttributes —
@@ -97,7 +102,7 @@ export function useRfiData(projectId: string) {
     isLoading: rfisQ.isLoading || attrsQ.isLoading || workflowQ.isLoading,
     isError: rfisQ.isError,
     error: rfisQ.error,
-    attrsInferred,
+    attrsMissingTitles,
     workflowMissing,
 
     canHydrate,

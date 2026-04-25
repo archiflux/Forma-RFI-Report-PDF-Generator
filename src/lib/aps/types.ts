@@ -60,7 +60,19 @@ export interface Rfi {
   // keyed by attribute id, but keep `unknown[]` so display/filter logic doesn't
   // have to special-case scalars vs arrays.
   customAttributes: Record<string, unknown[]>;
+  // Side-channel of metadata observed on each customAttribute entry —
+  // populated when APS attaches the attribute's display name / type / choice
+  // labels to its per-RFI value (which it commonly does on GET /rfis/:id even
+  // when the /attributes schema endpoint is forbidden). The inferrer pulls
+  // friendly names from here so non-admins can still see real titles.
+  customAttributesMeta?: Record<string, ObservedCustomAttrMeta>;
   attachmentCount: number;
+}
+
+export interface ObservedCustomAttrMeta {
+  name?: string;
+  dataType?: CustomAttributeType;
+  values?: CustomAttributeChoice[];
 }
 
 export interface RfiSearchFilter {

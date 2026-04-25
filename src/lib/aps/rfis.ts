@@ -4,6 +4,7 @@ import {
   ApsError,
   type CustomAttributeDef,
   type CustomAttributeType,
+  type ObservedCustomAttrMeta,
   type Rfi,
   type RfiScrapeProgress,
   type RfiSearchRequest,
@@ -36,21 +37,55 @@ export async function listCustomAttributes(
 }
 
 // Derive best-effort CustomAttributeDef[] from the custom-attribute values
-// that appear on the RFIs the user CAN read. Produces id-only defs with a
-// guessed dataType — good enough to surface columns in the grid and basic
-// filter operators in the builder even when /attributes is forbidden.
+// that appear on the RFIs the user CAN read. Aggregates per-id metadata
+// (name, dataType, choices) across every observed RFI, so a single RFI that
+// happened to carry `name: "Discipline"` lifts the title for that id across
+// the whole project. Falls back to id-only when nothing carries metadata.
 export function inferCustomAttributesFromRfis(rfis: Rfi[]): CustomAttributeDef[] {
   const out = new Map<string, CustomAttributeDef>();
+  const sampleValues = new Map<string, unknown[]>();
+  const aggregatedMeta = new Map<string, ObservedCustomAttrMeta>();
+
   for (const r of rfis) {
     const ca = r.customAttributes;
-    // Defensive: should always be an object after normalizeRfi, but guard
-    // against a stale cache or a future shape change anyway.
-    if (!ca || typeof ca !== "object") continue;
-    for (const [id, values] of Object.entries(ca)) {
-      if (out.has(id)) continue;
-      const arr = Array.isArray(values) ? values : [values];
-      out.set(id, { id, name: id, dataType: guessDataType(arr), inferred: true });
+    if (ca && typeof ca === "object") {
+      for (const [id, values] of Object.entries(ca)) {
+        const arr = Array.isArray(values) ? values : [values];
+        if (!sampleValues.has(id) && arr.length > 0) {
+          sampleValues.set(id, arr);
+        } else if (arr.length > 1) {
+          // Prefer the longer-cardinality sample so multi-choice fields are
+          // detected even if some RFIs only set a single option.
+          const prev = sampleValues.get(id);
+          if (!prev || arr.length > prev.length) sampleValues.set(id, arr);
+        }
+      }
     }
+    const meta = r.customAttributesMeta;
+    if (meta) {
+      for (const [id, m] of Object.entries(meta)) {
+        const existing = aggregatedMeta.get(id) ?? {};
+        aggregatedMeta.set(id, {
+          name: existing.name ?? m.name,
+          dataType: existing.dataType ?? m.dataType,
+          values: existing.values ?? m.values,
+        });
+      }
+    }
+  }
+
+  // Union of every id we ever saw — either as a value or via metadata.
+  const allIds = new Set<string>([...sampleValues.keys(), ...aggregatedMeta.keys()]);
+  for (const id of allIds) {
+    const m = aggregatedMeta.get(id);
+    const sample = sampleValues.get(id) ?? [];
+    out.set(id, {
+      id,
+      name: m?.name ?? id,
+      dataType: m?.dataType ?? guessDataType(sample),
+      values: m?.values,
+      inferred: true,
+    });
   }
   return [...out.values()];
 }
@@ -103,11 +138,31 @@ interface RawRfiParty {
   email?: string;
 }
 
+interface RawRfiChoice {
+  id?: string;
+  label?: string;
+  name?: string;
+  value?: unknown;
+}
+
 interface RawRfiCustomAttr {
   attributeDefinitionId?: string;
   id?: string;
+  // Display-side metadata APS may attach when the schema endpoint is unavailable.
+  name?: string;
+  title?: string;
+  displayName?: string;
+  attributeName?: string;
+  type?: string;
+  dataType?: string;
+  // The value(s) carried on this RFI for this attribute.
   value?: unknown;
   values?: unknown;
+  // Choice catalogues that some APS responses bundle with each value entry,
+  // letting us resolve choice ids to labels even without the schema.
+  options?: RawRfiChoice[];
+  choices?: RawRfiChoice[];
+  possibleValues?: RawRfiChoice[];
 }
 
 type RawRfiCustomAttributes =
@@ -189,6 +244,59 @@ function toValuesArray(v: unknown): unknown[] {
   return [v];
 }
 
+// APS sometimes only normalises the dataType string (e.g. "TEXT", "single_choice").
+// Map every spelling we've observed to our internal CustomAttributeType union.
+function normalizeAttrType(raw: string | undefined): CustomAttributeType | undefined {
+  if (!raw) return undefined;
+  const s = raw.toLowerCase().replace(/[_\s-]/g, "");
+  if (s === "text" || s === "string") return "text";
+  if (s === "numeric" || s === "number" || s === "integer" || s === "decimal") return "numeric";
+  if (s === "singlechoice" || s === "singlepick" || s === "select" || s === "dropdown") {
+    return "singleChoice";
+  }
+  if (s === "multichoice" || s === "multipick" || s === "multiselect") return "multiChoice";
+  return undefined;
+}
+
+function normalizeChoices(
+  raw: RawRfiChoice[] | undefined,
+): { id: string; label: string }[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: { id: string; label: string }[] = [];
+  for (const c of raw) {
+    if (!c || typeof c !== "object") continue;
+    const id = c.id ?? (typeof c.value === "string" ? c.value : undefined);
+    if (typeof id !== "string" || !id) continue;
+    out.push({ id, label: c.label ?? c.name ?? String(c.value ?? id) });
+  }
+  return out.length ? out : undefined;
+}
+
+// Extract the display-side metadata APS attaches to each customAttribute entry.
+// Returns undefined when nothing useful was present, so the caller can elide
+// the field on the Rfi and keep cached payloads small.
+export function extractCustomAttributesMeta(
+  raw: RawRfiCustomAttributes | unknown,
+): Record<string, ObservedCustomAttrMeta> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: Record<string, ObservedCustomAttrMeta> = {};
+  let any = false;
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const it = item as RawRfiCustomAttr;
+    const id = it.id ?? it.attributeDefinitionId;
+    if (typeof id !== "string" || !id) continue;
+    const name = it.name ?? it.title ?? it.displayName ?? it.attributeName;
+    const dataType = normalizeAttrType(it.dataType ?? it.type);
+    const values = normalizeChoices(it.options ?? it.choices ?? it.possibleValues);
+    if (name || dataType || values) {
+      out[id] = { name, dataType, values };
+      any = true;
+    }
+  }
+  return any ? out : undefined;
+}
+
 function normalizeParty(
   raw: RawRfiParty | null | undefined,
 ): { id: string; name: string } | undefined {
@@ -207,6 +315,7 @@ export function normalizeRfi(raw: unknown): Rfi {
       : Array.isArray(r.attachments)
         ? r.attachments.length
         : 0;
+  const meta = extractCustomAttributesMeta(r.customAttributes);
   return {
     id: r.id ?? "",
     number: r.number ?? "",
@@ -220,6 +329,7 @@ export function normalizeRfi(raw: unknown): Rfi {
     question: r.question,
     officialResponse: r.officialResponse,
     customAttributes: normalizeCustomAttributes(r.customAttributes),
+    ...(meta ? { customAttributesMeta: meta } : {}),
     attachmentCount,
   };
 }

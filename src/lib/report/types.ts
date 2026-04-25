@@ -86,7 +86,7 @@ export interface ReportTemplate {
   sort: SortSpec[];
   groupBy?: FieldId;
   output: OutputFormat;
-  pageSize?: "A4" | "Letter";
+  pageSize?: "A4" | "A3";
   orientation?: "portrait" | "landscape";
   brandId?: string;
   createdAt: string;

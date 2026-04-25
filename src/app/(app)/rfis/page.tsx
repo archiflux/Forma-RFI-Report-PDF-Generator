@@ -9,24 +9,24 @@ import { RfiGrid } from "@/components/rfi-grid";
 import { Button } from "@/components/ui/button";
 
 function MetadataBanner({
-  attrsInferred,
+  attrsMissingTitles,
   workflowMissing,
 }: {
-  attrsInferred: boolean;
+  attrsMissingTitles: boolean;
   workflowMissing: boolean;
 }) {
-  if (!attrsInferred && !workflowMissing) return null;
+  if (!attrsMissingTitles && !workflowMissing) return null;
   return (
     <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <p className="font-medium">Limited project metadata</p>
       <ul className="mt-1 list-disc pl-5 text-xs">
-        {attrsInferred ? (
+        {attrsMissingTitles ? (
           <li>
-            Custom-attribute <strong>definitions</strong> are hidden by Forma
-            (usually because you don&apos;t have <em>Manage Custom Attributes</em>
-            permission on this project). Columns for custom fields show their
-            raw IDs and values instead of friendly names. RFIs, custom values,
-            and export all still work.
+            One or more custom-field titles couldn&apos;t be resolved (Forma
+            didn&apos;t include them in the RFI payload and you don&apos;t have
+            <em> Manage Custom Attributes</em> permission). Those columns show
+            their raw IDs as the header. Filtering, sorting, and export still
+            work.
           </li>
         ) : null}
         {workflowMissing ? (
@@ -52,7 +52,7 @@ function RfisInner() {
     isLoading,
     isError,
     error,
-    attrsInferred,
+    attrsMissingTitles,
     workflowMissing,
     shouldHydrate,
     hydrating,
@@ -108,7 +108,7 @@ function RfisInner() {
         </div>
       </div>
 
-      <MetadataBanner attrsInferred={attrsInferred} workflowMissing={workflowMissing} />
+      <MetadataBanner attrsMissingTitles={attrsMissingTitles} workflowMissing={workflowMissing} />
 
       {!isLoading && !isError && (shouldHydrate || hydrating || hydrated) ? (
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">

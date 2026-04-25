@@ -22,11 +22,21 @@ function read(projectId: string): ReportTemplate[] {
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as ReportTemplate[];
-    return [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(migrateTemplate);
   } catch {
     return [];
   }
+}
+
+// Forward-migrate templates whose pageSize predates the A4/A3-only set
+// (older builds offered "Letter"). Anything we don't recognise gets folded
+// to A4 so the UI never tries to render an unsupported size.
+function migrateTemplate(t: unknown): ReportTemplate {
+  const r = t as ReportTemplate;
+  const pageSize: ReportTemplate["pageSize"] =
+    r.pageSize === "A3" ? "A3" : "A4";
+  return { ...r, pageSize };
 }
 
 function write(projectId: string, templates: ReportTemplate[]): void {

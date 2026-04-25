@@ -28,8 +28,14 @@ function BuilderInner() {
     isLoading,
     isError,
     error,
-    attrsInferred,
+    attrsMissingTitles,
     workflowMissing,
+    shouldHydrate,
+    hydrating,
+    hydrationProgress,
+    hydrateError,
+    hydrated,
+    hydrate,
   } = useRfiData(projectId);
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -128,16 +134,63 @@ function BuilderInner() {
         </p>
       ) : null}
 
-      {attrsInferred || workflowMissing ? (
+      {!isLoading && !isError && (shouldHydrate || hydrating || hydrated) ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          {hydrated ? (
+            <p className="font-medium">
+              Loaded full RFI detail — custom fields are now selectable.
+            </p>
+          ) : hydrating ? (
+            <>
+              <p className="font-medium">
+                Loading full RFI detail (
+                {hydrationProgress?.hydrated ?? 0} / {hydrationProgress?.total ?? rfis.length})
+              </p>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-blue-100">
+                <div
+                  className="h-full bg-blue-600 transition-[width]"
+                  style={{
+                    width: `${
+                      hydrationProgress && hydrationProgress.total > 0
+                        ? (hydrationProgress.hydrated / hydrationProgress.total) * 100
+                        : 5
+                    }%`,
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium">Custom fields not in the search response</p>
+                <p className="mt-1 text-xs">
+                  Click below to fetch each RFI&apos;s full detail individually
+                  so custom fields appear in the field picker, filters, and
+                  exported reports.
+                </p>
+              </div>
+              <Button size="sm" onClick={hydrate}>
+                Load full RFI detail
+              </Button>
+            </div>
+          )}
+          {hydrateError ? (
+            <p role="alert" className="mt-2 text-xs text-red-700">
+              {hydrateError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {attrsMissingTitles || workflowMissing ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p className="font-medium">Limited project metadata</p>
           <ul className="mt-1 list-disc pl-5 text-xs">
-            {attrsInferred ? (
+            {attrsMissingTitles ? (
               <li>
-                Custom-attribute definitions are hidden by Forma. Custom fields
-                appear with raw IDs and values, and choice filters aren&apos;t
-                available. Ask a project admin to grant <em>Manage Custom
-                Attributes</em> permission if you need full labels.
+                One or more custom-field titles couldn&apos;t be resolved. Those
+                columns use the raw attribute id as the header. Filtering and
+                export still work.
               </li>
             ) : null}
             {workflowMissing ? (

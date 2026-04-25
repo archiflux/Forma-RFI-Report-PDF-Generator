@@ -195,6 +195,105 @@ describe("inferCustomAttributesFromRfis", () => {
   });
 });
 
+describe("metadata extraction", () => {
+  it("captures name + dataType + choices from per-RFI customAttribute entries", () => {
+    const r = normalizeRfi({
+      id: "r1",
+      customAttributes: [
+        {
+          id: "disc",
+          name: "Discipline",
+          dataType: "single_choice",
+          options: [
+            { id: "arch", label: "Architecture" },
+            { id: "struct", label: "Structural" },
+          ],
+          values: ["arch"],
+        },
+      ],
+    });
+    expect(r.customAttributes).toEqual({ disc: ["arch"] });
+    expect(r.customAttributesMeta).toEqual({
+      disc: {
+        name: "Discipline",
+        dataType: "singleChoice",
+        values: [
+          { id: "arch", label: "Architecture" },
+          { id: "struct", label: "Structural" },
+        ],
+      },
+    });
+  });
+
+  it("accepts title/displayName/attributeName as alternate name keys", () => {
+    const r = normalizeRfi({
+      customAttributes: [{ id: "a", title: "Alpha", values: ["x"] }],
+    });
+    expect(r.customAttributesMeta?.a?.name).toBe("Alpha");
+  });
+
+  it("normalises various dataType spellings to the internal union", () => {
+    const r = normalizeRfi({
+      customAttributes: [
+        { id: "t", type: "TEXT", values: ["x"] },
+        { id: "n", type: "Decimal", values: [1.5] },
+        { id: "s", type: "single_choice", values: ["y"] },
+        { id: "m", type: "multi-select", values: ["a", "b"] },
+      ],
+    });
+    expect(r.customAttributesMeta?.t?.dataType).toBe("text");
+    expect(r.customAttributesMeta?.n?.dataType).toBe("numeric");
+    expect(r.customAttributesMeta?.s?.dataType).toBe("singleChoice");
+    expect(r.customAttributesMeta?.m?.dataType).toBe("multiChoice");
+  });
+
+  it("omits customAttributesMeta entirely when no entry carries metadata", () => {
+    const r = normalizeRfi({
+      customAttributes: [{ id: "a", values: ["x"] }],
+    });
+    expect(r.customAttributesMeta).toBeUndefined();
+  });
+
+  it("inferCustomAttributesFromRfis prefers names from observed metadata over raw ids", () => {
+    const rfis = [
+      normalizeRfi({
+        customAttributes: [{ id: "disc", name: "Discipline", values: ["x"] }],
+      }),
+      // A second RFI without metadata for the same attribute shouldn't clobber.
+      normalizeRfi({
+        customAttributes: [{ id: "disc", values: ["y"] }],
+      }),
+    ];
+    const out = inferCustomAttributesFromRfis(rfis);
+    const disc = out.find((a) => a.id === "disc");
+    expect(disc?.name).toBe("Discipline");
+    expect(disc?.inferred).toBe(true);
+  });
+
+  it("inferCustomAttributesFromRfis surfaces choice catalogues from observed options", () => {
+    const rfis = [
+      normalizeRfi({
+        customAttributes: [
+          {
+            id: "disc",
+            name: "Discipline",
+            options: [
+              { id: "arch", label: "Architecture" },
+              { id: "struct", label: "Structural" },
+            ],
+            values: ["arch"],
+          },
+        ],
+      }),
+    ];
+    const disc = inferCustomAttributesFromRfis(rfis).find((a) => a.id === "disc");
+    expect(disc?.values).toEqual([
+      { id: "arch", label: "Architecture" },
+      { id: "struct", label: "Structural" },
+    ]);
+  });
+});
+
 describe("rfisHaveCustomAttributes", () => {
   it("is false when no RFI carries any custom values", () => {
     expect(rfisHaveCustomAttributes([normalizeRfi({})])).toBe(false);

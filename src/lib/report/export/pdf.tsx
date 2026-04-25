@@ -19,7 +19,11 @@ export interface PdfBuildInput {
   totalAfterFilter: number;
 }
 
-function makeStyles(brand: Brand) {
+function makeStyles(
+  brand: Brand,
+  bodyFontSize: number = 8,
+  headerFontSize: number = 7.5,
+) {
   return StyleSheet.create({
     page: {
       paddingTop: 40,
@@ -137,11 +141,11 @@ function makeStyles(brand: Brand) {
     },
     tableCell: {
       padding: 4,
-      fontSize: 8,
+      fontSize: bodyFontSize,
       lineHeight: 1.3,
     },
     tableCellHeader: {
-      fontSize: 7.5,
+      fontSize: headerFontSize,
       fontFamily: "Helvetica-Bold",
       color: brand.primary,
       textTransform: "uppercase",
@@ -236,6 +240,54 @@ function percentWidths(fields: FieldId[]): string[] {
   return weights.map((w) => `${((w / total) * 100).toFixed(3)}%`);
 }
 
+// Page dimensions in PDF points (1pt = 1/72 inch). Used to compute the
+// available content width for the auto-fit pass.
+const PAGE_DIMENSIONS = {
+  A4: { width: 595.28, height: 841.89 },
+  A3: { width: 841.89, height: 1190.55 },
+} as const;
+
+const PAGE_PADDING_HORIZONTAL = 36; // matches styles.page paddingHorizontal
+
+// Approximate the on-page width (in pt) of a header label at a given font
+// size. Helvetica-Bold averages ~0.6em per character; we add a small padding
+// for the cell's left+right inset.
+function estimateColumnMinWidth(label: string, fontSize: number): number {
+  const charWidth = fontSize * 0.6;
+  const padding = 8;
+  return Math.max(28, label.length * charWidth + padding);
+}
+
+// Default header font size; auto-fit can shrink down to MIN_FONT_SIZE.
+const HEADER_FONT_SIZE_DEFAULT = 7.5;
+const MIN_FONT_SIZE = 5.5;
+
+// Auto-fit: if the natural minimum width of all column headers at the default
+// font size exceeds the page's content width, shrink the font size until they
+// fit. Returns { headerFontSize, bodyFontSize, scale } so styles can adapt.
+function autoFitFontSizes(
+  fields: FieldId[],
+  customAttributes: CustomAttributeDef[],
+  pageWidth: number,
+): { headerFontSize: number; bodyFontSize: number } {
+  const contentWidth = pageWidth - PAGE_PADDING_HORIZONTAL * 2;
+  const labels = fields.map((f) => labelForField(f, customAttributes));
+  const minWidthAtDefault = labels.reduce(
+    (sum, l) => sum + estimateColumnMinWidth(l, HEADER_FONT_SIZE_DEFAULT),
+    0,
+  );
+  if (minWidthAtDefault <= contentWidth) {
+    return { headerFontSize: HEADER_FONT_SIZE_DEFAULT, bodyFontSize: 8 };
+  }
+  // Min widths scale linearly with font size. Solve for the largest font that fits.
+  const scale = contentWidth / minWidthAtDefault;
+  const headerFontSize = Math.max(MIN_FONT_SIZE, HEADER_FONT_SIZE_DEFAULT * scale);
+  // Body text is normally ~0.5pt larger than the header — keep that ratio so
+  // headers stay visually distinct even when shrunk.
+  const bodyFontSize = Math.max(MIN_FONT_SIZE, 8 * scale);
+  return { headerFontSize, bodyFontSize };
+}
+
 export function ReportPdf({
   template,
   groups,
@@ -246,10 +298,24 @@ export function ReportPdf({
   totalBeforeFilter,
   totalAfterFilter,
 }: PdfBuildInput) {
-  const styles = makeStyles(brand);
-  // @react-pdf/renderer PageSize is case-sensitive: "A4", "LETTER", etc.
-  const size: "A4" | "LETTER" = template.pageSize === "Letter" ? "LETTER" : "A4";
-  const orientation = template.orientation ?? "portrait";
+  // Default to A4 if the template carries an unknown page size — handles
+  // legacy templates that may have been saved with "Letter" before the
+  // option was removed.
+  const size: "A4" | "A3" = template.pageSize === "A3" ? "A3" : "A4";
+  const orientation: "portrait" | "landscape" =
+    template.orientation === "landscape" ? "landscape" : "portrait";
+
+  // Compute the actual page-content width (in pt) so we can auto-fit the
+  // table. Landscape swaps width/height.
+  const dims = PAGE_DIMENSIONS[size];
+  const pageWidth = orientation === "landscape" ? dims.height : dims.width;
+
+  const { headerFontSize, bodyFontSize } = autoFitFontSizes(
+    template.fields,
+    customAttributes,
+    pageWidth,
+  );
+  const styles = makeStyles(brand, bodyFontSize, headerFontSize);
   const widths = percentWidths(template.fields);
   const filterLines = describeFilter(template, customAttributes);
 
