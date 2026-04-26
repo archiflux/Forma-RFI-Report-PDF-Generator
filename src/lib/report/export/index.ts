@@ -8,11 +8,16 @@ import type { Rfi } from "@/lib/aps/types";
 import { buildCsv, csvBlob } from "./csv";
 import { downloadBlob, safeFilename } from "./download";
 
+export type ItemKind = "rfi" | "issue";
+
 export interface ExportInput {
   template: ReportTemplate;
   rfis: Rfi[];
   customAttributes: CustomAttributeDef[];
   projectName: string;
+  // Drives PDF cover wording ("RFI report" vs "Issue report") and the
+  // metadata grid label ("RFIs in report" vs "Issues in report").
+  itemKind?: ItemKind;
 }
 
 export async function exportReport({
@@ -20,6 +25,7 @@ export async function exportReport({
   rfis,
   customAttributes,
   projectName,
+  itemKind = "rfi",
 }: ExportInput): Promise<void> {
   const { groups, filtered } = applyTemplate(rfis, template, customAttributes);
 
@@ -40,6 +46,7 @@ export async function exportReport({
     brand: resolveBrand(template.brandId),
     totalBeforeFilter: rfis.length,
     totalAfterFilter: filtered.length,
+    itemKind,
   });
   downloadBlob(blob, safeFilename(template.name, "pdf"));
 }

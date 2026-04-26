@@ -30,7 +30,7 @@ const MAX_TOTAL = 5000;
 //   }
 // Note that `type` is usually "text" even for choice fields — the actual
 // dataType is inferred from `multipleChoice` + non-empty `possibleValues`.
-interface RawAttrDef {
+export interface RawAttrDef {
   id?: string;
   name?: string;
   type?: string;
@@ -39,7 +39,7 @@ interface RawAttrDef {
   possibleValues?: Array<{ id?: string; name?: string; label?: string; value?: unknown }>;
 }
 
-function attrDefDataType(raw: RawAttrDef): CustomAttributeType {
+export function attrDefDataType(raw: RawAttrDef): CustomAttributeType {
   const t = raw.type?.toLowerCase().replace(/[_\s-]/g, "");
   if (t === "numeric" || t === "number" || t === "integer" || t === "decimal") {
     return "numeric";
@@ -50,7 +50,7 @@ function attrDefDataType(raw: RawAttrDef): CustomAttributeType {
   return "text";
 }
 
-function attrDefChoices(
+export function attrDefChoices(
   raw: RawAttrDef,
 ): { id: string; label: string }[] | undefined {
   if (!Array.isArray(raw.possibleValues) || raw.possibleValues.length === 0) {
@@ -65,6 +65,23 @@ function attrDefChoices(
   return out.length ? out : undefined;
 }
 
+// Shared parser: takes raw `{results: RawAttrDef[]}` from either the RFI
+// /attributes endpoint or the Issues /issue-attribute-definitions endpoint
+// and produces a clean CustomAttributeDef[].
+export function parseAttributeDefs(results: RawAttrDef[] | undefined): CustomAttributeDef[] {
+  return (results ?? []).flatMap((raw) => {
+    if (typeof raw?.id !== "string" || !raw.id) return [];
+    const def: CustomAttributeDef = {
+      id: raw.id,
+      name: raw.name ?? raw.id,
+      dataType: attrDefDataType(raw),
+    };
+    const values = attrDefChoices(raw);
+    if (values) def.values = values;
+    return [def];
+  });
+}
+
 export async function listCustomAttributes(
   client: ApsClient,
   projectId: string,
@@ -74,17 +91,7 @@ export async function listCustomAttributes(
     const res = await client.request<{ results?: RawAttrDef[] }>({
       path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/attributes`,
     });
-    return (res.results ?? []).flatMap((raw) => {
-      if (typeof raw?.id !== "string" || !raw.id) return [];
-      const def: CustomAttributeDef = {
-        id: raw.id,
-        name: raw.name ?? raw.id,
-        dataType: attrDefDataType(raw),
-      };
-      const values = attrDefChoices(raw);
-      if (values) def.values = values;
-      return [def];
-    });
+    return parseAttributeDefs(res.results);
   } catch (e) {
     // /attributes is officially gated behind data:read+data:write+data:create
     // (per the APS Postman collection). When even those scopes don't help —

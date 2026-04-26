@@ -17,6 +17,7 @@ export interface PdfBuildInput {
   generatedAt?: Date;
   totalBeforeFilter: number;
   totalAfterFilter: number;
+  itemKind?: "rfi" | "issue";
 }
 
 function makeStyles(
@@ -214,7 +215,7 @@ function describeFilter(
   if (template.groupBy) {
     lines.push(`Grouped by ${labelForField(template.groupBy, customAttributes)}`);
   }
-  if (lines.length === 0) lines.push("No filters applied — all RFIs included.");
+  if (lines.length === 0) lines.push("No filters applied — all items included.");
   return lines;
 }
 
@@ -297,7 +298,10 @@ export function ReportPdf({
   generatedAt = new Date(),
   totalBeforeFilter,
   totalAfterFilter,
+  itemKind = "rfi",
 }: PdfBuildInput) {
+  const itemNoun = itemKind === "issue" ? "Issue" : "RFI";
+  const itemNounPlural = itemKind === "issue" ? "Issues" : "RFIs";
   // Default to A4 if the template carries an unknown page size — handles
   // legacy templates that may have been saved with "Letter" before the
   // option was removed.
@@ -323,7 +327,7 @@ export function ReportPdf({
     <Document
       title={template.name}
       author={brand.name}
-      subject={`RFI report — ${projectName}`}
+      subject={`${itemNoun} report — ${projectName}`}
     >
       {/* Cover page */}
       <Page size={size} orientation={orientation} style={styles.page}>
@@ -342,7 +346,7 @@ export function ReportPdf({
             </Text>
           </View>
           <View style={styles.coverMetaCell}>
-            <Text style={styles.coverMetaLabel}>RFIs in report</Text>
+            <Text style={styles.coverMetaLabel}>{itemNounPlural} in report</Text>
             <Text style={styles.coverMetaValue}>
               {totalAfterFilter.toLocaleString()} of {totalBeforeFilter.toLocaleString()}
             </Text>
@@ -386,7 +390,9 @@ export function ReportPdf({
         </View>
 
         {totalAfterFilter === 0 ? (
-          <Text style={styles.noRows}>No RFIs match the current filters.</Text>
+          <Text style={styles.noRows}>
+            No {itemNounPlural.toLowerCase()} match the current filters.
+          </Text>
         ) : (
           groups.map((group) => (
             <View key={group.key}>
