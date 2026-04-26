@@ -28,10 +28,37 @@ function rfi(custom: Record<string, unknown>): Rfi {
 }
 
 describe("listCustomAttributes — permission handling", () => {
-  it("returns the definitions when APS responds 200", async () => {
+  it("parses APS's actual response shape (type + multipleChoice + possibleValues)", async () => {
+    // Mirrors the documented shape from the APS Postman collection:
+    //   { id, name, type, multipleChoice, possibleValues: [{ id, name }] }
     const fetchImpl = vi.fn(async () =>
       new Response(
-        JSON.stringify({ results: [{ id: "a", name: "A", dataType: "text" }] }),
+        JSON.stringify({
+          results: [
+            { id: "txt", name: "Notes", type: "text", multipleChoice: false, possibleValues: [] },
+            { id: "num", name: "Cost", type: "numeric", multipleChoice: false, possibleValues: [] },
+            {
+              id: "disc",
+              name: "Discipline",
+              type: "text",
+              multipleChoice: false,
+              possibleValues: [
+                { id: "arch", name: "Architecture" },
+                { id: "struct", name: "Structural" },
+              ],
+            },
+            {
+              id: "tags",
+              name: "Tags",
+              type: "text",
+              multipleChoice: true,
+              possibleValues: [
+                { id: "urgent", name: "Urgent" },
+                { id: "external", name: "External" },
+              ],
+            },
+          ],
+        }),
         { status: 200 },
       ),
     );
@@ -40,8 +67,33 @@ describe("listCustomAttributes — permission handling", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
     const attrs = await listCustomAttributes(client, "p");
-    expect(attrs).toHaveLength(1);
-    expect(attrs[0]?.id).toBe("a");
+    expect(attrs).toHaveLength(4);
+    const by = Object.fromEntries(attrs.map((a) => [a.id, a]));
+    expect(by.txt?.name).toBe("Notes");
+    expect(by.txt?.dataType).toBe("text");
+    expect(by.num?.dataType).toBe("numeric");
+    expect(by.disc?.dataType).toBe("singleChoice");
+    expect(by.disc?.values).toEqual([
+      { id: "arch", label: "Architecture" },
+      { id: "struct", label: "Structural" },
+    ]);
+    expect(by.tags?.dataType).toBe("multiChoice");
+    expect(by.tags?.values).toHaveLength(2);
+  });
+
+  it("skips definitions missing an id", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ results: [{ name: "no id" }, { id: "ok", name: "OK", type: "text" }] }),
+        { status: 200 },
+      ),
+    );
+    const client = new ApsClient({
+      getAccessToken: () => "t",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const attrs = await listCustomAttributes(client, "p");
+    expect(attrs.map((a) => a.id)).toEqual(["ok"]);
   });
 
   it("returns [] on 403 so callers can degrade gracefully", async () => {

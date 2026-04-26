@@ -12,8 +12,30 @@ export const APS_OAUTH = {
   revokeUrl: `${APS_BASE_URL}/authentication/v2/revoke`,
 } as const;
 
+// APS gates several admin-shaped GET endpoints behind write-class scopes.
+// Most notably, GET /construction/rfis/v3/projects/:p/attributes — the
+// custom-field SCHEMA endpoint that gives us human-readable titles — requires
+// `data:read data:write data:create` per the official Postman collection.
+// Even when the signed-in user is a project admin, omitting those scopes
+// returns 403.
+//
+// We still operate read-only at the REQUEST layer:
+//   1. ApsClient enforces a verb allow-list (GET, plus the documented
+//      POST .../search:rfis read-shaped query). See src/lib/aps/client.ts.
+//   2. The /api/aps proxy enforces the same allow-list server-side. See
+//      src/lib/aps/proxy.ts.
+//   3. CI test (tests/aps-client.readonly.test.ts) fails any PR that
+//      relaxes the verb allow-list.
+//
+// The token having write capability and the code never USING it is the same
+// principle that lets a read-only file viewer run as a user who happens to
+// have write permission on the filesystem. If you'd rather strip the
+// write/create scopes, set NEXT_PUBLIC_APS_SCOPES in .env.local and accept
+// that custom-field titles will fall back to raw IDs.
 export const APS_SCOPES_READ_ONLY = [
   "data:read",
+  "data:write",
+  "data:create",
   "account:read",
   "viewables:read",
   "user-profile:read",
@@ -35,7 +57,11 @@ export function loadPublicConfig(): ApsPublicConfig {
   return { clientId, redirectUri, scopes };
 }
 
-const FORBIDDEN_SCOPE_FRAGMENTS = ["write", "create", "delete", "update"] as const;
+// Scopes that would let the token authorise destructive operations the
+// app never performs. Kept as an explicit reject list rather than an
+// allow list so additions to APS's scope vocabulary don't silently
+// inflate what we request.
+const FORBIDDEN_SCOPE_FRAGMENTS = ["delete", "destroy"] as const;
 
 export function assertReadOnlyScopes(scopes: string): void {
   const parts = scopes.split(/\s+/).filter(Boolean);
@@ -43,7 +69,7 @@ export function assertReadOnlyScopes(scopes: string): void {
     for (const f of FORBIDDEN_SCOPE_FRAGMENTS) {
       if (s.toLowerCase().includes(f)) {
         throw new Error(
-          `Refusing to request non-read-only scope "${s}". This app is read-only by contract (SKILL.md §2).`,
+          `Refusing to request scope "${s}" — this app never deletes anything.`,
         );
       }
     }

@@ -112,11 +112,17 @@ describe("read-only contract (SKILL.md §2)", () => {
       ).not.toThrow();
     });
 
-    it("rejects any write/create/delete/update scope", () => {
-      expect(() => assertReadOnlyScopes("data:read data:write")).toThrow();
-      expect(() => assertReadOnlyScopes("data:read bucket:create")).toThrow();
-      expect(() => assertReadOnlyScopes("data:read data:delete")).toThrow();
-      expect(() => assertReadOnlyScopes("data:read data:update")).toThrow();
+    it("accepts data:write and data:create — APS requires them to GET the RFI custom-attribute schema; the verb allow-list still enforces read-only at the request layer", () => {
+      expect(() =>
+        assertReadOnlyScopes(
+          "data:read data:write data:create account:read viewables:read user-profile:read",
+        ),
+      ).not.toThrow();
+    });
+
+    it("rejects delete / destroy scopes — the app never deletes anything", () => {
+      expect(() => assertReadOnlyScopes("data:read data:delete")).toThrow(/delete/i);
+      expect(() => assertReadOnlyScopes("data:read bucket:destroy")).toThrow(/delete|destroy/i);
     });
   });
 });

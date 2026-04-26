@@ -14,21 +14,80 @@ import {
 const DEFAULT_PAGE_SIZE = 200;
 const MAX_TOTAL = 5000;
 
+// Shape of GET /construction/rfis/v3/projects/:p/attributes per the official
+// Postman collection:
+//   {
+//     "results": [{
+//       "id": "<uuid>",
+//       "name": "Discipline",
+//       "type": "text",
+//       "description": "...",
+//       "multipleChoice": false,
+//       "possibleValues": [{ "id": "<uuid>", "name": "Architecture" }]
+//     }]
+//   }
+// Note that `type` is usually "text" even for choice fields — the actual
+// dataType is inferred from `multipleChoice` + non-empty `possibleValues`.
+interface RawAttrDef {
+  id?: string;
+  name?: string;
+  type?: string;
+  description?: string;
+  multipleChoice?: boolean;
+  possibleValues?: Array<{ id?: string; name?: string; label?: string; value?: unknown }>;
+}
+
+function attrDefDataType(raw: RawAttrDef): CustomAttributeType {
+  const t = raw.type?.toLowerCase().replace(/[_\s-]/g, "");
+  if (t === "numeric" || t === "number" || t === "integer" || t === "decimal") {
+    return "numeric";
+  }
+  const hasChoices = Array.isArray(raw.possibleValues) && raw.possibleValues.length > 0;
+  if (raw.multipleChoice === true) return "multiChoice";
+  if (hasChoices) return "singleChoice";
+  return "text";
+}
+
+function attrDefChoices(
+  raw: RawAttrDef,
+): { id: string; label: string }[] | undefined {
+  if (!Array.isArray(raw.possibleValues) || raw.possibleValues.length === 0) {
+    return undefined;
+  }
+  const out: { id: string; label: string }[] = [];
+  for (const v of raw.possibleValues) {
+    const id = v?.id ?? (typeof v?.value === "string" ? v.value : undefined);
+    if (typeof id !== "string" || !id) continue;
+    out.push({ id, label: v.label ?? v.name ?? String(v.value ?? id) });
+  }
+  return out.length ? out : undefined;
+}
+
 export async function listCustomAttributes(
   client: ApsClient,
   projectId: string,
 ): Promise<CustomAttributeDef[]> {
   const p = normaliseProjectIdForRfi(projectId);
   try {
-    const res = await client.request<{ results?: CustomAttributeDef[] }>({
+    const res = await client.request<{ results?: RawAttrDef[] }>({
       path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/attributes`,
     });
-    return res.results ?? [];
+    return (res.results ?? []).flatMap((raw) => {
+      if (typeof raw?.id !== "string" || !raw.id) return [];
+      const def: CustomAttributeDef = {
+        id: raw.id,
+        name: raw.name ?? raw.id,
+        dataType: attrDefDataType(raw),
+      };
+      const values = attrDefChoices(raw);
+      if (values) def.values = values;
+      return [def];
+    });
   } catch (e) {
-    // The /attributes endpoint requires "Manage Custom Attributes" project
-    // permission (admin-ish). Non-admins get 403 here even when they can
-    // read RFIs fine via /search:rfis. We fall back to an empty list and
-    // let the caller infer minimal defs from the RFI payloads themselves.
+    // /attributes is officially gated behind data:read+data:write+data:create
+    // (per the APS Postman collection). When even those scopes don't help —
+    // typically because the signed-in user isn't a project admin — fall back
+    // to the per-RFI metadata + inference path so the app still works.
     if (e instanceof ApsError && (e.status === 401 || e.status === 403)) {
       return [];
     }

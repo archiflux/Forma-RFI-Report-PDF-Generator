@@ -117,9 +117,15 @@ Rationale for each pick lives in `SKILL.md` §3.
 - **Memory-resident access token.** The access token is held in a React/Zustand
   store — never in `localStorage`. The refresh token lives in `sessionStorage`
   (tab lifetime) and is wiped on sign-out.
-- **Read-only scopes only.** `data:read account:read viewables:read
-  user-profile:read`. No `*:write`, `*:create`, or `*:delete` scope is ever
-  requested; adding one would be a blocking code review comment.
+- **Read-only at the request layer.** Three layers of defence enforce that
+  only `GET` and the documented `POST .../search:rfis` ever leave the app:
+  the `ApsClient` verb allow-list, the `/api/aps` proxy's matching server-side
+  allow-list, and a CI test that fails any PR weakening either. The token
+  itself carries `data:read data:write data:create account:read viewables:read
+  user-profile:read` — the write/create scopes are required by APS to GET the
+  custom-attribute schema (`/construction/rfis/v3/.../attributes`), but the
+  code can't actually write because the verb allow-list blocks every non-GET.
+  `*:delete` and `*:destroy` scopes remain explicitly forbidden.
 - **No data leaves the browser.** PDFs and CSVs are built client-side and
   downloaded via `Blob` URLs. Nothing we host ever sees an RFI.
 - **CSP** locked down to `connect-src https://developer.api.autodesk.com`
@@ -201,7 +207,7 @@ Open `.env.local` in a text editor and paste your Client ID:
 
 ```
 NEXT_PUBLIC_APS_CLIENT_ID=paste-your-client-id-here
-NEXT_PUBLIC_APS_SCOPES=data:read account:read viewables:read user-profile:read
+NEXT_PUBLIC_APS_SCOPES=data:read data:write data:create account:read viewables:read user-profile:read
 NEXT_PUBLIC_APS_REDIRECT_URI=http://localhost:3000/auth/callback
 ```
 
