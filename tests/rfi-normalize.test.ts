@@ -84,18 +84,57 @@ describe("normalizeRfi", () => {
     expect(r.attachmentCount).toBe(0);
   });
 
-  it("normalises assignee/manager via id/userId/autodeskId + name/displayName/email", () => {
+  it("collapses APS RFI v3 assignedTo array into the assignees list", () => {
+    // APS v3 returns assignedTo as `[{ id, type }]` — id-only references.
+    // The roster pass later resolves names; the normaliser just collects.
     const r = normalizeRfi({
-      assignee: { userId: "u1", displayName: "Alice" },
-      manager: { id: "u2", name: "Bob" },
+      assignedTo: [
+        { id: "u1", type: "user" },
+        { id: "u2", type: "user" },
+      ],
+      manager: { id: "u3", name: "Cara" },
     });
-    expect(r.assignee).toEqual({ id: "u1", name: "Alice" });
-    expect(r.manager).toEqual({ id: "u2", name: "Bob" });
+    expect(r.assignees).toEqual([
+      { id: "u1", name: "u1" },
+      { id: "u2", name: "u2" },
+    ]);
+    expect(r.manager).toEqual({ id: "u3", name: "Cara" });
   });
 
-  it("falls back to assignedTo when assignee is missing", () => {
-    const r = normalizeRfi({ assignedTo: { id: "u", name: "X" } });
-    expect(r.assignee).toEqual({ id: "u", name: "X" });
+  it("tolerates a single { id, type } object instead of an array", () => {
+    const r = normalizeRfi({ assignedTo: { id: "u", type: "user" } });
+    expect(r.assignees).toEqual([{ id: "u", name: "u" }]);
+  });
+
+  it("merges a populated `assignee` object into assignees alongside assignedTo", () => {
+    const r = normalizeRfi({
+      assignee: { userId: "u1", displayName: "Alice" },
+      assignedTo: [{ id: "u2", type: "user" }],
+    });
+    expect(r.assignees).toEqual([
+      { id: "u1", name: "Alice" },
+      { id: "u2", name: "u2" },
+    ]);
+  });
+
+  it("uses customIdentifier as the human RFI number", () => {
+    expect(normalizeRfi({ customIdentifier: "RFI-001" }).number).toBe("RFI-001");
+    expect(normalizeRfi({ identifier: "RFI-002" }).number).toBe("RFI-002");
+    expect(normalizeRfi({ rfiNumber: "RFI-003" }).number).toBe("RFI-003");
+  });
+
+  it("normalises attachments + derives count when an explicit count is missing", () => {
+    const r = normalizeRfi({
+      attachments: [
+        { attachmentId: "a1", fileName: "spec.pdf", displayName: "Spec.pdf" },
+        { id: "a2", fileName: "drawing.pdf" },
+      ],
+    });
+    expect(r.attachmentCount).toBe(2);
+    expect(r.attachments).toEqual([
+      { id: "a1", fileName: "spec.pdf", displayName: "Spec.pdf" },
+      { id: "a2", fileName: "drawing.pdf" },
+    ]);
   });
 
   it("derives attachmentCount from attachments array if explicit count is missing", () => {

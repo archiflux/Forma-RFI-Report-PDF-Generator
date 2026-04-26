@@ -23,6 +23,8 @@ function rfi(custom: Record<string, unknown>): Rfi {
     status: "open",
     createdAt: "2026-01-01T00:00:00Z",
     customAttributes: asValuesRecord(custom),
+    assignees: [],
+    attachments: [],
     attachmentCount: 0,
   };
 }

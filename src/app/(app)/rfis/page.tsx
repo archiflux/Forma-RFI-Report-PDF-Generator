@@ -60,7 +60,8 @@ function RfisInner() {
     hydrateError,
     hydrated,
     hydrate,
-  } = useRfiData(projectId);
+    projectName,
+  } = useRfiData(projectId, hubId);
 
   const statusLabels = useMemo(
     () => (workflow.length ? buildStatusLabelMap(workflow) : undefined),
@@ -85,7 +86,14 @@ function RfisInner() {
         <div>
           <h2 className="text-xl font-semibold">RFIs</h2>
           <p className="mt-1 text-sm text-neutral-600">
-            Project{" "}
+            {projectName ? (
+              <>
+                <span className="font-medium text-[color:var(--brand-ink)]">
+                  {projectName}
+                </span>
+                <span className="text-neutral-400"> · </span>
+              </>
+            ) : null}
             <code className="rounded bg-neutral-100 px-1">{projectId}</code>
           </p>
         </div>
@@ -176,7 +184,12 @@ function RfisInner() {
       ) : null}
 
       {!isLoading && !isError ? (
-        <RfiGrid rfis={rfis} customAttributes={attrs} statusLabels={statusLabels} />
+        <RfiGrid
+          rfis={rfis}
+          customAttributes={attrs}
+          statusLabels={statusLabels}
+          projectId={projectId}
+        />
       ) : null}
     </section>
   );

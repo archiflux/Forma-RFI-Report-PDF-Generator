@@ -42,6 +42,15 @@ export interface RfiParty {
   name: string;
 }
 
+export interface RfiAttachment {
+  id: string;
+  fileName?: string;
+  displayName?: string;
+  storageUrn?: string;
+  attachmentType?: string;
+  url?: string; // optional direct Forma deep link if APS returned one
+}
+
 export interface Rfi {
   id: string;
   number: string;
@@ -50,7 +59,9 @@ export interface Rfi {
   statusLabel?: string;
   createdAt: string;
   dueDate?: string;
-  assignee?: RfiParty;
+  // APS RFI v3 returns assignedTo as an array of { id, type } — we resolve
+  // ids to names in a post-pass once the project user roster is loaded.
+  assignees: RfiParty[];
   manager?: RfiParty;
   question?: string;
   officialResponse?: string;
@@ -66,6 +77,7 @@ export interface Rfi {
   // when the /attributes schema endpoint is forbidden). The inferrer pulls
   // friendly names from here so non-admins can still see real titles.
   customAttributesMeta?: Record<string, ObservedCustomAttrMeta>;
+  attachments: RfiAttachment[];
   attachmentCount: number;
 }
 

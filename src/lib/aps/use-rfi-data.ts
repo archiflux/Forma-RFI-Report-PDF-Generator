@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  applyUserRoster,
   hydrateRfis,
   type HydrationProgress,
   listCustomAttributes,
@@ -10,16 +11,19 @@ import {
   rfisHaveCustomAttributes,
   scrapeAllRfis,
 } from "./rfis";
+import { getProjectName } from "./projects";
+import { buildUserRoster, getProjectUsers } from "./users";
 import { getWorkflow } from "./workflow";
 import { useApsClient } from "./use-client";
 import type { Rfi } from "./types";
 
 // 10 minutes — RFIs don't change that fast and the user is about to export them.
 const STALE_MS = 10 * 60_000;
+const PROJECT_META_STALE_MS = 60 * 60_000; // user roster + name barely change
 
 const HYDRATED_KEY = (projectId: string) => ["rfis-hydrated", projectId] as const;
 
-export function useRfiData(projectId: string) {
+export function useRfiData(projectId: string, hubId?: string) {
   const client = useApsClient();
   const qc = useQueryClient();
   const enabled = Boolean(projectId);
@@ -45,6 +49,22 @@ export function useRfiData(projectId: string) {
     staleTime: STALE_MS,
   });
 
+  // Project user roster — used to resolve assignedTo[] ids to display names.
+  const usersQ = useQuery({
+    queryKey: ["project-users", projectId],
+    queryFn: () => getProjectUsers(client, projectId),
+    enabled,
+    staleTime: PROJECT_META_STALE_MS,
+  });
+
+  // Project display name — used in the PDF cover/footer and the page header.
+  const projectNameQ = useQuery({
+    queryKey: ["project-name", hubId, projectId],
+    queryFn: () => getProjectName(client, hubId ?? "", projectId),
+    enabled: enabled && Boolean(hubId),
+    staleTime: PROJECT_META_STALE_MS,
+  });
+
   // Hydrated copy — populated by hydrate() below, never auto-fetched.
   const hydratedQ = useQuery<Rfi[]>({
     queryKey: HYDRATED_KEY(projectId),
@@ -57,23 +77,26 @@ export function useRfiData(projectId: string) {
   const [hydrateError, setHydrateError] = useState<string | null>(null);
 
   const baseRfis = rfisQ.data ?? [];
-  const rfis = hydratedQ.data ?? baseRfis;
+  const baseOrHydrated = hydratedQ.data ?? baseRfis;
+
+  // Fold the user roster into RFIs once both queries have settled.
+  const userRoster = useMemo(
+    () => buildUserRoster(usersQ.data ?? []),
+    [usersQ.data],
+  );
+  const rfis = useMemo(
+    () => applyUserRoster(baseOrHydrated, userRoster),
+    [baseOrHydrated, userRoster],
+  );
 
   const mergedAttrs = useMemo(
     () => mergeCustomAttributes(attrsQ.data ?? [], rfis),
     [attrsQ.data, rfis],
   );
 
-  // True when at least one custom attribute couldn't be resolved to a
-  // friendly title — i.e. its display name fell back to the raw id because
-  // /attributes was forbidden AND the per-RFI metadata didn't carry a name.
-  // This is the only signal worth showing the user; "inferred" alone is now
-  // expected for any non-admin and isn't actionable.
   const attrsMissingTitles = mergedAttrs.some((a) => a.inferred && a.name === a.id);
   const workflowMissing = (workflowQ.data ?? []).length === 0 && Boolean(baseRfis.length);
 
-  // True when search:rfis returned RFIs but none carry customAttributes —
-  // the signal that hydration would actually add information.
   const searchHasCustomAttrs = rfisHaveCustomAttributes(baseRfis);
   const canHydrate = baseRfis.length > 0 && !hydratedQ.data && !hydrating;
   const shouldHydrate = canHydrate && !searchHasCustomAttrs;
@@ -99,6 +122,8 @@ export function useRfiData(projectId: string) {
     rfis,
     attrs: mergedAttrs,
     workflow: workflowQ.data ?? [],
+    projectName: projectNameQ.data,
+    userRoster,
     isLoading: rfisQ.isLoading || attrsQ.isLoading || workflowQ.isLoading,
     isError: rfisQ.isError,
     error: rfisQ.error,

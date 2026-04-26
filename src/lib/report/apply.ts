@@ -101,8 +101,9 @@ export function applyFilter(
     }
 
     if (assigneeNeedle) {
-      const name = r.assignee?.name?.toLowerCase() ?? "";
-      if (!name.includes(assigneeNeedle)) return false;
+      // Match if ANY assignee's name contains the needle (case-insensitive).
+      const names = (r.assignees ?? []).map((a) => a.name.toLowerCase());
+      if (!names.some((n) => n.includes(assigneeNeedle))) return false;
     }
 
     if (filter.dueDate && (filter.dueDate.gte || filter.dueDate.lte)) {

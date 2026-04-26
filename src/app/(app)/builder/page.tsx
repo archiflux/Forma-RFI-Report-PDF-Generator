@@ -36,7 +36,8 @@ function BuilderInner() {
     hydrateError,
     hydrated,
     hydrate,
-  } = useRfiData(projectId);
+    projectName,
+  } = useRfiData(projectId, hubId);
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
@@ -67,7 +68,7 @@ function BuilderInner() {
         template,
         rfis: rfisWithLabels,
         customAttributes: attrs,
-        projectName: projectId, // replaced with real project name in Phase 5/6
+        projectName: projectName ?? projectId,
       });
     } catch (e) {
       setExportErr(e instanceof Error ? e.message : String(e));
@@ -100,7 +101,14 @@ function BuilderInner() {
         <div>
           <h2 className="text-xl font-semibold">Report builder</h2>
           <p className="mt-1 text-sm text-neutral-600">
-            Project{" "}
+            {projectName ? (
+              <>
+                <span className="font-medium text-[color:var(--brand-ink)]">
+                  {projectName}
+                </span>
+                <span className="text-neutral-400"> · </span>
+              </>
+            ) : null}
             <code className="rounded bg-neutral-100 px-1">{projectId}</code>
             {isLoading ? " · loading RFIs…" : ` · ${rfis.length.toLocaleString()} RFIs loaded`}
           </p>

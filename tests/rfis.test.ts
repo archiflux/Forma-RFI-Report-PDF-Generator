@@ -11,6 +11,8 @@ function makeRfi(i: number): Rfi {
     status: "open",
     createdAt: "2026-01-01T00:00:00Z",
     customAttributes: {},
+    assignees: [],
+    attachments: [],
     attachmentCount: 0,
   };
 }

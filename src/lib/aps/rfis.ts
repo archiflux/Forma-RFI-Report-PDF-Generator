@@ -6,6 +6,8 @@ import {
   type CustomAttributeType,
   type ObservedCustomAttrMeta,
   type Rfi,
+  type RfiAttachment,
+  type RfiParty,
   type RfiScrapeProgress,
   type RfiSearchRequest,
   type RfiSearchResponse,
@@ -230,9 +232,32 @@ type RawRfiCustomAttributes =
   | Record<string, unknown>
   | RawRfiCustomAttr[];
 
+// APS RFI v3 commonly returns assignedTo as `[{ id, type }]` (an array of
+// references — multiple assignees are possible). Older / sibling APIs
+// occasionally return a single { id, type } object or a bare id string.
+type RawAssignedToEntry = { id?: string; type?: string; userId?: string } | string | null;
+type RawAssignedTo = RawAssignedToEntry | RawAssignedToEntry[] | null | undefined;
+
+interface RawRfiAttachment {
+  id?: string;
+  attachmentId?: string;
+  fileName?: string;
+  displayName?: string;
+  storageUrn?: string;
+  attachmentType?: string;
+  url?: string;
+  permittedActions?: unknown;
+}
+
 interface RawRfi {
   id?: string;
   number?: string;
+  // The user-facing RFI identifier (e.g. "RFI-001"). APS calls this
+  // `customIdentifier` on v3; older / sibling shapes use other names.
+  customIdentifier?: string;
+  identifier?: string;
+  displayId?: string;
+  rfiNumber?: string;
   title?: string;
   status?: string;
   statusLabel?: string;
@@ -240,12 +265,15 @@ interface RawRfi {
   dueDate?: string;
   assignee?: RawRfiParty | null;
   manager?: RawRfiParty | null;
-  assignedTo?: RawRfiParty | null;
+  assignedTo?: RawAssignedTo;
+  reviewer?: RawRfiParty | null;
+  managerUser?: RawRfiParty | null;
   question?: string;
   officialResponse?: string;
   customAttributes?: RawRfiCustomAttributes;
   attachmentCount?: number;
-  attachments?: unknown[];
+  attachments?: RawRfiAttachment[];
+  attachmentIds?: unknown[];
 }
 
 interface RawRfiSearchResponse {
@@ -366,29 +394,85 @@ function normalizeParty(
   return { id: id ?? "", name: name ?? id ?? "" };
 }
 
+// APS RFI v3 returns assignedTo as an array of references. Each reference
+// is { id, type } with no name attached — we resolve names later via the
+// project user roster. Tolerate the older single-object form, bare-id-string
+// form, and a missing field.
+function normalizeAssignees(raw: RawAssignedTo): RfiParty[] {
+  if (raw === null || raw === undefined) return [];
+  const items = Array.isArray(raw) ? raw : [raw];
+  const out: RfiParty[] = [];
+  for (const item of items) {
+    if (item === null || item === undefined) continue;
+    if (typeof item === "string") {
+      if (item) out.push({ id: item, name: item });
+      continue;
+    }
+    if (typeof item !== "object") continue;
+    const id = item.id ?? item.userId;
+    if (typeof id !== "string" || !id) continue;
+    out.push({ id, name: id }); // name is the id until the user-roster pass resolves it
+  }
+  return out;
+}
+
+function normalizeAttachments(raw: RawRfiAttachment[] | undefined): RfiAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RfiAttachment[] = [];
+  for (const a of raw) {
+    if (!a || typeof a !== "object") continue;
+    const id = a.id ?? a.attachmentId;
+    if (typeof id !== "string" || !id) continue;
+    out.push({
+      id,
+      ...(a.fileName ? { fileName: a.fileName } : {}),
+      ...(a.displayName ? { displayName: a.displayName } : {}),
+      ...(a.storageUrn ? { storageUrn: a.storageUrn } : {}),
+      ...(a.attachmentType ? { attachmentType: a.attachmentType } : {}),
+      ...(a.url ? { url: a.url } : {}),
+    });
+  }
+  return out;
+}
+
 export function normalizeRfi(raw: unknown): Rfi {
   const r = (raw && typeof raw === "object" ? (raw as RawRfi) : {}) as RawRfi;
+  const attachments = normalizeAttachments(r.attachments);
+  // Trust the explicit count if present; otherwise fall back to the raw
+  // observed array length (so we don't under-report when an attachment entry
+  // lacked an id and got filtered out of the normalised list); finally fall
+  // back to attachmentIds[].length.
   const attachmentCount =
     typeof r.attachmentCount === "number"
       ? r.attachmentCount
-      : Array.isArray(r.attachments)
+      : Array.isArray(r.attachments) && r.attachments.length > 0
         ? r.attachments.length
-        : 0;
+        : Array.isArray(r.attachmentIds)
+          ? r.attachmentIds.length
+          : 0;
   const meta = extractCustomAttributesMeta(r.customAttributes);
+  const assignees = normalizeAssignees(r.assignedTo);
+  // If APS gave us a fully-populated `assignee` object, fold it in too.
+  const legacyAssignee = normalizeParty(r.assignee);
+  if (legacyAssignee && !assignees.some((a) => a.id === legacyAssignee.id)) {
+    assignees.unshift(legacyAssignee);
+  }
+  const number = r.customIdentifier ?? r.identifier ?? r.displayId ?? r.rfiNumber ?? r.number ?? "";
   return {
     id: r.id ?? "",
-    number: r.number ?? "",
+    number,
     title: r.title ?? "",
     status: r.status ?? "",
     statusLabel: r.statusLabel,
     createdAt: r.createdAt ?? "",
     dueDate: r.dueDate,
-    assignee: normalizeParty(r.assignee ?? r.assignedTo),
-    manager: normalizeParty(r.manager),
+    assignees,
+    manager: normalizeParty(r.manager ?? r.managerUser ?? r.reviewer),
     question: r.question,
     officialResponse: r.officialResponse,
     customAttributes: normalizeCustomAttributes(r.customAttributes),
     ...(meta ? { customAttributesMeta: meta } : {}),
+    attachments,
     attachmentCount,
   };
 }
@@ -524,4 +608,24 @@ export function rfisHaveCustomAttributes(rfis: Rfi[]): boolean {
     if (ca && typeof ca === "object" && Object.keys(ca).length > 0) return true;
   }
   return false;
+}
+
+// Replace each RfiParty's `name` (which defaults to its id when normalised)
+// with the resolved display name from the project user roster. Pure / cheap —
+// runs in a useMemo so memoisation handles the cost.
+export function applyUserRoster(
+  rfis: Rfi[],
+  roster: ReadonlyMap<string, string>,
+): Rfi[] {
+  if (roster.size === 0) return rfis;
+  const fix = (p: RfiParty): RfiParty => {
+    const resolved = roster.get(p.id);
+    return resolved && resolved !== p.name ? { id: p.id, name: resolved } : p;
+  };
+  return rfis.map((r) => {
+    const assignees = r.assignees.map(fix);
+    const manager = r.manager ? fix(r.manager) : r.manager;
+    if (assignees === r.assignees && manager === r.manager) return r;
+    return { ...r, assignees, manager };
+  });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { useMemo, useState } from "react";
 import type { CustomAttributeDef, Rfi } from "@/lib/aps/types";
 import {
@@ -7,12 +8,14 @@ import {
   formatCustomAttributeValue,
   getBuiltinValue,
 } from "@/lib/rfi/format";
+import { rfiUrl } from "@/lib/aps/links";
 import { cn } from "@/lib/cn";
 
 interface Props {
   rfis: Rfi[];
   customAttributes: CustomAttributeDef[];
   statusLabels?: Map<string, string>;
+  projectId?: string;
 }
 
 function resolveStatusLabel(r: Rfi, map?: Map<string, string>): Rfi {
@@ -21,7 +24,55 @@ function resolveStatusLabel(r: Rfi, map?: Map<string, string>): Rfi {
   return label ? { ...r, statusLabel: label } : r;
 }
 
-export function RfiGrid({ rfis, customAttributes, statusLabels }: Props) {
+function renderBuiltinCell(
+  r: Rfi,
+  columnId: (typeof BUILTIN_COLUMNS)[number]["id"],
+  projectId?: string,
+): React.ReactNode {
+  if (columnId === "title") {
+    return <span className="font-medium">{getBuiltinValue(r, columnId)}</span>;
+  }
+  if (columnId === "number" && projectId && r.id) {
+    return (
+      <a
+        href={rfiUrl(projectId, r.id)}
+        target="_blank"
+        rel="noreferrer"
+        className="font-medium text-[color:var(--brand-primary)] hover:underline"
+      >
+        {getBuiltinValue(r, columnId) || "(unidentified)"}
+      </a>
+    );
+  }
+  if (columnId === "attachmentCount") {
+    const n = r.attachmentCount ?? 0;
+    if (n === 0) return "0";
+    // Drill-in via the RFI deep link — Forma's RFI page exposes the
+    // attachments tab. Embedding signed download URLs would require
+    // server-side calls per file and is left for a later phase.
+    if (projectId && r.id) {
+      return (
+        <a
+          href={rfiUrl(projectId, r.id)}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[color:var(--brand-primary)] hover:underline"
+          title={
+            (r.attachments ?? [])
+              .map((a) => a.displayName ?? a.fileName ?? a.id)
+              .join("\n") || undefined
+          }
+        >
+          {n} {n === 1 ? "file" : "files"}
+        </a>
+      );
+    }
+    return String(n);
+  }
+  return getBuiltinValue(r, columnId);
+}
+
+export function RfiGrid({ rfis, customAttributes, statusLabels, projectId }: Props) {
   const [query, setQuery] = useState("");
 
   const rows = useMemo(() => {
@@ -33,7 +84,7 @@ export function RfiGrid({ rfis, customAttributes, statusLabels }: Props) {
         r.number,
         r.title,
         r.statusLabel ?? r.status,
-        r.assignee?.name,
+        ...(r.assignees ?? []).map((a) => a.name),
         r.question,
       ]
         .filter(Boolean)
@@ -93,11 +144,7 @@ export function RfiGrid({ rfis, customAttributes, statusLabels }: Props) {
               >
                 {BUILTIN_COLUMNS.map((c) => (
                   <td key={c.id} className="px-3 py-2 align-top text-neutral-800">
-                    {c.id === "title" ? (
-                      <span className="font-medium">{getBuiltinValue(r, c.id)}</span>
-                    ) : (
-                      getBuiltinValue(r, c.id)
-                    )}
+                    {renderBuiltinCell(r, c.id, projectId)}
                   </td>
                 ))}
                 {customAttributes.map((a) => (

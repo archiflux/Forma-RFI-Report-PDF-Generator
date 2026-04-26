@@ -94,7 +94,7 @@ export function getBuiltinValue(rfi: Rfi, column: BuiltinFieldId): string {
     case "statusLabel":
       return rfi.statusLabel ?? rfi.status;
     case "assignee":
-      return rfi.assignee?.name ?? "";
+      return (rfi.assignees ?? []).map((a) => a.name).filter(Boolean).join(", ");
     case "manager":
       return rfi.manager?.name ?? "";
     case "dueDate":

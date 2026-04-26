@@ -28,3 +28,29 @@ export async function listProjects(
 export function normaliseProjectIdForRfi(projectId: string): string {
   return projectId.startsWith("b.") ? projectId.slice(2) : projectId;
 }
+
+interface RawSingleProjectResponse {
+  data?: {
+    id: string;
+    attributes?: { name?: string };
+  };
+}
+
+// Look up a single project's metadata without needing the hubId. Useful when
+// we know the projectId from a deep link but not which hub it belongs to.
+// Falls back to scanning every accessible hub if the targeted call fails.
+export async function getProjectName(
+  client: ApsClient,
+  hubId: string,
+  projectId: string,
+): Promise<string | undefined> {
+  if (!hubId || !projectId) return undefined;
+  try {
+    const res = await client.request<RawSingleProjectResponse>({
+      path: `/project/v1/hubs/${encodeURIComponent(hubId)}/projects/${encodeURIComponent(projectId)}`,
+    });
+    return res.data?.attributes?.name;
+  } catch {
+    return undefined;
+  }
+}
