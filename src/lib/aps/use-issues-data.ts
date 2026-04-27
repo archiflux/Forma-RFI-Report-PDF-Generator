@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   hydrateIssues,
@@ -16,12 +16,14 @@ import {
 import { getProjectName } from "./projects";
 import { buildUserRoster, getProjectUsers } from "./users";
 import { useApsClient } from "./use-client";
+import { readHydrated, writeHydrated } from "./hydration-cache";
 import type { Rfi } from "./types";
 
 const STALE_MS = 10 * 60_000;
 const PROJECT_META_STALE_MS = 60 * 60_000;
 
 const HYDRATED_KEY = (projectId: string) => ["issues-hydrated", projectId] as const;
+const HYDRATED_PREFIX = "issues";
 
 export function useIssuesData(projectId: string, hubId?: string) {
   const client = useApsClient();
@@ -56,11 +58,24 @@ export function useIssuesData(projectId: string, hubId?: string) {
     staleTime: PROJECT_META_STALE_MS,
   });
 
+  // gcTime: Infinity so the hydrated payload survives a brief observerless
+  // window during /issues → /issues/builder navigation. See use-rfi-data.ts
+  // for the rationale.
   const hydratedQ = useQuery<Rfi[]>({
     queryKey: HYDRATED_KEY(projectId),
     enabled: false,
     staleTime: STALE_MS,
+    gcTime: Infinity,
   });
+
+  useEffect(() => {
+    if (!projectId) return;
+    if (qc.getQueryData<Rfi[]>(HYDRATED_KEY(projectId))) return;
+    const stored = readHydrated(HYDRATED_PREFIX, projectId);
+    if (stored && stored.length > 0) {
+      qc.setQueryData(HYDRATED_KEY(projectId), stored);
+    }
+  }, [projectId, qc]);
 
   const [hydrationProgress, setHydrationProgress] = useState<IssueHydrationProgress | null>(null);
   const [hydrating, setHydrating] = useState(false);
@@ -104,6 +119,7 @@ export function useIssuesData(projectId: string, hubId?: string) {
         { comments: opts.comments ?? false },
       );
       qc.setQueryData(HYDRATED_KEY(projectId), full);
+      writeHydrated(HYDRATED_PREFIX, projectId, full);
       return applyUserRoster(full, userRoster);
     } catch (e) {
       setHydrateError(e instanceof Error ? e.message : String(e));

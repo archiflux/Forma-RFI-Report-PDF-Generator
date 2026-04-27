@@ -1,6 +1,15 @@
 "use client";
 
-import { Document, Link, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
+import {
+  Document,
+  Font,
+  Link,
+  Page,
+  StyleSheet,
+  Text,
+  View,
+  pdf,
+} from "@react-pdf/renderer";
 import type { CustomAttributeDef, Rfi } from "@/lib/aps/types";
 import type { Brand } from "@/lib/brands";
 import { DEFAULT_BRAND } from "@/lib/brands";
@@ -14,6 +23,20 @@ import {
 import type { RfiGroup } from "../apply";
 import type { FieldId, ReportTemplate } from "../types";
 import { customAttrId, isCustomField } from "../types";
+
+// Register a global hyphenation callback so @react-pdf can break long
+// unbroken strings (URLs, attachment paths, signed-URL query strings,
+// custom-id codes) at safe positions. Without this, an 800-char URL in an
+// RFI question forces the flexbox layout engine to push coords past
+// pdf-lib's serialiser limits, surfacing as
+//   "unsupported number: -1.6897464143597548e+22".
+// Module-load side-effect is fine — the callback is idempotent and the
+// detail PDF module is dynamic-imported only when an export runs.
+const HYPHEN_CHUNK = 40;
+Font.registerHyphenationCallback((word) => {
+  if (word.length <= HYPHEN_CHUNK) return [word];
+  return word.match(new RegExp(`.{1,${HYPHEN_CHUNK}}`, "g")) ?? [word];
+});
 
 export interface DetailPdfInput {
   template: ReportTemplate;
@@ -337,153 +360,172 @@ export function DetailPdf({
         </View>
       </Page>
 
-      {/* Detail pages — one section per RFI/Issue, grouped if requested. */}
-      <Page size={size} orientation={orientation} style={styles.page}>
-        <View style={styles.pageHeader} fixed>
-          <Text style={styles.pageHeaderTitle}>{template.name}</Text>
-          <Text style={styles.pageHeaderMeta}>
-            {projectName} · {generatedAt.toISOString().slice(0, 10)}
-          </Text>
-        </View>
-
-        {totalAfterFilter === 0 ? (
-          <Text style={{ marginTop: 30, fontSize: 10, color: brand.muted, textAlign: "center" }}>
+      {/* Empty-state page when filters exclude everything. */}
+      {totalAfterFilter === 0 ? (
+        <Page size={size} orientation={orientation} style={styles.page}>
+          <View style={styles.pageHeader} fixed>
+            <Text style={styles.pageHeaderTitle}>{template.name}</Text>
+            <Text style={styles.pageHeaderMeta}>
+              {projectName} · {generatedAt.toISOString().slice(0, 10)}
+            </Text>
+          </View>
+          <Text
+            style={{
+              marginTop: 30,
+              fontSize: 10,
+              color: brand.muted,
+              textAlign: "center",
+            }}
+          >
             No {itemNounPlural.toLowerCase()} match the current filters.
           </Text>
-        ) : (
-          groups.map((group, gi) => (
-            <View key={group.key}>
-              {groups.length > 1 ? (
+          <View style={styles.footer} fixed>
+            <Text>{brand.name} · {projectName}</Text>
+            <Text
+              render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+            />
+          </View>
+        </Page>
+      ) : null}
+
+      {/* One Page per RFI/Issue. Letting <Page wrap> handle long content
+          inside a single item is robust; chaining many items inside one
+          <Page wrap> with manual `break` props is the pattern that
+          historically blew up @react-pdf's flex layout (out-of-range
+          coords → "unsupported number" pdf-lib error). */}
+      {groups.flatMap((group) =>
+        group.rfis.map((rfi, ri) => {
+          const link = projectId ? linkBase(projectId, rfi.id) : undefined;
+          const showGroupHeading = groups.length > 1 && ri === 0;
+          return (
+            <Page
+              key={`${group.key}-${rfi.id}`}
+              size={size}
+              orientation={orientation}
+              style={styles.page}
+              wrap
+            >
+              <View style={styles.pageHeader} fixed>
+                <Text style={styles.pageHeaderTitle}>{template.name}</Text>
+                <Text style={styles.pageHeaderMeta}>
+                  {projectName} · {generatedAt.toISOString().slice(0, 10)}
+                </Text>
+              </View>
+
+              {showGroupHeading ? (
                 <Text style={styles.sectionHeading}>
                   {group.label} · {group.rfis.length}
                 </Text>
               ) : null}
 
-              {group.rfis.map((rfi, ri) => {
-                const link = projectId ? linkBase(projectId, rfi.id) : undefined;
-                const isLast = ri === group.rfis.length - 1 && gi === groups.length - 1;
-                // Force a page break before every RFI except the first. We
-                // pass the prop only when we want it set — explicitly
-                // passing `break={false}` hits a different code path in
-                // @react-pdf that can produce out-of-range layout coords.
-                const breakProps = ri > 0 || gi > 0 ? { break: true as const } : {};
+              <View style={styles.rfiHeader}>
+                <Text style={styles.rfiNumber}>
+                  {rfi.number || rfi.id} · {rfi.statusLabel ?? rfi.status}
+                </Text>
+                <Text style={styles.rfiTitle}>{rfi.title || "(untitled)"}</Text>
+                {link ? (
+                  <Link src={link} style={styles.rfiLink}>
+                    {link}
+                  </Link>
+                ) : null}
+              </View>
 
-                return (
-                  <View key={rfi.id} wrap {...breakProps}>
-                    <View style={styles.rfiHeader}>
-                      <Text style={styles.rfiNumber}>
-                        {rfi.number || rfi.id} · {rfi.statusLabel ?? rfi.status}
-                      </Text>
-                      <Text style={styles.rfiTitle}>{rfi.title || "(untitled)"}</Text>
-                      {link ? (
-                        <Link src={link} style={styles.rfiLink}>
-                          {link}
-                        </Link>
-                      ) : null}
-                    </View>
-
-                    {/* Meta grid — every selected field except the "wide" ones */}
-                    {fieldsForMeta.length > 0 ? (
-                      <View style={styles.metaGrid}>
-                        {fieldsForMeta.map((f) => {
-                          const value = fieldValueString(rfi, f, customAttributes);
-                          if (!value) return null;
-                          const wide = WIDE_FIELDS.has(f);
-                          return (
-                            <View
-                              key={f}
-                              style={wide ? styles.metaCellWide : styles.metaCell}
-                            >
-                              <Text style={styles.metaLabel}>
-                                {labelForField(f, customAttributes)}
-                              </Text>
-                              <Text style={styles.metaValue}>{value}</Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    ) : null}
-
-                    {rfi.question ? (
-                      <View>
-                        <Text style={styles.sectionHeading}>Question</Text>
-                        <Text style={styles.paragraph}>{rfi.question}</Text>
-                      </View>
-                    ) : null}
-
-                    {rfi.suggestedAnswer ? (
-                      <View>
-                        <Text style={styles.sectionHeading}>Suggested answer</Text>
-                        <Text style={styles.paragraph}>{rfi.suggestedAnswer}</Text>
-                      </View>
-                    ) : null}
-
-                    {rfi.officialResponse ? (
-                      <View>
-                        <Text style={styles.sectionHeading}>Official response</Text>
-                        <Text style={styles.paragraph}>{rfi.officialResponse}</Text>
-                      </View>
-                    ) : null}
-
-                    {rfi.attachments && rfi.attachments.length > 0 ? (
-                      <View>
-                        <Text style={styles.sectionHeading}>
-                          Attachments ({rfi.attachments.length})
+              {fieldsForMeta.length > 0 ? (
+                <View style={styles.metaGrid}>
+                  {fieldsForMeta.map((f) => {
+                    const value = fieldValueString(rfi, f, customAttributes);
+                    if (!value) return null;
+                    const wide = WIDE_FIELDS.has(f);
+                    return (
+                      <View
+                        key={f}
+                        style={wide ? styles.metaCellWide : styles.metaCell}
+                      >
+                        <Text style={styles.metaLabel}>
+                          {labelForField(f, customAttributes)}
                         </Text>
-                        <View style={styles.attachmentsList}>
-                          {rfi.attachments.map((a) => (
-                            <View key={a.id} style={styles.attachmentRow}>
-                              <Text style={styles.attachmentBullet}>•</Text>
-                              <Text style={styles.attachmentName}>
-                                {a.displayName || a.fileName || a.id}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                        {link ? (
-                          <Link src={link} style={styles.paragraphSmall}>
-                            Open in Forma →
-                          </Link>
-                        ) : null}
+                        <Text style={styles.metaValue}>{value}</Text>
                       </View>
-                    ) : null}
+                    );
+                  })}
+                </View>
+              ) : null}
 
-                    {showComments && rfi.comments && rfi.comments.length > 0 ? (
-                      <View>
-                        <Text style={styles.sectionHeading}>
-                          Comments ({rfi.comments.length})
+              {rfi.question ? (
+                <View>
+                  <Text style={styles.sectionHeading}>Question</Text>
+                  <Text style={styles.paragraph}>{rfi.question}</Text>
+                </View>
+              ) : null}
+
+              {rfi.suggestedAnswer ? (
+                <View>
+                  <Text style={styles.sectionHeading}>Suggested answer</Text>
+                  <Text style={styles.paragraph}>{rfi.suggestedAnswer}</Text>
+                </View>
+              ) : null}
+
+              {rfi.officialResponse ? (
+                <View>
+                  <Text style={styles.sectionHeading}>Official response</Text>
+                  <Text style={styles.paragraph}>{rfi.officialResponse}</Text>
+                </View>
+              ) : null}
+
+              {rfi.attachments && rfi.attachments.length > 0 ? (
+                <View>
+                  <Text style={styles.sectionHeading}>
+                    Attachments ({rfi.attachments.length})
+                  </Text>
+                  <View style={styles.attachmentsList}>
+                    {rfi.attachments.map((a) => (
+                      <View key={a.id} style={styles.attachmentRow}>
+                        <Text style={styles.attachmentBullet}>•</Text>
+                        <Text style={styles.attachmentName}>
+                          {a.displayName || a.fileName || a.id}
                         </Text>
-                        {rfi.comments.map((c) => (
-                          <View key={c.id} style={styles.commentBlock}>
-                            <Text style={styles.commentMeta}>
-                              {c.author?.name ?? "Unknown"}
-                              {c.createdAt ? ` · ${formatDate(c.createdAt)}` : ""}
-                              {c.isOfficialResponse ? "  " : ""}
-                              {c.isOfficialResponse ? (
-                                <Text style={styles.officialBadge}>OFFICIAL RESPONSE</Text>
-                              ) : null}
-                            </Text>
-                            <Text style={styles.commentBody}>{c.body}</Text>
-                          </View>
-                        ))}
                       </View>
-                    ) : null}
-
-                    {!isLast ? <View style={styles.rfiSeparator} /> : null}
+                    ))}
                   </View>
-                );
-              })}
-            </View>
-          ))
-        )}
+                  {link ? (
+                    <Link src={link} style={styles.paragraphSmall}>
+                      Open in Forma →
+                    </Link>
+                  ) : null}
+                </View>
+              ) : null}
 
-        <View style={styles.footer} fixed>
-          <Text>{brand.name} · {projectName}</Text>
-          <Text
-            render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-          />
-        </View>
-      </Page>
+              {showComments && rfi.comments && rfi.comments.length > 0 ? (
+                <View>
+                  <Text style={styles.sectionHeading}>
+                    Comments ({rfi.comments.length})
+                  </Text>
+                  {rfi.comments.map((c) => (
+                    <View key={c.id} style={styles.commentBlock} wrap={false}>
+                      <Text style={styles.commentMeta}>
+                        {c.author?.name ?? "Unknown"}
+                        {c.createdAt ? ` · ${formatDate(c.createdAt)}` : ""}
+                        {c.isOfficialResponse ? "  " : ""}
+                        {c.isOfficialResponse ? (
+                          <Text style={styles.officialBadge}>OFFICIAL RESPONSE</Text>
+                        ) : null}
+                      </Text>
+                      <Text style={styles.commentBody}>{c.body}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <View style={styles.footer} fixed>
+                <Text>{brand.name} · {projectName}</Text>
+                <Text
+                  render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+                />
+              </View>
+            </Page>
+          );
+        }),
+      )}
     </Document>
   );
 }

@@ -38,6 +38,21 @@ export const useAuth = create<AuthState>((set, get) => ({
   signOut: async () => {
     const current = get().tokens;
     set({ tokens: null });
+    // Drop any cached RFI/Issue payloads so the next sign-in (which may be
+    // a different Autodesk user) doesn't see the previous user's data.
+    if (typeof window !== "undefined") {
+      try {
+        const ss = window.sessionStorage;
+        const drop: string[] = [];
+        for (let i = 0; i < ss.length; i++) {
+          const k = ss.key(i);
+          if (k && k.startsWith("forma-rfi:")) drop.push(k);
+        }
+        for (const k of drop) ss.removeItem(k);
+      } catch {
+        // sessionStorage blocked — nothing to clean up.
+      }
+    }
     await apsSignOut(current?.accessToken ?? null);
   },
 }));
