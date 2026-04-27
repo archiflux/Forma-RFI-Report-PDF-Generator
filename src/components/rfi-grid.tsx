@@ -103,28 +103,28 @@ export function RfiGrid({
   }, [rfis, query, statusLabels]);
 
   return (
-    <div className="mt-4 rounded-xl bg-white shadow-sm ring-1 ring-neutral-200">
-      <div className="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3">
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[color:var(--brand-border)] bg-white shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--brand-border)] px-4 py-3">
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by number, title, status, assignee…"
-          className="w-full max-w-sm rounded-md border border-neutral-300 px-3 py-1.5 text-sm focus:border-[color:var(--brand-primary)] focus:outline-none"
+          className="w-full max-w-sm rounded-lg border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20"
         />
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-[color:var(--brand-muted)]">
           {rows.length.toLocaleString()} of {rfis.length.toLocaleString()}
         </p>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-neutral-200 text-sm">
-          <thead className="bg-neutral-50">
+        <table className="min-w-full divide-y divide-[color:var(--brand-border)] text-sm">
+          <thead className="bg-[color:var(--brand-canvas)]">
             <tr>
               {BUILTIN_COLUMNS.map((c) => (
                 <th
                   key={c.id}
-                  className="sticky top-0 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-700"
+                  className="sticky top-0 bg-[color:var(--brand-canvas)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--brand-secondary)]"
                   scope="col"
                 >
                   {c.label}
@@ -133,30 +133,30 @@ export function RfiGrid({
               {customAttributes.map((a) => (
                 <th
                   key={a.id}
-                  className="sticky top-0 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-700"
+                  className="sticky top-0 bg-[color:var(--brand-canvas)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--brand-secondary)]"
                   scope="col"
                 >
                   {a.name}
-                  <span className="ml-1 text-[10px] font-normal text-neutral-400">
+                  <span className="ml-1 text-[10px] font-normal text-[color:var(--brand-muted)]">
                     (custom)
                   </span>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-[color:var(--brand-border)]">
             {rows.map((r, i) => (
               <tr
                 key={r.id}
-                className={cn(i % 2 === 1 ? "bg-neutral-50/50" : "")}
+                className={cn(i % 2 === 1 ? "bg-[color:var(--brand-canvas)]/60" : "")}
               >
                 {BUILTIN_COLUMNS.map((c) => (
-                  <td key={c.id} className="px-3 py-2 align-top text-neutral-800">
+                  <td key={c.id} className="px-3 py-2 align-top text-[color:var(--brand-ink)]">
                     {renderBuiltinCell(r, c.id, projectId, buildUrl)}
                   </td>
                 ))}
                 {customAttributes.map((a) => (
-                  <td key={a.id} className="px-3 py-2 align-top text-neutral-800">
+                  <td key={a.id} className="px-3 py-2 align-top text-[color:var(--brand-ink)]">
                     {formatCustomAttributeValue(a, r.customAttributes[a.id])}
                   </td>
                 ))}
@@ -165,7 +165,7 @@ export function RfiGrid({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  className="px-3 py-6 text-center text-neutral-500"
+                  className="px-3 py-6 text-center text-[color:var(--brand-muted)]"
                   colSpan={BUILTIN_COLUMNS.length + customAttributes.length}
                 >
                   No {itemKind === "issue" ? "issues" : "RFIs"} match this filter.

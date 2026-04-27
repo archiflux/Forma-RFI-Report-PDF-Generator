@@ -106,68 +106,93 @@ function BuilderInner() {
 
   const exportReady = !isLoading && !isError && template.fields.length > 0 && rfis.length > 0;
 
+  const isRateLimited = /\b429\b|rate[- ]?limit/i.test(
+    error instanceof Error ? error.message : "",
+  );
+
   return (
     <section className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">Report builder</h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            {projectName ? (
-              <>
-                <span className="font-medium text-[color:var(--brand-ink)]">
-                  {projectName}
-                </span>
-                <span className="text-neutral-400"> · </span>
-              </>
-            ) : null}
-            <code className="rounded bg-neutral-100 px-1">{projectId}</code>
-            {isLoading ? " · loading RFIs…" : ` · ${rfis.length.toLocaleString()} RFIs loaded`}
-          </p>
+      <div className="rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
+              Report builder
+            </p>
+            <h2 className="mt-1 truncate text-xl font-semibold text-[color:var(--brand-primary)] sm:text-2xl">
+              {projectName ?? "Project"}
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--brand-muted)]">
+              {isLoading
+                ? "Loading RFIs…"
+                : `${rfis.length.toLocaleString()} ${rfis.length === 1 ? "RFI" : "RFIs"} loaded`}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href={`/rfis?hubId=${encodeURIComponent(hubId)}&projectId=${encodeURIComponent(projectId)}`}
+              className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline"
+            >
+              ← Back to RFIs
+            </Link>
+            <Button
+              size="md"
+              disabled={!exportReady || exporting}
+              onClick={onExport}
+            >
+              {exporting ? "Generating…" : `Export ${template.output.toUpperCase()}`}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/rfis?hubId=${encodeURIComponent(hubId)}&projectId=${encodeURIComponent(projectId)}`}
-            className="text-sm text-neutral-500 underline"
-          >
-            Back to RFIs
-          </Link>
-          <Button
-            size="md"
-            disabled={!exportReady || exporting}
-            onClick={onExport}
-          >
-            {exporting ? "Generating…" : `Export → ${template.output.toUpperCase()}`}
-          </Button>
-        </div>
+        <div
+          aria-hidden
+          className="mt-5 h-1 w-16 rounded-full bg-[color:var(--brand-accent)]"
+        />
       </div>
 
       {exportErr ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
           Export failed: {exportErr}
         </p>
       ) : null}
 
       {isError ? (
-        <p role="alert" className="text-sm text-red-600">
-          {error instanceof Error ? error.message : "Failed to load project data."}
-        </p>
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <p className="font-semibold">
+            {isRateLimited
+              ? "Forma is rate-limiting this project"
+              : "Failed to load project data"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-red-700/90">
+            {isRateLimited
+              ? "Large projects can hit Autodesk's burst limits. The app already retries automatically — wait a minute and try again, or apply tighter filters before loading."
+              : error instanceof Error
+                ? error.message
+                : "Try refreshing this page."}
+          </p>
+        </div>
       ) : null}
 
       {!isLoading && !isError && (shouldHydrate || hydrating || hydrated) ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <div className="rounded-xl border border-[color:var(--brand-secondary)]/20 bg-[color:var(--brand-secondary)]/5 px-4 py-3 text-sm text-[color:var(--brand-secondary)]">
           {hydrated ? (
-            <p className="font-medium">
+            <p className="font-semibold">
               Loaded full RFI detail — custom fields are now selectable.
             </p>
           ) : hydrating ? (
             <>
-              <p className="font-medium">
+              <p className="font-semibold">
                 Loading full RFI detail (
                 {hydrationProgress?.hydrated ?? 0} / {hydrationProgress?.total ?? rfis.length})
               </p>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-blue-100">
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--brand-secondary)]/15">
                 <div
-                  className="h-full bg-blue-600 transition-[width]"
+                  className="h-full bg-[color:var(--brand-secondary)] transition-[width]"
                   style={{
                     width: `${
                       hydrationProgress && hydrationProgress.total > 0
@@ -179,16 +204,16 @@ function BuilderInner() {
               </div>
             </>
           ) : (
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium">Custom fields not in the search response</p>
-                <p className="mt-1 text-xs">
-                  Click below to fetch each RFI&apos;s full detail individually
-                  so custom fields appear in the field picker, filters, and
-                  exported reports.
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">Custom fields not in the search response</p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  Fetch each RFI&apos;s full detail individually so custom
+                  fields appear in the field picker, filters, and exported
+                  reports.
                 </p>
               </div>
-              <Button size="sm" onClick={() => hydrate()}>
+              <Button size="sm" variant="secondary" onClick={() => hydrate()}>
                 Load full RFI detail
               </Button>
             </div>
@@ -202,8 +227,8 @@ function BuilderInner() {
       ) : null}
 
       {attrsMissingTitles || workflowMissing ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-medium">Limited project metadata</p>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Limited project metadata</p>
           <ul className="mt-1 list-disc pl-5 text-xs">
             {attrsMissingTitles ? (
               <li>
@@ -225,7 +250,7 @@ function BuilderInner() {
         onTemplateChange={setTemplate}
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         <FieldPicker
           fields={template.fields}
           onChange={(fields) => setTemplate({ ...template, fields })}
@@ -237,7 +262,7 @@ function BuilderInner() {
           customAttributes={attrs}
           workflow={workflow}
         />
-        <div className="space-y-6">
+        <div className="space-y-6 md:col-span-2 xl:col-span-1">
           <SortPicker
             sort={template.sort}
             onChange={(sort) => setTemplate({ ...template, sort })}

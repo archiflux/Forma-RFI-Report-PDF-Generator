@@ -17,8 +17,8 @@ function MetadataBanner({
 }) {
   if (!attrsMissingTitles && !workflowMissing) return null;
   return (
-    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      <p className="font-medium">Limited project metadata</p>
+    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <p className="font-semibold">Limited project metadata</p>
       <ul className="mt-1 list-disc pl-5 text-xs">
         {attrsMissingTitles ? (
           <li>
@@ -80,59 +80,68 @@ function RfisInner() {
     );
   }
 
+  const isRateLimited = /\b429\b|rate[- ]?limit/i.test(
+    error instanceof Error ? error.message : "",
+  );
+
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">RFIs</h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            {projectName ? (
-              <>
-                <span className="font-medium text-[color:var(--brand-ink)]">
-                  {projectName}
-                </span>
-                <span className="text-neutral-400"> · </span>
-              </>
-            ) : null}
-            <code className="rounded bg-neutral-100 px-1">{projectId}</code>
-          </p>
+      <div className="rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
+              Step 3 of 3 · RFIs
+            </p>
+            <h2 className="mt-1 truncate text-2xl font-semibold text-[color:var(--brand-primary)]">
+              {projectName ?? "Project RFIs"}
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--brand-muted)]">
+              {isLoading
+                ? "Loading RFIs…"
+                : `${rfis.length.toLocaleString()} ${rfis.length === 1 ? "RFI" : "RFIs"} loaded`}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href={`/projects?hubId=${encodeURIComponent(hubId)}`}
+              className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline"
+            >
+              ← Change project
+            </Link>
+            <Button
+              disabled={isLoading || rfis.length === 0}
+              onClick={() => {
+                const qs = new URLSearchParams({ hubId, projectId }).toString();
+                window.location.assign(`/builder?${qs}`);
+              }}
+            >
+              Build report →
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Link
-            href={`/projects?hubId=${encodeURIComponent(hubId)}`}
-            className="self-center text-sm text-neutral-500 underline"
-          >
-            Change project
-          </Link>
-          <Button
-            disabled={isLoading || rfis.length === 0}
-            onClick={() => {
-              const qs = new URLSearchParams({ hubId, projectId }).toString();
-              window.location.assign(`/builder?${qs}`);
-            }}
-          >
-            Build report →
-          </Button>
-        </div>
+        <div
+          aria-hidden
+          className="mt-5 h-1 w-16 rounded-full bg-[color:var(--brand-accent)]"
+        />
       </div>
 
       <MetadataBanner attrsMissingTitles={attrsMissingTitles} workflowMissing={workflowMissing} />
 
       {!isLoading && !isError && (shouldHydrate || hydrating || hydrated) ? (
-        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <div className="mt-4 rounded-xl border border-[color:var(--brand-secondary)]/20 bg-[color:var(--brand-secondary)]/5 px-4 py-3 text-sm text-[color:var(--brand-secondary)]">
           {hydrated ? (
-            <p className="font-medium">
+            <p className="font-semibold">
               Loaded full RFI detail — custom fields are now populated.
             </p>
           ) : hydrating ? (
             <>
-              <p className="font-medium">
+              <p className="font-semibold">
                 Loading full RFI detail (
                 {hydrationProgress?.hydrated ?? 0} / {hydrationProgress?.total ?? rfis.length})
               </p>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-blue-100">
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--brand-secondary)]/15">
                 <div
-                  className="h-full bg-blue-600 transition-[width]"
+                  className="h-full bg-[color:var(--brand-secondary)] transition-[width]"
                   style={{
                     width: `${
                       hydrationProgress && hydrationProgress.total > 0
@@ -144,18 +153,18 @@ function RfisInner() {
               </div>
             </>
           ) : (
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium">Custom fields not in the search response</p>
-                <p className="mt-1 text-xs">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">Custom fields not in the search response</p>
+                <p className="mt-1 text-xs leading-relaxed">
                   Forma&apos;s search endpoint didn&apos;t include custom-attribute
-                  values for this project. Click below to fetch each RFI&apos;s
-                  full detail individually — slower, but the only way to surface
-                  custom fields when search omits them. Hundreds of RFIs typically
+                  values for this project. Fetch each RFI&apos;s full detail
+                  individually — slower, but the only way to surface custom
+                  fields when search omits them. Hundreds of RFIs typically
                   finish in 5–15 seconds.
                 </p>
               </div>
-              <Button size="sm" onClick={() => hydrate()}>
+              <Button size="sm" variant="secondary" onClick={() => hydrate()}>
                 Load full RFI detail
               </Button>
             </div>
@@ -169,18 +178,34 @@ function RfisInner() {
       ) : null}
 
       {isLoading ? (
-        <div className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-neutral-200">
-          <p className="text-sm font-medium">Loading RFIs…</p>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded bg-neutral-100">
+        <div className="mt-6 rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card">
+          <p className="text-sm font-semibold text-[color:var(--brand-primary)]">
+            Loading RFIs…
+          </p>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--brand-canvas)]">
             <div className="h-full w-1/4 animate-pulse bg-[color:var(--brand-primary)]" />
           </div>
         </div>
       ) : null}
 
       {isError ? (
-        <p role="alert" className="mt-6 text-sm text-red-600">
-          {error instanceof Error ? error.message : String(error)}
-        </p>
+        <div
+          role="alert"
+          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <p className="font-semibold">
+            {isRateLimited
+              ? "Forma is rate-limiting this project"
+              : "Failed to load RFIs"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-red-700/90">
+            {isRateLimited
+              ? "Large projects can hit Autodesk's burst limits. The app already retries automatically — wait a minute and try again."
+              : error instanceof Error
+                ? error.message
+                : String(error)}
+          </p>
+        </div>
       ) : null}
 
       {!isLoading && !isError ? (
@@ -197,7 +222,11 @@ function RfisInner() {
 
 export default function RfisPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-neutral-500">Loading…</p>}>
+    <Suspense
+      fallback={
+        <p className="text-sm text-[color:var(--brand-muted)]">Loading…</p>
+      }
+    >
       <RfisInner />
     </Suspense>
   );

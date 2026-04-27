@@ -37,26 +37,30 @@ export function FieldPicker({ fields, onChange, customAttributes }: Props) {
   }
 
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-neutral-200">
-      <h3 className="text-sm font-semibold">Columns</h3>
-      <p className="mt-1 text-xs text-neutral-500">
+    <div className="rounded-2xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card sm:p-5">
+      <h3 className="text-sm font-semibold text-[color:var(--brand-primary)]">
+        Columns
+      </h3>
+      <p className="mt-1 text-xs text-[color:var(--brand-muted)]">
         Selected fields appear in this order in the report.
       </p>
 
       {fields.length > 0 ? (
-        <ol className="mt-3 space-y-1">
+        <ol className="mt-3 space-y-1.5">
           {fields.map((f, i) => (
             <li
               key={f}
-              className="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-sm"
+              className="flex items-center gap-2 rounded-lg border border-[color:var(--brand-border)] bg-[color:var(--brand-canvas)] px-2.5 py-1.5 text-sm"
             >
-              <span className="flex-1 truncate">{labelForField(f, customAttributes)}</span>
+              <span className="flex-1 truncate font-medium text-[color:var(--brand-ink)]">
+                {labelForField(f, customAttributes)}
+              </span>
               <button
                 type="button"
                 onClick={() => move(i, -1)}
                 disabled={i === 0}
                 aria-label={`Move ${labelForField(f, customAttributes)} up`}
-                className="rounded px-1.5 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30"
+                className="rounded-md px-1.5 text-[color:var(--brand-muted)] hover:bg-white hover:text-[color:var(--brand-primary)] disabled:opacity-30"
               >
                 ↑
               </button>
@@ -65,7 +69,7 @@ export function FieldPicker({ fields, onChange, customAttributes }: Props) {
                 onClick={() => move(i, 1)}
                 disabled={i === fields.length - 1}
                 aria-label={`Move ${labelForField(f, customAttributes)} down`}
-                className="rounded px-1.5 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30"
+                className="rounded-md px-1.5 text-[color:var(--brand-muted)] hover:bg-white hover:text-[color:var(--brand-primary)] disabled:opacity-30"
               >
                 ↓
               </button>
@@ -73,7 +77,7 @@ export function FieldPicker({ fields, onChange, customAttributes }: Props) {
                 type="button"
                 onClick={() => toggle(f)}
                 aria-label={`Remove ${labelForField(f, customAttributes)}`}
-                className="rounded px-1.5 text-red-500 hover:bg-red-50"
+                className="rounded-md px-1.5 text-red-500 hover:bg-red-50"
               >
                 ✕
               </button>
@@ -81,13 +85,13 @@ export function FieldPicker({ fields, onChange, customAttributes }: Props) {
           ))}
         </ol>
       ) : (
-        <p className="mt-3 rounded-md border border-dashed border-neutral-300 p-3 text-xs text-neutral-500">
+        <p className="mt-3 rounded-lg border border-dashed border-[color:var(--brand-border)] p-3 text-xs text-[color:var(--brand-muted)]">
           No columns selected.
         </p>
       )}
 
       <div className="mt-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
           Available
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">

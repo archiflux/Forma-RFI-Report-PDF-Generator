@@ -30,7 +30,7 @@ function MultiSelectPills({
     onChange([...next]);
   }
   if (options.length === 0)
-    return <p className="text-xs text-neutral-500">{emptyLabel}</p>;
+    return <p className="text-xs text-[color:var(--brand-muted)]">{emptyLabel}</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => {
@@ -42,8 +42,8 @@ function MultiSelectPills({
             onClick={() => toggle(opt.id)}
             className={
               on
-                ? "rounded-full bg-[color:var(--brand-primary)] px-2.5 py-0.5 text-xs text-white"
-                : "rounded-full border border-neutral-300 px-2.5 py-0.5 text-xs text-neutral-700 hover:bg-neutral-50"
+                ? "rounded-full bg-[color:var(--brand-primary)] px-3 py-1 text-xs font-medium text-white shadow-sm"
+                : "rounded-full border border-[color:var(--brand-border)] bg-white px-3 py-1 text-xs font-medium text-[color:var(--brand-ink)] hover:border-[color:var(--brand-primary)] hover:text-[color:var(--brand-primary)]"
             }
           >
             {opt.label}
@@ -73,14 +73,14 @@ function DateRangeInputs({
         type="date"
         value={gte}
         onChange={(e) => set({ gte: e.target.value || undefined, lte: lte || undefined })}
-        className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+        className="w-full rounded-lg border border-[color:var(--brand-border)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20"
       />
-      <span className="text-xs text-neutral-400">to</span>
+      <span className="text-xs text-[color:var(--brand-muted)]">to</span>
       <input
         type="date"
         value={lte}
         onChange={(e) => set({ gte: gte || undefined, lte: e.target.value || undefined })}
-        className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+        className="w-full rounded-lg border border-[color:var(--brand-border)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20"
       />
     </div>
   );
@@ -113,31 +113,34 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
 
   const statusOptions = workflow.map((w) => ({ id: w.id, label: w.label }));
 
+  const inputClass =
+    "mt-1 w-full rounded-lg border border-[color:var(--brand-border)] bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20";
+  const labelClass =
+    "text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]";
+
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-neutral-200">
-      <h3 className="text-sm font-semibold">Filters</h3>
-      <p className="mt-1 text-xs text-neutral-500">
+    <div className="rounded-2xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card sm:p-5">
+      <h3 className="text-sm font-semibold text-[color:var(--brand-primary)]">
+        Filters
+      </h3>
+      <p className="mt-1 text-xs text-[color:var(--brand-muted)]">
         Leave any section blank to skip that filter. All active filters combine with AND.
       </p>
 
       <div className="mt-4 space-y-5">
         <div>
-          <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-            Free-text search
-          </label>
+          <label className={labelClass}>Free-text search</label>
           <input
             type="search"
             value={filter.search ?? ""}
             onChange={(e) => setRoot("search", e.target.value || undefined)}
             placeholder="Matches RFI #, title, question, or response"
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+            className={inputClass}
           />
         </div>
 
         <div>
-          <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-            Status
-          </label>
+          <label className={labelClass}>Status</label>
           <div className="mt-1">
             <MultiSelectPills
               options={statusOptions}
@@ -149,22 +152,18 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
         </div>
 
         <div>
-          <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-            Assignee name contains
-          </label>
+          <label className={labelClass}>Assignee name contains</label>
           <input
             type="search"
             value={filter.assigneeContains ?? ""}
             onChange={(e) => setRoot("assigneeContains", e.target.value || undefined)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+            className={inputClass}
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-              Due date between
-            </label>
+            <label className={labelClass}>Due date between</label>
             <div className="mt-1">
               <DateRangeInputs
                 value={filter.dueDate}
@@ -173,9 +172,7 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-              Created between
-            </label>
+            <label className={labelClass}>Created between</label>
             <div className="mt-1">
               <DateRangeInputs
                 value={filter.createdAt}
@@ -187,16 +184,19 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
 
         {customAttributes.length > 0 ? (
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-              Custom attributes
-            </p>
-            <div className="mt-2 space-y-4">
+            <p className={labelClass}>Custom attributes</p>
+            <div className="mt-2 space-y-3">
               {customAttributes.map((attr) => {
                 const clause = filter.customAttributes?.[attr.id] ?? {};
                 return (
-                  <div key={attr.id} className="rounded-md border border-neutral-200 p-3">
-                    <p className="text-sm font-medium">{attr.name}</p>
-                    <p className="text-[10px] uppercase tracking-wider text-neutral-400">
+                  <div
+                    key={attr.id}
+                    className="rounded-lg border border-[color:var(--brand-border)] bg-[color:var(--brand-canvas)] p-3"
+                  >
+                    <p className="text-sm font-medium text-[color:var(--brand-ink)]">
+                      {attr.name}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--brand-muted)]">
                       {attr.dataType}
                     </p>
                     <div className="mt-2">
@@ -208,7 +208,7 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
                           onChange={(e) =>
                             setCustom(attr.id, { ...clause, contains: e.target.value || undefined })
                           }
-                          className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                          className="w-full rounded-lg border border-[color:var(--brand-border)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20"
                         />
                       ) : null}
                       {attr.dataType === "numeric" ? (
@@ -226,9 +226,9 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
                                 },
                               })
                             }
-                            className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                            className="w-full rounded-lg border border-[color:var(--brand-border)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20"
                           />
-                          <span className="text-xs text-neutral-400">to</span>
+                          <span className="text-xs text-[color:var(--brand-muted)]">to</span>
                           <input
                             type="number"
                             placeholder="max"
@@ -242,7 +242,7 @@ export function FilterBuilder({ filter, onChange, customAttributes, workflow }: 
                                 },
                               })
                             }
-                            className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                            className="w-full rounded-lg border border-[color:var(--brand-border)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20"
                           />
                         </div>
                       ) : null}

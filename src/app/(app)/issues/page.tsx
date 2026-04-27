@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 function MetadataBanner({ attrsMissingTitles }: { attrsMissingTitles: boolean }) {
   if (!attrsMissingTitles) return null;
   return (
-    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      <p className="font-medium">Limited project metadata</p>
+    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <p className="font-semibold">Limited project metadata</p>
       <p className="mt-1 text-xs">
         One or more custom-field titles couldn&apos;t be resolved. Those columns
         show their raw IDs as the header. Filtering, sorting, and export still
@@ -54,59 +54,68 @@ function IssuesInner() {
     );
   }
 
+  const isRateLimited = /\b429\b|rate[- ]?limit/i.test(
+    error instanceof Error ? error.message : "",
+  );
+
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Issues</h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            {projectName ? (
-              <>
-                <span className="font-medium text-[color:var(--brand-ink)]">
-                  {projectName}
-                </span>
-                <span className="text-neutral-400"> · </span>
-              </>
-            ) : null}
-            <code className="rounded bg-neutral-100 px-1">{projectId}</code>
-          </p>
+      <div className="rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
+              Step 3 of 3 · Issues
+            </p>
+            <h2 className="mt-1 truncate text-2xl font-semibold text-[color:var(--brand-primary)]">
+              {projectName ?? "Project issues"}
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--brand-muted)]">
+              {isLoading
+                ? "Loading issues…"
+                : `${items.length.toLocaleString()} ${items.length === 1 ? "issue" : "issues"} loaded`}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href={`/projects?hubId=${encodeURIComponent(hubId)}`}
+              className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline"
+            >
+              ← Change project
+            </Link>
+            <Button
+              disabled={isLoading || items.length === 0}
+              onClick={() => {
+                const qs = new URLSearchParams({ hubId, projectId }).toString();
+                window.location.assign(`/issues/builder?${qs}`);
+              }}
+            >
+              Build report →
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Link
-            href={`/projects?hubId=${encodeURIComponent(hubId)}`}
-            className="self-center text-sm text-neutral-500 underline"
-          >
-            Change project
-          </Link>
-          <Button
-            disabled={isLoading || items.length === 0}
-            onClick={() => {
-              const qs = new URLSearchParams({ hubId, projectId }).toString();
-              window.location.assign(`/issues/builder?${qs}`);
-            }}
-          >
-            Build report →
-          </Button>
-        </div>
+        <div
+          aria-hidden
+          className="mt-5 h-1 w-16 rounded-full bg-[color:var(--brand-accent)]"
+        />
       </div>
 
       <MetadataBanner attrsMissingTitles={attrsMissingTitles} />
 
       {!isLoading && !isError && (shouldHydrate || hydrating || hydrated) ? (
-        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <div className="mt-4 rounded-xl border border-[color:var(--brand-secondary)]/20 bg-[color:var(--brand-secondary)]/5 px-4 py-3 text-sm text-[color:var(--brand-secondary)]">
           {hydrated ? (
-            <p className="font-medium">
+            <p className="font-semibold">
               Loaded full issue detail — custom fields are now populated.
             </p>
           ) : hydrating ? (
             <>
-              <p className="font-medium">
+              <p className="font-semibold">
                 Loading full issue detail (
                 {hydrationProgress?.hydrated ?? 0} / {hydrationProgress?.total ?? items.length})
               </p>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-blue-100">
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--brand-secondary)]/15">
                 <div
-                  className="h-full bg-blue-600 transition-[width]"
+                  className="h-full bg-[color:var(--brand-secondary)] transition-[width]"
                   style={{
                     width: `${
                       hydrationProgress && hydrationProgress.total > 0
@@ -118,16 +127,16 @@ function IssuesInner() {
               </div>
             </>
           ) : (
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium">Custom fields not in the search response</p>
-                <p className="mt-1 text-xs">
-                  Click below to fetch each issue&apos;s full detail individually
-                  so custom fields appear in the field picker, filters, and
-                  exported reports.
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">Custom fields not in the search response</p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  Fetch each issue&apos;s full detail individually so custom
+                  fields appear in the field picker, filters, and exported
+                  reports.
                 </p>
               </div>
-              <Button size="sm" onClick={() => hydrate()}>
+              <Button size="sm" variant="secondary" onClick={() => hydrate()}>
                 Load full issue detail
               </Button>
             </div>
@@ -141,18 +150,34 @@ function IssuesInner() {
       ) : null}
 
       {isLoading ? (
-        <div className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-neutral-200">
-          <p className="text-sm font-medium">Loading issues…</p>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded bg-neutral-100">
+        <div className="mt-6 rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card">
+          <p className="text-sm font-semibold text-[color:var(--brand-primary)]">
+            Loading issues…
+          </p>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--brand-canvas)]">
             <div className="h-full w-1/4 animate-pulse bg-[color:var(--brand-primary)]" />
           </div>
         </div>
       ) : null}
 
       {isError ? (
-        <p role="alert" className="mt-6 text-sm text-red-600">
-          {error instanceof Error ? error.message : String(error)}
-        </p>
+        <div
+          role="alert"
+          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <p className="font-semibold">
+            {isRateLimited
+              ? "Forma is rate-limiting this project"
+              : "Failed to load issues"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-red-700/90">
+            {isRateLimited
+              ? "Large projects can hit Autodesk's burst limits. The app already retries automatically — wait a minute and try again."
+              : error instanceof Error
+                ? error.message
+                : String(error)}
+          </p>
+        </div>
       ) : null}
 
       {!isLoading && !isError ? (
@@ -169,7 +194,11 @@ function IssuesInner() {
 
 export default function IssuesPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-neutral-500">Loading…</p>}>
+    <Suspense
+      fallback={
+        <p className="text-sm text-[color:var(--brand-muted)]">Loading…</p>
+      }
+    >
       <IssuesInner />
     </Suspense>
   );
