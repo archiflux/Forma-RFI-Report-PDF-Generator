@@ -15,6 +15,7 @@ export interface ExportInput {
   rfis: Rfi[];
   customAttributes: CustomAttributeDef[];
   projectName: string;
+  projectId?: string; // used by Detail layout to embed Forma deep links
   // Drives PDF cover wording ("RFI report" vs "Issue report") and the
   // metadata grid label ("RFIs in report" vs "Issues in report").
   itemKind?: ItemKind;
@@ -25,28 +26,52 @@ export async function exportReport({
   rfis,
   customAttributes,
   projectName,
+  projectId,
   itemKind = "rfi",
 }: ExportInput): Promise<void> {
   const { groups, filtered } = applyTemplate(rfis, template, customAttributes);
 
   if (template.output === "csv") {
-    const csv = buildCsv({ template, groups, customAttributes });
+    const csv = buildCsv({
+      template,
+      groups,
+      customAttributes,
+      ctx: { projectId, itemKind },
+    });
     downloadBlob(csvBlob(csv), safeFilename(template.name, "csv"));
     return;
   }
 
-  // Dynamic-import the PDF module so @react-pdf/renderer (~400 KB) isn't in
-  // the initial bundle. It's only needed on an actual export.
-  const { buildPdfBlob } = await import("./pdf");
-  const blob = await buildPdfBlob({
-    template,
-    groups,
-    customAttributes,
-    projectName,
-    brand: resolveBrand(template.brandId),
-    totalBeforeFilter: rfis.length,
-    totalAfterFilter: filtered.length,
-    itemKind,
-  });
+  // Dynamic-import the PDF modules so @react-pdf/renderer (~400 KB) isn't in
+  // the initial bundle. Each layout has its own renderer module so the unused
+  // one's components don't ship to clients who only ever pick one variant.
+  const layout = template.pdfLayout ?? "table";
+  const blob = await (async () => {
+    if (layout === "detail") {
+      const { buildDetailPdfBlob } = await import("./pdf-detail");
+      return buildDetailPdfBlob({
+        template,
+        groups,
+        customAttributes,
+        projectName,
+        projectId,
+        brand: resolveBrand(template.brandId),
+        totalBeforeFilter: rfis.length,
+        totalAfterFilter: filtered.length,
+        itemKind,
+      });
+    }
+    const { buildPdfBlob } = await import("./pdf");
+    return buildPdfBlob({
+      template,
+      groups,
+      customAttributes,
+      projectName,
+      brand: resolveBrand(template.brandId),
+      totalBeforeFilter: rfis.length,
+      totalAfterFilter: filtered.length,
+      itemKind,
+    });
+  })();
   downloadBlob(blob, safeFilename(template.name, "pdf"));
 }

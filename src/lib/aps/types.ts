@@ -58,13 +58,33 @@ export interface Rfi {
   status: string;
   statusLabel?: string;
   createdAt: string;
+  updatedAt?: string;
+  closedAt?: string;
+  respondedAt?: string;
   dueDate?: string;
   // APS RFI v3 returns assignedTo as an array of { id, type } — we resolve
   // ids to names in a post-pass once the project user roster is loaded.
   assignees: RfiParty[];
   manager?: RfiParty;
+  ballInCourt: RfiParty[];
+  coReviewers: RfiParty[];
+  distributionList: RfiParty[];
+  watchers: RfiParty[];
+  // Built-in scalar fields commonly surfaced in Forma's RFI UI. Each is
+  // optional because APS only returns them on hydrated GETs and tenants
+  // configure their RFI types differently.
+  priority?: string;
+  location?: string;
+  locationDescription?: string;
+  discipline?: string;
+  category?: string;
   question?: string;
   officialResponse?: string;
+  suggestedAnswer?: string;
+  rfiTypeId?: string;
+  // Catch-all for fields APS returns that we haven't explicitly modelled.
+  // Lets the grid surface unexpected built-in fields without a code change.
+  extra: Record<string, unknown>;
   // APS v3 returns each custom attribute as { id, values: [...] }, where `values`
   // is always an array — single-element for text/numeric/single-choice and
   // multi-element for multi-choice. We collapse the wire format into a record
@@ -79,6 +99,18 @@ export interface Rfi {
   customAttributesMeta?: Record<string, ObservedCustomAttrMeta>;
   attachments: RfiAttachment[];
   attachmentCount: number;
+  comments: RfiComment[];
+}
+
+export interface RfiComment {
+  id: string;
+  body: string;
+  author?: RfiParty;
+  createdAt?: string;
+  attachments: RfiAttachment[];
+  // True when this comment is the official RFI response, false for
+  // informal back-and-forth.
+  isOfficialResponse?: boolean;
 }
 
 export interface ObservedCustomAttrMeta {

@@ -89,18 +89,25 @@ export function useIssuesData(projectId: string, hubId?: string) {
   const canHydrate = baseItems.length > 0 && !hydratedQ.data && !hydrating;
   const shouldHydrate = canHydrate && !searchHasCustomAttrs;
 
-  async function hydrate() {
-    if (!projectId || !baseItems.length) return;
+  async function hydrate(opts: { comments?: boolean } = {}): Promise<Rfi[] | null> {
+    if (!projectId || !baseItems.length) return null;
     setHydrating(true);
     setHydrateError(null);
     setHydrationProgress({ hydrated: 0, total: baseItems.length });
     try {
-      const full = await hydrateIssues(client, projectId, baseItems, (p) =>
-        setHydrationProgress(p),
+      const full = await hydrateIssues(
+        client,
+        projectId,
+        baseItems,
+        (p) => setHydrationProgress(p),
+        undefined,
+        { comments: opts.comments ?? false },
       );
       qc.setQueryData(HYDRATED_KEY(projectId), full);
+      return applyUserRoster(full, userRoster);
     } catch (e) {
       setHydrateError(e instanceof Error ? e.message : String(e));
+      return null;
     } finally {
       setHydrating(false);
     }

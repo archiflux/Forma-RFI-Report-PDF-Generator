@@ -155,7 +155,7 @@ function RfisInner() {
                   finish in 5–15 seconds.
                 </p>
               </div>
-              <Button size="sm" onClick={hydrate}>
+              <Button size="sm" onClick={() => hydrate()}>
                 Load full RFI detail
               </Button>
             </div>

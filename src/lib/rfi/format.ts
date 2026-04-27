@@ -1,10 +1,16 @@
 import type { CustomAttributeDef, Rfi } from "@/lib/aps/types";
+import { issueUrl, rfiUrl } from "@/lib/aps/links";
 import {
   type BuiltinFieldId,
   type FieldId,
   customAttrId,
   isCustomField,
 } from "@/lib/report/types";
+
+export interface FormatContext {
+  projectId?: string;
+  itemKind?: "rfi" | "issue";
+}
 
 export function formatDate(iso: string | undefined): string {
   if (!iso) return "";
@@ -64,13 +70,28 @@ export const BUILTIN_COLUMNS: readonly BuiltinColumnMeta[] = [
   { id: "number", label: "RFI #" },
   { id: "title", label: "Title" },
   { id: "statusLabel", label: "Status" },
+  { id: "priority", label: "Priority" },
   { id: "assignee", label: "Assignee" },
   { id: "manager", label: "Manager" },
+  { id: "ballInCourt", label: "Ball in court" },
+  { id: "coReviewers", label: "Co-reviewers" },
+  { id: "distributionList", label: "Distribution list" },
+  { id: "watchers", label: "Watchers" },
+  { id: "location", label: "Location" },
+  { id: "locationDescription", label: "Location description" },
+  { id: "discipline", label: "Discipline" },
+  { id: "category", label: "Category" },
   { id: "dueDate", label: "Due" },
   { id: "createdAt", label: "Created" },
+  { id: "updatedAt", label: "Updated" },
+  { id: "respondedAt", label: "Responded" },
+  { id: "closedAt", label: "Closed" },
   { id: "attachmentCount", label: "Attachments" },
+  { id: "attachmentList", label: "Attachment files" },
   { id: "question", label: "Question" },
   { id: "officialResponse", label: "Official response" },
+  { id: "suggestedAnswer", label: "Suggested answer" },
+  { id: "formaUrl", label: "Forma URL" },
 ];
 
 export function labelForField(
@@ -85,7 +106,15 @@ export function labelForField(
   return BUILTIN_COLUMNS.find((c) => c.id === id)?.label ?? id;
 }
 
-export function getBuiltinValue(rfi: Rfi, column: BuiltinFieldId): string {
+function partyListNames(parties: { name: string }[] | undefined): string {
+  return (parties ?? []).map((p) => p.name).filter(Boolean).join(", ");
+}
+
+export function getBuiltinValue(
+  rfi: Rfi,
+  column: BuiltinFieldId,
+  ctx?: FormatContext,
+): string {
   switch (column) {
     case "number":
       return rfi.number;
@@ -93,20 +122,56 @@ export function getBuiltinValue(rfi: Rfi, column: BuiltinFieldId): string {
       return rfi.title;
     case "statusLabel":
       return rfi.statusLabel ?? rfi.status;
+    case "priority":
+      return rfi.priority ?? "";
     case "assignee":
-      return (rfi.assignees ?? []).map((a) => a.name).filter(Boolean).join(", ");
+      return partyListNames(rfi.assignees);
     case "manager":
       return rfi.manager?.name ?? "";
+    case "ballInCourt":
+      return partyListNames(rfi.ballInCourt);
+    case "coReviewers":
+      return partyListNames(rfi.coReviewers);
+    case "distributionList":
+      return partyListNames(rfi.distributionList);
+    case "watchers":
+      return partyListNames(rfi.watchers);
+    case "location":
+      return rfi.location ?? "";
+    case "locationDescription":
+      return rfi.locationDescription ?? "";
+    case "discipline":
+      return rfi.discipline ?? "";
+    case "category":
+      return rfi.category ?? "";
     case "dueDate":
       return formatDate(rfi.dueDate);
     case "createdAt":
       return formatDate(rfi.createdAt);
+    case "updatedAt":
+      return formatDate(rfi.updatedAt);
+    case "respondedAt":
+      return formatDate(rfi.respondedAt);
+    case "closedAt":
+      return formatDate(rfi.closedAt);
     case "attachmentCount":
       return String(rfi.attachmentCount ?? 0);
+    case "attachmentList":
+      return (rfi.attachments ?? [])
+        .map((a) => a.displayName ?? a.fileName ?? a.id)
+        .filter(Boolean)
+        .join(" | ");
     case "question":
       return rfi.question ?? "";
     case "officialResponse":
       return rfi.officialResponse ?? "";
+    case "suggestedAnswer":
+      return rfi.suggestedAnswer ?? "";
+    case "formaUrl":
+      if (!ctx?.projectId || !rfi.id) return "";
+      return ctx.itemKind === "issue"
+        ? issueUrl(ctx.projectId, rfi.id)
+        : rfiUrl(ctx.projectId, rfi.id);
   }
 }
 
@@ -117,6 +182,7 @@ export function getFieldValue(
   rfi: Rfi,
   field: FieldId,
   customAttributes: CustomAttributeDef[],
+  ctx?: FormatContext,
 ): string | number | null {
   if (isCustomField(field)) {
     const def = customAttributes.find((a) => a.id === customAttrId(field));
@@ -144,7 +210,7 @@ export function getFieldValue(
     case "createdAt":
       return rfi.createdAt ?? null;
     default: {
-      const v = getBuiltinValue(rfi, field);
+      const v = getBuiltinValue(rfi, field, ctx);
       return v === "" ? null : v;
     }
   }
@@ -155,7 +221,8 @@ export function getFieldDisplay(
   rfi: Rfi,
   field: FieldId,
   customAttributes: CustomAttributeDef[],
+  ctx?: FormatContext,
 ): string {
-  const v = getFieldValue(rfi, field, customAttributes);
+  const v = getFieldValue(rfi, field, customAttributes, ctx);
   return v === null ? "" : String(v);
 }

@@ -101,18 +101,29 @@ export function useRfiData(projectId: string, hubId?: string) {
   const canHydrate = baseRfis.length > 0 && !hydratedQ.data && !hydrating;
   const shouldHydrate = canHydrate && !searchHasCustomAttrs;
 
-  async function hydrate() {
-    if (!projectId || !baseRfis.length) return;
+  async function hydrate(opts: { comments?: boolean } = {}): Promise<Rfi[] | null> {
+    if (!projectId || !baseRfis.length) return null;
     setHydrating(true);
     setHydrateError(null);
     setHydrationProgress({ hydrated: 0, total: baseRfis.length });
     try {
-      const full = await hydrateRfis(client, projectId, baseRfis, (p) =>
-        setHydrationProgress(p),
+      const full = await hydrateRfis(
+        client,
+        projectId,
+        baseRfis,
+        (p) => setHydrationProgress(p),
+        undefined,
+        // Always re-fetch attachments so counts are correct; comments only
+        // when the caller asks (it adds a request per RFI).
+        { attachments: true, comments: opts.comments ?? false },
       );
       qc.setQueryData(HYDRATED_KEY(projectId), full);
+      // Apply the user roster on the freshly-hydrated data so the caller can
+      // export immediately without waiting for the next React render.
+      return applyUserRoster(full, userRoster);
     } catch (e) {
       setHydrateError(e instanceof Error ? e.message : String(e));
+      return null;
     } finally {
       setHydrating(false);
     }

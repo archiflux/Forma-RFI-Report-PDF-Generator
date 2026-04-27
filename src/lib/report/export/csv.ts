@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import type { CustomAttributeDef } from "@/lib/aps/types";
-import { getFieldDisplay, labelForField } from "@/lib/rfi/format";
+import { getFieldDisplay, labelForField, type FormatContext } from "@/lib/rfi/format";
 import type { RfiGroup } from "../apply";
 import type { FieldId, ReportTemplate } from "../types";
 
@@ -12,9 +12,11 @@ export interface CsvBuildInput {
   template: ReportTemplate;
   groups: RfiGroup[];
   customAttributes: CustomAttributeDef[];
+  // Powers the Forma-URL column and any future link-aware fields.
+  ctx?: FormatContext;
 }
 
-export function buildCsv({ template, groups, customAttributes }: CsvBuildInput): string {
+export function buildCsv({ template, groups, customAttributes, ctx }: CsvBuildInput): string {
   const fields: FieldId[] = template.fields;
   const header = buildHeader(fields, customAttributes, template.groupBy);
   const rows: string[][] = [];
@@ -22,7 +24,7 @@ export function buildCsv({ template, groups, customAttributes }: CsvBuildInput):
   for (const group of groups) {
     const groupLabel = template.groupBy ? group.label : undefined;
     for (const rfi of group.rfis) {
-      const row = fields.map((f) => getFieldDisplay(rfi, f, customAttributes));
+      const row = fields.map((f) => getFieldDisplay(rfi, f, customAttributes, ctx));
       if (groupLabel !== undefined) row.unshift(groupLabel);
       rows.push(row);
     }

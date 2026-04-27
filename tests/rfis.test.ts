@@ -12,8 +12,14 @@ function makeRfi(i: number): Rfi {
     createdAt: "2026-01-01T00:00:00Z",
     customAttributes: {},
     assignees: [],
+    ballInCourt: [],
+    coReviewers: [],
+    distributionList: [],
+    watchers: [],
+    extra: {},
     attachments: [],
     attachmentCount: 0,
+    comments: [],
   };
 }
 

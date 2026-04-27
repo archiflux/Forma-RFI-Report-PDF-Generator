@@ -59,19 +59,32 @@ export async function getProjectUsers(
   return out;
 }
 
-function normalizeUser(raw: RawProjectUser): ProjectUser {
+function normalizeUser(raw: RawProjectUser): ProjectUser & { autodeskId?: string } {
   const id = raw.id ?? raw.autodeskId ?? "";
   const composed =
     [raw.firstName, raw.lastName].filter((s) => typeof s === "string" && s.length).join(" ") ||
     undefined;
   const name = raw.name ?? composed ?? raw.email ?? id;
-  return { id, name, email: raw.email };
+  return { id, name, email: raw.email, autodeskId: raw.autodeskId };
 }
 
+// Build a roster keyed by EVERY id we have for each user. APS RFI v3 references
+// users by their Autodesk Oxygen id (assignedTo[].id), but the project-users
+// endpoint returns both that id AND a separate construction-side id. Without
+// keying by both, half the references stay unresolved.
 export function buildUserRoster(users: ProjectUser[]): Map<string, string> {
   const out = new Map<string, string>();
   for (const u of users) {
-    if (u.id && u.name) out.set(u.id, u.name);
+    const enriched = u as ProjectUser & { autodeskId?: string };
+    if (!enriched.name) continue;
+    if (enriched.id) out.set(enriched.id, enriched.name);
+    if (enriched.autodeskId && !out.has(enriched.autodeskId)) {
+      out.set(enriched.autodeskId, enriched.name);
+    }
+    // Email is a useful tertiary key for fallbacks.
+    if (enriched.email && !out.has(enriched.email)) {
+      out.set(enriched.email, enriched.name);
+    }
   }
   return out;
 }

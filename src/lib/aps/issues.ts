@@ -14,7 +14,13 @@
 import type { ApsClient } from "./client";
 import { normaliseProjectIdForRfi } from "./projects";
 import { normalizeRfi, parseAttributeDefs, type RawAttrDef } from "./rfis";
-import { ApsError, type CustomAttributeDef, type Rfi, type RfiScrapeProgress } from "./types";
+import {
+  ApsError,
+  type CustomAttributeDef,
+  type Rfi,
+  type RfiComment,
+  type RfiScrapeProgress,
+} from "./types";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_TOTAL = 5000;
@@ -129,6 +135,51 @@ export async function getIssueById(
   return normalizeRfi(raw);
 }
 
+interface RawIssueComment {
+  id?: string;
+  body?: string;
+  text?: string;
+  createdBy?: { id?: string; name?: string; email?: string } | null;
+  createdAt?: string;
+}
+
+export async function getIssueComments(
+  client: ApsClient,
+  projectId: string,
+  issueId: string,
+): Promise<RfiComment[]> {
+  const p = normaliseProjectIdForRfi(projectId);
+  try {
+    const res = await client.request<{ results?: RawIssueComment[] }>({
+      path: `/construction/issues/v1/projects/${encodeURIComponent(p)}/issues/${encodeURIComponent(issueId)}/comments`,
+      query: { limit: 200 },
+    });
+    return (res.results ?? []).flatMap((raw) => {
+      if (!raw || typeof raw !== "object") return [];
+      const id = raw.id;
+      if (typeof id !== "string" || !id) return [];
+      const author =
+        raw.createdBy && typeof raw.createdBy === "object"
+          ? {
+              id: raw.createdBy.id ?? "",
+              name:
+                raw.createdBy.name ?? raw.createdBy.email ?? raw.createdBy.id ?? "Unknown",
+            }
+          : undefined;
+      const out: RfiComment = {
+        id,
+        body: raw.body ?? raw.text ?? "",
+        ...(author ? { author } : {}),
+        ...(raw.createdAt ? { createdAt: raw.createdAt } : {}),
+        attachments: [],
+      };
+      return [out];
+    });
+  } catch {
+    return [];
+  }
+}
+
 export interface IssueHydrationProgress {
   hydrated: number;
   total: number;
@@ -142,6 +193,7 @@ export async function hydrateIssues(
   issues: Rfi[],
   onProgress?: (p: IssueHydrationProgress) => void,
   signal?: AbortSignal,
+  options: { comments?: boolean } = {},
 ): Promise<Rfi[]> {
   const total = issues.length;
   if (total === 0) return issues;
@@ -156,7 +208,15 @@ export async function hydrateIssues(
       const original = issues[i];
       if (!original) continue;
       try {
-        out[i] = await getIssueById(client, projectId, original.id);
+        const [detail, comments] = await Promise.all([
+          getIssueById(client, projectId, original.id),
+          options.comments
+            ? getIssueComments(client, projectId, original.id)
+            : Promise.resolve(null as RfiComment[] | null),
+        ]);
+        const merged: Rfi = { ...detail };
+        if (comments) merged.comments = comments;
+        out[i] = merged;
       } catch {
         out[i] = original;
       }

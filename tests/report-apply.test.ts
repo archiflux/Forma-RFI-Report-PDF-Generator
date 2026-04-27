@@ -58,7 +58,14 @@ function rfi(
     dueDate: `2026-0${(i % 9) + 1}-15`,
     customAttributes: asValuesRecord(custom),
     attachmentCount: 0,
-    assignees: [{ id: `u${i}`, name: `User ${i}` }], attachments: [],
+    assignees: [{ id: `u${i}`, name: `User ${i}` }],
+    ballInCourt: [],
+    coReviewers: [],
+    distributionList: [],
+    watchers: [],
+    extra: {},
+    attachments: [],
+    comments: [],
     ...rest,
   };
 }

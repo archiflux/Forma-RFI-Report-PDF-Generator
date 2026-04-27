@@ -11,13 +11,28 @@ export const BUILTIN_FIELD_IDS = [
   "number",
   "title",
   "statusLabel",
+  "priority",
   "assignee",
   "manager",
+  "ballInCourt",
+  "coReviewers",
+  "distributionList",
+  "watchers",
+  "location",
+  "locationDescription",
+  "discipline",
+  "category",
   "dueDate",
   "createdAt",
+  "updatedAt",
+  "respondedAt",
+  "closedAt",
   "attachmentCount",
+  "attachmentList",
   "question",
   "officialResponse",
+  "suggestedAnswer",
+  "formaUrl",
 ] as const;
 
 export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
@@ -86,6 +101,14 @@ export interface ReportTemplate {
   sort: SortSpec[];
   groupBy?: FieldId;
   output: OutputFormat;
+  // PDF layout style. "table" is the default — one wide table with every
+  // selected field as a column. "detail" produces one full-page section per
+  // RFI with question / response / attachments / optional comment thread,
+  // similar to ACC's "RFI Detail" template.
+  pdfLayout?: "table" | "detail";
+  // When pdfLayout is "detail", whether to include the comment history
+  // (requires hydration with comments=true).
+  detailIncludeComments?: boolean;
   pageSize?: "A4" | "A3";
   orientation?: "portrait" | "landscape";
   brandId?: string;

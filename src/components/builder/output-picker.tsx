@@ -61,26 +61,89 @@ export function OutputPicker({ template, onChange }: Props) {
       </div>
 
       {template.output === "pdf" ? (
-        <div className="mt-3">
-          <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-            Page size
-          </label>
-          <select
-            value={currentVariant(template)}
-            onChange={(e) => onChange(setVariant(template, e.target.value as PageVariant))}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
-          >
-            {PAGE_VARIANTS.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-neutral-500">
-            The table auto-fits the page width — choose landscape or A3 if you
-            need more horizontal room for many columns.
-          </p>
-        </div>
+        <>
+          <div className="mt-3">
+            <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+              Layout
+            </label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    id: "table" as const,
+                    label: "Table",
+                    hint: "One row per RFI — like ACC's “Summary”",
+                  },
+                  {
+                    id: "detail" as const,
+                    label: "Detail",
+                    hint: "One section per RFI — like ACC's “Detail”",
+                  },
+                ]
+              ).map((l) => {
+                const on = (template.pdfLayout ?? "table") === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => onChange({ ...template, pdfLayout: l.id })}
+                    className={cn(
+                      "rounded-lg border p-2.5 text-left transition",
+                      on
+                        ? "border-[color:var(--brand-primary)] bg-[color:var(--brand-primary)]/5"
+                        : "border-neutral-200 hover:border-neutral-300",
+                    )}
+                  >
+                    <p className="text-sm font-medium">{l.label}</p>
+                    <p className="mt-0.5 text-xs text-neutral-500">{l.hint}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {template.pdfLayout === "detail" ? (
+            <label className="mt-3 flex items-start gap-2 text-xs text-neutral-700">
+              <input
+                type="checkbox"
+                checked={template.detailIncludeComments ?? false}
+                onChange={(e) =>
+                  onChange({ ...template, detailIncludeComments: e.target.checked })
+                }
+                className="mt-0.5"
+              />
+              <span>
+                Include comment history.{" "}
+                <span className="text-neutral-500">
+                  Requires loading full RFI detail with comments — adds a
+                  request per RFI.
+                </span>
+              </span>
+            </label>
+          ) : null}
+
+          <div className="mt-3">
+            <label className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+              Page size
+            </label>
+            <select
+              value={currentVariant(template)}
+              onChange={(e) => onChange(setVariant(template, e.target.value as PageVariant))}
+              className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            >
+              {PAGE_VARIANTS.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-neutral-500">
+              {template.pdfLayout === "detail"
+                ? "Detail sections wrap to fit the chosen page."
+                : "The table auto-fits the page width — choose landscape or A3 if you need more horizontal room for many columns."}
+            </p>
+          </div>
+        </>
       ) : null}
     </div>
   );

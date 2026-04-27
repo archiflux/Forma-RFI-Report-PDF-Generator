@@ -57,11 +57,20 @@ function BuilderInner() {
     setExporting(true);
     setExportErr(null);
     try {
+      const wantsComments =
+        template.pdfLayout === "detail" && (template.detailIncludeComments ?? false);
+      const haveComments = items.some((r) => r.comments && r.comments.length > 0);
+      let dataset = items;
+      if (wantsComments && !haveComments) {
+        const refreshed = await hydrate({ comments: true });
+        if (refreshed) dataset = refreshed;
+      }
       await exportReport({
         template,
-        rfis: items, // Rfi shape doubles as the canonical Item shape
+        rfis: dataset,
         customAttributes: attrs,
         projectName: projectName ?? projectId,
+        projectId,
         itemKind: "issue",
       });
     } catch (e) {
@@ -169,7 +178,7 @@ function BuilderInner() {
                   exported reports.
                 </p>
               </div>
-              <Button size="sm" onClick={hydrate}>
+              <Button size="sm" onClick={() => hydrate()}>
                 Load full issue detail
               </Button>
             </div>

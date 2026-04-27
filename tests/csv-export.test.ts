@@ -47,7 +47,14 @@ function rfi(overrides: Partial<Rfi> & { custom?: Record<string, unknown> } = {}
     dueDate: "2026-02-01",
     customAttributes: asValuesRecord(custom),
     attachmentCount: 0,
-    assignees: [{ id: "u", name: "Alice" }], attachments: [],
+    assignees: [{ id: "u", name: "Alice" }],
+    ballInCourt: [],
+    coReviewers: [],
+    distributionList: [],
+    watchers: [],
+    extra: {},
+    attachments: [],
+    comments: [],
     ...rest,
   };
 }

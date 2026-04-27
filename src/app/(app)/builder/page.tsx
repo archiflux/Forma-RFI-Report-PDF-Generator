@@ -64,11 +64,22 @@ function BuilderInner() {
     setExporting(true);
     setExportErr(null);
     try {
+      // If the user picked the Detail layout with comments and we haven't
+      // hydrated comments yet, do that now so the PDF actually has them.
+      const wantsComments =
+        template.pdfLayout === "detail" && (template.detailIncludeComments ?? false);
+      const haveComments = rfisWithLabels.some((r) => r.comments && r.comments.length > 0);
+      let dataset = rfisWithLabels;
+      if (wantsComments && !haveComments) {
+        const refreshed = await hydrate({ comments: true });
+        if (refreshed) dataset = refreshed;
+      }
       await exportReport({
         template,
-        rfis: rfisWithLabels,
+        rfis: dataset,
         customAttributes: attrs,
         projectName: projectName ?? projectId,
+        projectId,
       });
     } catch (e) {
       setExportErr(e instanceof Error ? e.message : String(e));
@@ -177,7 +188,7 @@ function BuilderInner() {
                   exported reports.
                 </p>
               </div>
-              <Button size="sm" onClick={hydrate}>
+              <Button size="sm" onClick={() => hydrate()}>
                 Load full RFI detail
               </Button>
             </div>

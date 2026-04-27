@@ -127,7 +127,7 @@ function IssuesInner() {
                   exported reports.
                 </p>
               </div>
-              <Button size="sm" onClick={hydrate}>
+              <Button size="sm" onClick={() => hydrate()}>
                 Load full issue detail
               </Button>
             </div>

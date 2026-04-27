@@ -7,6 +7,7 @@ import {
   type ObservedCustomAttrMeta,
   type Rfi,
   type RfiAttachment,
+  type RfiComment,
   type RfiParty,
   type RfiScrapeProgress,
   type RfiSearchRequest,
@@ -256,11 +257,26 @@ interface RawRfiAttachment {
   permittedActions?: unknown;
 }
 
+interface RawRfiComment {
+  id?: string;
+  commentId?: string;
+  body?: string;
+  text?: string;
+  createdBy?: RawRfiParty | null;
+  author?: RawRfiParty | null;
+  user?: RawRfiParty | null;
+  createdAt?: string;
+  attachments?: RawRfiAttachment[];
+  attachmentType?: string;
+  isOfficialResponse?: boolean;
+}
+
+// Fields we explicitly model and extract from the RFI payload. We use a
+// permissive index signature so unknown/extra fields fall through into the
+// catch-all `extra` bag rather than getting silently dropped.
 interface RawRfi {
   id?: string;
   number?: string;
-  // The user-facing RFI identifier (e.g. "RFI-001"). APS calls this
-  // `customIdentifier` on v3; older / sibling shapes use other names.
   customIdentifier?: string;
   identifier?: string;
   displayId?: string;
@@ -269,18 +285,44 @@ interface RawRfi {
   status?: string;
   statusLabel?: string;
   createdAt?: string;
+  updatedAt?: string;
+  closedAt?: string;
+  respondedAt?: string;
   dueDate?: string;
+
   assignee?: RawRfiParty | null;
-  manager?: RawRfiParty | null;
   assignedTo?: RawAssignedTo;
-  reviewer?: RawRfiParty | null;
+  manager?: RawRfiParty | null;
   managerUser?: RawRfiParty | null;
+  managedBy?: RawAssignedTo;
+  reviewer?: RawRfiParty | null;
+  ballInCourt?: RawAssignedTo;
+  ballInCourtId?: string;
+  coReviewers?: RawAssignedTo;
+  reviewers?: RawAssignedTo;
+  distributionList?: RawAssignedTo;
+  distributedTo?: RawAssignedTo;
+  watchers?: RawAssignedTo;
+
+  priority?: string;
+  location?: string;
+  locationId?: string;
+  locationDescription?: string;
+  discipline?: string;
+  disciplines?: string[] | string;
+  category?: string;
+
   question?: string;
   officialResponse?: string;
+  suggestedAnswer?: string;
+  rfiTypeId?: string;
+
   customAttributes?: RawRfiCustomAttributes;
   attachmentCount?: number;
   attachments?: RawRfiAttachment[];
   attachmentIds?: unknown[];
+
+  [extra: string]: unknown;
 }
 
 interface RawRfiSearchResponse {
@@ -442,13 +484,35 @@ function normalizeAttachments(raw: RawRfiAttachment[] | undefined): RfiAttachmen
   return out;
 }
 
+// Fields we extract explicitly. Anything on the raw payload NOT in this
+// list ends up in the `extra` bag so it can still appear as a column.
+const EXPLICIT_FIELDS = new Set<string>([
+  "id", "number", "customIdentifier", "identifier", "displayId", "rfiNumber",
+  "title", "status", "statusLabel",
+  "createdAt", "updatedAt", "closedAt", "respondedAt", "dueDate",
+  "assignee", "assignedTo", "manager", "managerUser", "managedBy", "reviewer",
+  "ballInCourt", "ballInCourtId", "coReviewers", "reviewers",
+  "distributionList", "distributedTo", "watchers",
+  "priority", "location", "locationId", "locationDescription",
+  "discipline", "disciplines", "category",
+  "question", "officialResponse", "suggestedAnswer", "rfiTypeId",
+  "customAttributes", "attachments", "attachmentCount", "attachmentIds",
+  "comments",
+]);
+
+function extractExtra(r: RawRfi): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(r)) {
+    if (EXPLICIT_FIELDS.has(k)) continue;
+    if (v === null || v === undefined) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
 export function normalizeRfi(raw: unknown): Rfi {
   const r = (raw && typeof raw === "object" ? (raw as RawRfi) : {}) as RawRfi;
   const attachments = normalizeAttachments(r.attachments);
-  // Trust the explicit count if present; otherwise fall back to the raw
-  // observed array length (so we don't under-report when an attachment entry
-  // lacked an id and got filtered out of the normalised list); finally fall
-  // back to attachmentIds[].length.
   const attachmentCount =
     typeof r.attachmentCount === "number"
       ? r.attachmentCount
@@ -458,13 +522,36 @@ export function normalizeRfi(raw: unknown): Rfi {
           ? r.attachmentIds.length
           : 0;
   const meta = extractCustomAttributesMeta(r.customAttributes);
+
   const assignees = normalizeAssignees(r.assignedTo);
-  // If APS gave us a fully-populated `assignee` object, fold it in too.
   const legacyAssignee = normalizeParty(r.assignee);
   if (legacyAssignee && !assignees.some((a) => a.id === legacyAssignee.id)) {
     assignees.unshift(legacyAssignee);
   }
-  const number = r.customIdentifier ?? r.identifier ?? r.displayId ?? r.rfiNumber ?? r.number ?? "";
+
+  // Manager is single in the data model. Look across the various spellings
+  // APS has used; first non-empty wins.
+  const manager =
+    normalizeParty(r.manager) ??
+    normalizeParty(r.managerUser) ??
+    normalizeAssignees(r.managedBy)[0] ??
+    normalizeParty(r.reviewer);
+
+  // Ball-in-court — array because APS sometimes returns multiple. If APS
+  // returns it as a bare id (ballInCourtId), wrap into a single-entry array.
+  const ballInCourt = normalizeAssignees(r.ballInCourt);
+  if (ballInCourt.length === 0 && typeof r.ballInCourtId === "string" && r.ballInCourtId) {
+    ballInCourt.push({ id: r.ballInCourtId, name: r.ballInCourtId });
+  }
+
+  const number =
+    r.customIdentifier ?? r.identifier ?? r.displayId ?? r.rfiNumber ?? r.number ?? "";
+
+  // Discipline is sometimes an array, sometimes a single string.
+  const discipline = Array.isArray(r.disciplines)
+    ? r.disciplines.filter((s) => typeof s === "string").join(", ")
+    : (r.discipline ?? (typeof r.disciplines === "string" ? r.disciplines : undefined));
+
   return {
     id: r.id ?? "",
     number,
@@ -472,15 +559,35 @@ export function normalizeRfi(raw: unknown): Rfi {
     status: r.status ?? "",
     statusLabel: r.statusLabel,
     createdAt: r.createdAt ?? "",
+    updatedAt: r.updatedAt,
+    closedAt: r.closedAt,
+    respondedAt: r.respondedAt,
     dueDate: r.dueDate,
+
     assignees,
-    manager: normalizeParty(r.manager ?? r.managerUser ?? r.reviewer),
+    manager,
+    ballInCourt,
+    coReviewers: normalizeAssignees(r.coReviewers ?? r.reviewers),
+    distributionList: normalizeAssignees(r.distributionList ?? r.distributedTo),
+    watchers: normalizeAssignees(r.watchers),
+
+    priority: r.priority,
+    location: r.location ?? r.locationId,
+    locationDescription: r.locationDescription,
+    discipline,
+    category: r.category,
+
     question: r.question,
     officialResponse: r.officialResponse,
+    suggestedAnswer: r.suggestedAnswer,
+    rfiTypeId: r.rfiTypeId,
+
+    extra: extractExtra(r),
     customAttributes: normalizeCustomAttributes(r.customAttributes),
     ...(meta ? { customAttributesMeta: meta } : {}),
     attachments,
     attachmentCount,
+    comments: [],
   };
 }
 
@@ -526,6 +633,67 @@ export async function getRfiById(
   return normalizeRfi(raw);
 }
 
+// GET /construction/rfis/v3/projects/:p/rfis/:id/attachments — separate
+// endpoint. Search and even GET-by-id sometimes return an empty attachments
+// array on tenants where attachments live in a sibling endpoint, so we hit
+// this explicitly during hydration.
+export async function getRfiAttachments(
+  client: ApsClient,
+  projectId: string,
+  rfiId: string,
+): Promise<RfiAttachment[]> {
+  const p = normaliseProjectIdForRfi(projectId);
+  try {
+    const res = await client.request<{ results?: RawRfiAttachment[] }>({
+      path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/rfis/${encodeURIComponent(rfiId)}/attachments`,
+    });
+    return normalizeAttachments(res.results ?? []);
+  } catch (e) {
+    // Per-RFI permission boundary — fall back to whatever was on the RFI.
+    if (e instanceof ApsError && (e.status === 401 || e.status === 403)) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+// GET /construction/rfis/v3/projects/:p/rfis/:id/comments — paginated.
+export async function getRfiComments(
+  client: ApsClient,
+  projectId: string,
+  rfiId: string,
+): Promise<RfiComment[]> {
+  const p = normaliseProjectIdForRfi(projectId);
+  try {
+    const res = await client.request<{ results?: RawRfiComment[] }>({
+      path: `/construction/rfis/v3/projects/${encodeURIComponent(p)}/rfis/${encodeURIComponent(rfiId)}/comments`,
+      query: { limit: 200 },
+    });
+    return (res.results ?? []).flatMap((raw) => {
+      if (!raw || typeof raw !== "object") return [];
+      const id = raw.id ?? raw.commentId;
+      if (typeof id !== "string" || !id) return [];
+      const author = normalizeParty(raw.createdBy ?? raw.author ?? raw.user);
+      const comment: RfiComment = {
+        id,
+        body: raw.body ?? raw.text ?? "",
+        ...(author ? { author } : {}),
+        ...(raw.createdAt ? { createdAt: raw.createdAt } : {}),
+        attachments: normalizeAttachments(raw.attachments),
+        ...(raw.attachmentType === "rfiResponse" || raw.isOfficialResponse
+          ? { isOfficialResponse: true }
+          : {}),
+      };
+      return [comment];
+    });
+  } catch (e) {
+    if (e instanceof ApsError && (e.status === 401 || e.status === 403)) {
+      return [];
+    }
+    throw e;
+  }
+}
+
 // Walk every page of search:rfis until exhausted or MAX_TOTAL hit.
 // onProgress lets the UI render a progress bar without waiting for the full set.
 export async function scrapeAllRfis(
@@ -559,17 +727,29 @@ export interface HydrationProgress {
   total: number;
 }
 
+export interface HydrateOptions {
+  // Fetch the per-RFI /attachments list (and use its length for the
+  // accurate count). Default true — search/get-by-id sometimes return
+  // an empty attachments array even when files exist.
+  attachments?: boolean;
+  // Fetch /comments as well. Default false — comments add a request per
+  // RFI, only needed when the user wants the Detail PDF layout.
+  comments?: boolean;
+}
+
 // Some APS configurations return RFIs from /search:rfis with no customAttributes
 // — the schema is right but the field is absent or empty even when values exist.
 // Hydrate by fetching each RFI's full detail individually with bounded
 // concurrency. Replaces every input RFI with its full-detail counterpart in
-// place, preserving order.
+// place, preserving order. Optionally pulls attachments and comments from
+// their dedicated endpoints in parallel with the main fetch.
 export async function hydrateRfis(
   client: ApsClient,
   projectId: string,
   rfis: Rfi[],
   onProgress?: (p: HydrationProgress) => void,
   signal?: AbortSignal,
+  options: HydrateOptions = { attachments: true, comments: false },
 ): Promise<Rfi[]> {
   const total = rfis.length;
   if (total === 0) return rfis;
@@ -586,7 +766,22 @@ export async function hydrateRfis(
       const original = rfis[i];
       if (!original) continue;
       try {
-        out[i] = await getRfiById(client, projectId, original.id);
+        const [detail, attachments, comments] = await Promise.all([
+          getRfiById(client, projectId, original.id),
+          options.attachments !== false
+            ? getRfiAttachments(client, projectId, original.id)
+            : Promise.resolve(null as RfiAttachment[] | null),
+          options.comments
+            ? getRfiComments(client, projectId, original.id)
+            : Promise.resolve(null as RfiComment[] | null),
+        ]);
+        const merged: Rfi = { ...detail };
+        if (attachments) {
+          merged.attachments = attachments;
+          merged.attachmentCount = attachments.length;
+        }
+        if (comments) merged.comments = comments;
+        out[i] = merged;
       } catch {
         // If a single RFI fails to hydrate (deleted, permissions on this
         // particular item, transient), keep the slim version we already had
@@ -629,10 +824,40 @@ export function applyUserRoster(
     const resolved = roster.get(p.id);
     return resolved && resolved !== p.name ? { id: p.id, name: resolved } : p;
   };
+  const fixList = (xs: RfiParty[]): RfiParty[] => {
+    let changed = false;
+    const out = xs.map((p) => {
+      const next = fix(p);
+      if (next !== p) changed = true;
+      return next;
+    });
+    return changed ? out : xs;
+  };
   return rfis.map((r) => {
-    const assignees = r.assignees.map(fix);
+    const assignees = fixList(r.assignees);
+    const ballInCourt = fixList(r.ballInCourt);
+    const coReviewers = fixList(r.coReviewers);
+    const distributionList = fixList(r.distributionList);
+    const watchers = fixList(r.watchers);
     const manager = r.manager ? fix(r.manager) : r.manager;
-    if (assignees === r.assignees && manager === r.manager) return r;
-    return { ...r, assignees, manager };
+    if (
+      assignees === r.assignees &&
+      ballInCourt === r.ballInCourt &&
+      coReviewers === r.coReviewers &&
+      distributionList === r.distributionList &&
+      watchers === r.watchers &&
+      manager === r.manager
+    ) {
+      return r;
+    }
+    return {
+      ...r,
+      assignees,
+      ballInCourt,
+      coReviewers,
+      distributionList,
+      watchers,
+      manager,
+    };
   });
 }
