@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   applyUserRoster,
@@ -15,6 +15,7 @@ import { getProjectName } from "./projects";
 import { buildUserRoster, getProjectUsers } from "./users";
 import { getWorkflow } from "./workflow";
 import { useApsClient } from "./use-client";
+import { readHydrated, writeHydrated } from "./hydration-cache";
 import type { Rfi } from "./types";
 
 // 10 minutes — RFIs don't change that fast and the user is about to export them.
@@ -22,6 +23,7 @@ const STALE_MS = 10 * 60_000;
 const PROJECT_META_STALE_MS = 60 * 60_000; // user roster + name barely change
 
 const HYDRATED_KEY = (projectId: string) => ["rfis-hydrated", projectId] as const;
+const HYDRATED_PREFIX = "rfis";
 
 export function useRfiData(projectId: string, hubId?: string) {
   const client = useApsClient();
@@ -66,11 +68,27 @@ export function useRfiData(projectId: string, hubId?: string) {
   });
 
   // Hydrated copy — populated by hydrate() below, never auto-fetched.
+  // gcTime: Infinity prevents TanStack Query from collecting the dataset
+  // when the user briefly has no observers (e.g. mid-navigation between
+  // /rfis and /builder); without it the cache disappears after 5 min and
+  // the user has to re-hydrate, losing every custom field.
   const hydratedQ = useQuery<Rfi[]>({
     queryKey: HYDRATED_KEY(projectId),
     enabled: false,
     staleTime: STALE_MS,
+    gcTime: Infinity,
   });
+
+  // Prime the in-memory cache from sessionStorage on mount. Survives
+  // navigation, route changes, and (within the same tab) page reloads.
+  useEffect(() => {
+    if (!projectId) return;
+    if (qc.getQueryData<Rfi[]>(HYDRATED_KEY(projectId))) return;
+    const stored = readHydrated(HYDRATED_PREFIX, projectId);
+    if (stored && stored.length > 0) {
+      qc.setQueryData(HYDRATED_KEY(projectId), stored);
+    }
+  }, [projectId, qc]);
 
   const [hydrationProgress, setHydrationProgress] = useState<HydrationProgress | null>(null);
   const [hydrating, setHydrating] = useState(false);
@@ -118,6 +136,7 @@ export function useRfiData(projectId: string, hubId?: string) {
         { attachments: true, comments: opts.comments ?? false },
       );
       qc.setQueryData(HYDRATED_KEY(projectId), full);
+      writeHydrated(HYDRATED_PREFIX, projectId, full);
       // Apply the user roster on the freshly-hydrated data so the caller can
       // export immediately without waiting for the next React render.
       return applyUserRoster(full, userRoster);
