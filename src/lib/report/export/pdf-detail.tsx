@@ -123,13 +123,19 @@ function makeStyles(brand: Brand) {
       flexWrap: "wrap",
       marginBottom: 10,
     },
+    // Use integer-friendly flex basis instead of fractional percentages —
+    // @react-pdf's flex layout can produce out-of-range coords when 33.333%
+    // compounds across siblings, surfacing as "unsupported number" errors
+    // from the underlying PDF writer.
     metaCell: {
-      width: "33.333%",
+      flexBasis: "33%",
+      flexGrow: 1,
       paddingRight: 8,
       marginBottom: 8,
     },
     metaCellWide: {
-      width: "100%",
+      flexBasis: "100%",
+      flexGrow: 1,
       paddingRight: 0,
       marginBottom: 8,
     },
@@ -156,13 +162,18 @@ function makeStyles(brand: Brand) {
       color: brand.ink,
       marginBottom: 4,
     },
+    paragraphSmall: {
+      fontSize: 8,
+      color: brand.primary,
+      marginBottom: 4,
+    },
     attachmentsList: {
       marginTop: 2,
     },
     attachmentRow: {
       flexDirection: "row",
-      fontSize: 8.5,
-      marginBottom: 1.5,
+      fontSize: 9,
+      marginBottom: 2,
     },
     attachmentBullet: { width: 10, color: brand.muted },
     attachmentName: { flex: 1, color: brand.ink },
@@ -171,7 +182,9 @@ function makeStyles(brand: Brand) {
       marginTop: 4,
       marginBottom: 6,
       paddingLeft: 8,
-      borderLeftWidth: 1.5,
+      // Integer border width — non-integer values can hit a "number out of
+      // range" path in some pdf-lib serialisers.
+      borderLeftWidth: 2,
       borderLeftColor: "#e5e7eb",
       borderLeftStyle: "solid",
     },
@@ -349,9 +362,14 @@ export function DetailPdf({
               {group.rfis.map((rfi, ri) => {
                 const link = projectId ? linkBase(projectId, rfi.id) : undefined;
                 const isLast = ri === group.rfis.length - 1 && gi === groups.length - 1;
+                // Force a page break before every RFI except the first. We
+                // pass the prop only when we want it set — explicitly
+                // passing `break={false}` hits a different code path in
+                // @react-pdf that can produce out-of-range layout coords.
+                const breakProps = ri > 0 || gi > 0 ? { break: true as const } : {};
 
                 return (
-                  <View key={rfi.id} wrap break={ri > 0}>
+                  <View key={rfi.id} wrap {...breakProps}>
                     <View style={styles.rfiHeader}>
                       <Text style={styles.rfiNumber}>
                         {rfi.number || rfi.id} · {rfi.statusLabel ?? rfi.status}
@@ -423,7 +441,7 @@ export function DetailPdf({
                           ))}
                         </View>
                         {link ? (
-                          <Link src={link} style={[styles.paragraph, { color: brand.primary, fontSize: 8 }]}>
+                          <Link src={link} style={styles.paragraphSmall}>
                             Open in Forma →
                           </Link>
                         ) : null}
