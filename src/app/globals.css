@@ -2,22 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Bailey Partnership brand tokens — derived from the report cover page:
+   #143644 ribbons, #d1c800 accent strips, #0e2841 titles, black body text.
+   --brand-primary mirrors the title-text colour so primary buttons read as
+   the same authoritative navy used on the cover; --brand-secondary is the
+   ribbon teal used for headers and dividers. */
 :root {
-  --brand-primary: #0f3d5c;
-  --brand-accent: #d97706;
-  --brand-ink: #111827;
+  --brand-primary: #0e2841;
+  --brand-secondary: #143644;
+  --brand-accent: #d1c800;
+  --brand-ink: #000000;
+  --brand-ink-soft: #2a2f36;
   --brand-muted: #6b7280;
   --brand-surface: #ffffff;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --brand-canvas: #f5f6f8;
+  --brand-border: #e3e6eb;
+  --brand-ring: rgba(14, 40, 65, 0.18);
+  --font-sans:
+    var(--font-figtree), "Figtree", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
 }
 
 html,
 body {
-  background: #f7f7f8;
+  background: var(--brand-canvas);
   color: var(--brand-ink);
   font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
 }
 
 * {
   box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--brand-primary);
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--brand-accent);
+  color: var(--brand-primary);
 }

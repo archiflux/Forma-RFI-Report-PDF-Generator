@@ -43,21 +43,26 @@ export function SortPicker({
     onChange([...sort, { field: firstUnused, order: "asc" }]);
   }
 
+  const labelClass =
+    "text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]";
+  const selectClass =
+    "rounded-lg border border-[color:var(--brand-border)] bg-white px-2 py-1.5 text-sm outline-none transition-colors focus:border-[color:var(--brand-primary)] focus:ring-2 focus:ring-[color:var(--brand-primary)]/20";
+
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-neutral-200">
-      <h3 className="text-sm font-semibold">Sort &amp; group</h3>
+    <div className="rounded-2xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card sm:p-5">
+      <h3 className="text-sm font-semibold text-[color:var(--brand-primary)]">
+        Sort &amp; group
+      </h3>
 
       <div className="mt-3">
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-          Sort by
-        </p>
+        <p className={labelClass}>Sort by</p>
         <ol className="mt-2 space-y-2">
           {sort.map((s, i) => (
             <li key={`${s.field}-${i}`} className="flex items-center gap-2">
               <select
                 value={s.field}
                 onChange={(e) => updateAt(i, { field: e.target.value as FieldId })}
-                className="flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                className={`${selectClass} flex-1`}
               >
                 {allFields.map((f) => (
                   <option key={f} value={f}>
@@ -68,7 +73,7 @@ export function SortPicker({
               <select
                 value={s.order}
                 onChange={(e) => updateAt(i, { order: e.target.value as "asc" | "desc" })}
-                className="rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                className={selectClass}
               >
                 <option value="asc">Asc</option>
                 <option value="desc">Desc</option>
@@ -77,7 +82,7 @@ export function SortPicker({
                 type="button"
                 onClick={() => removeAt(i)}
                 aria-label="Remove sort"
-                className="rounded px-1.5 text-red-500 hover:bg-red-50"
+                className="rounded-md px-1.5 text-red-500 hover:bg-red-50"
               >
                 ✕
               </button>
@@ -96,13 +101,11 @@ export function SortPicker({
       </div>
 
       <div className="mt-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-          Group by
-        </p>
+        <p className={labelClass}>Group by</p>
         <select
           value={groupBy ?? ""}
           onChange={(e) => onGroupByChange((e.target.value || undefined) as FieldId | undefined)}
-          className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+          className={`${selectClass} mt-2 w-full`}
         >
           <option value="">(none)</option>
           {allFields.map((f) => (

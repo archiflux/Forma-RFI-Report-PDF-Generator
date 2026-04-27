@@ -720,7 +720,12 @@ export async function scrapeAllRfis(
   return out;
 }
 
-const HYDRATE_CONCURRENCY = 8;
+// Concurrency for /rfis/:id detail fetches during hydration. APS rate-limits
+// per-project bursts and 8 workers reliably tripped 429 on large projects;
+// 4 lands well under the bucket while still hydrating ~5000 RFIs in a
+// reasonable time. The ApsClient retries any 429 it does see, so this is
+// belt-and-braces.
+const HYDRATE_CONCURRENCY = 4;
 
 export interface HydrationProgress {
   hydrated: number;

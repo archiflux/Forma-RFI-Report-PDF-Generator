@@ -41,13 +41,18 @@ export default function HubsPage() {
 
   return (
     <section>
-      <h2 className="text-xl font-semibold">Choose a hub</h2>
-      <p className="mt-1 text-sm text-neutral-600">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
+        Step 1 of 3
+      </p>
+      <h2 className="mt-1 text-2xl font-semibold text-[color:var(--brand-primary)]">
+        Choose a hub
+      </h2>
+      <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
         Pick the Forma hub (account) you want to pull RFIs from.
       </p>
 
       {q.isLoading ? (
-        <p className="mt-6 text-sm text-neutral-500">Loading hubs…</p>
+        <p className="mt-6 text-sm text-[color:var(--brand-muted)]">Loading hubs…</p>
       ) : q.isError ? (
         <p className="mt-6 text-sm text-red-600">
           {q.error instanceof Error ? q.error.message : String(q.error)}
@@ -77,12 +82,14 @@ function HubGroup({ kind, hubs }: { kind: HubKind; hubs: Hub[] }) {
   const hint = KIND_HINT[kind];
   return (
     <div className="mt-6">
-      <h3 className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
         {KIND_LABEL[kind]} · {hubs.length}
       </h3>
-      {hint ? <p className="mt-1 text-xs text-neutral-500">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-1 text-xs text-[color:var(--brand-muted)]">{hint}</p>
+      ) : null}
 
-      <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {hubs.map((hub) => (
           <li key={hub.id}>
             <Link
@@ -90,15 +97,23 @@ function HubGroup({ kind, hubs }: { kind: HubKind; hubs: Hub[] }) {
               aria-disabled={kind === "personal"}
               className={
                 kind === "acc"
-                  ? "block rounded-xl bg-white p-5 shadow-sm ring-1 ring-neutral-200 transition hover:ring-[color:var(--brand-primary)]"
-                  : "block rounded-xl bg-neutral-50 p-5 ring-1 ring-neutral-200"
+                  ? "group block rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card transition-colors hover:border-[color:var(--brand-primary)]"
+                  : "block rounded-2xl border border-[color:var(--brand-border)] bg-[color:var(--brand-canvas)] p-5"
               }
             >
-              <p className="font-medium">{hub.name}</p>
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="font-semibold text-[color:var(--brand-primary)]">
+                {hub.name}
+              </p>
+              <p className="mt-1 text-xs text-[color:var(--brand-muted)]">
                 {hub.region ?? "—"}
                 {hub.extensionType ? ` · ${hub.extensionType}` : ""}
               </p>
+              {kind === "acc" ? (
+                <span
+                  aria-hidden
+                  className="mt-3 inline-block h-1 w-10 rounded-full bg-[color:var(--brand-accent)] transition-all group-hover:w-16"
+                />
+              ) : null}
             </Link>
           </li>
         ))}

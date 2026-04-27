@@ -85,6 +85,79 @@ describe("read-only contract (SKILL.md §2)", () => {
       ).rejects.toMatchObject({ name: "ApsError", status: 403 });
     });
 
+    it("retries 429 with backoff and surfaces the final error if APS keeps refusing", async () => {
+      const fetchMock = vi.fn(async () =>
+        new Response(JSON.stringify({ error: "rate_limited" }), {
+          status: 429,
+          headers: { "Retry-After": "0", "Content-Type": "application/json" },
+        }),
+      );
+      const sleeps: number[] = [];
+      const c = new ApsClient({
+        getAccessToken: () => "t",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        sleepImpl: async (ms) => {
+          sleeps.push(ms);
+        },
+        maxRetries: 3,
+      });
+      await expect(
+        c.request({
+          method: "POST",
+          path: "/construction/rfis/v3/projects/abc/search:rfis",
+          body: {},
+        }),
+      ).rejects.toMatchObject({ name: "ApsError", status: 429 });
+      // 1 original + 3 retries = 4 fetches, 3 sleeps in between.
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(sleeps).toHaveLength(3);
+    });
+
+    it("recovers when a 429 is followed by a success", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response("rate", {
+            status: 429,
+            headers: { "Retry-After": "0" },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ ok: true }), { status: 200 }),
+        );
+      const c = new ApsClient({
+        getAccessToken: () => "t",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        sleepImpl: async () => {},
+      });
+      await expect(c.request({ path: "/project/v1/hubs" })).resolves.toEqual({
+        ok: true,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("honours Retry-After (delta-seconds) when present on a 429", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response("rate", {
+            status: 429,
+            headers: { "Retry-After": "2" },
+          }),
+        )
+        .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+      const sleeps: number[] = [];
+      const c = new ApsClient({
+        getAccessToken: () => "t",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        sleepImpl: async (ms) => {
+          sleeps.push(ms);
+        },
+      });
+      await c.request({ path: "/project/v1/hubs" });
+      expect(sleeps).toEqual([2000]);
+    });
+
     // Regression: Safari/WebKit throws "Can only call Window.fetch on
     // instances of Window" when fetch is invoked via a method on a non-Window
     // object. Binding fetch to globalThis in the default ctor avoids it.

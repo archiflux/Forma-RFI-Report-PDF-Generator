@@ -32,15 +32,21 @@ export default function AuthedLayout({
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-[color:var(--brand-accent)]">
-              Bailey Partnership
-            </p>
-            <h1 className="text-lg font-semibold text-[color:var(--brand-ink)]">
-              Forma RFI Reports
-            </h1>
+      <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/85 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden
+              className="hidden h-9 w-1.5 rounded-full bg-[color:var(--brand-accent)] sm:inline-block"
+            />
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
+                Bailey Partnership
+              </p>
+              <h1 className="text-base font-semibold text-[color:var(--brand-primary)] sm:text-lg">
+                Forma RFI Reports
+              </h1>
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -54,7 +60,9 @@ export default function AuthedLayout({
           </Button>
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+      <div className="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+        {children}
+      </div>
     </div>
   );
 }
