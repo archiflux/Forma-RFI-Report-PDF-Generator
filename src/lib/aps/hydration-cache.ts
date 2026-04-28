@@ -1,21 +1,30 @@
 // Per-tab persistence of hydrated RFI / Issue datasets.
 //
-// Hydration walks every RFI's full-detail endpoint and can take 30+ seconds
-// on a large project. Once that's done, navigating /rfis → /builder must
-// not lose it, or the user has to do the slow walk again. The TanStack
-// Query cache lives in memory and is enough during continuous interaction,
-// but it gets garbage-collected after `gcTime` (default 5 min) and is wiped
-// by a Cmd-R. sessionStorage keeps the data alive for the tab's lifetime
-// without leaking it to other tabs or surviving a quit-and-reopen.
+// Hydration walks every RFI's full-detail endpoint and can take several
+// minutes on a 600+ RFI project. Once done, navigating /rfis → /builder
+// must not lose it, or the user has to do the slow walk again.
+//
+// Two layers cover this:
+//   - In-memory: TanStack Query (gcTime: Infinity on the hydrated query)
+//     handles SPA navigation, which keeps the same QueryClient instance.
+//   - sessionStorage: a lean snapshot survives a Cmd-R within the same tab.
+//
+// We persist a lean form (no `comments`, no `extra` bag) because
+// sessionStorage caps at ~5 MB per origin in most browsers. A 600-RFI
+// payload with full comments easily blows past that and silently fails
+// the write — leaving the user thinking the cache is broken. Lean form
+// keeps the bits the merge / display path actually needs (custom
+// attributes, parties, attachments) and drops the fat ones.
 //
 // Read-only / privacy: we only ever store data the user just fetched with
 // their own bearer token. Nothing leaves the browser. sessionStorage is
 // scoped to origin + tab, so a different Forma user signing in on the same
-// machine in a new tab never sees this dataset.
+// machine in a new tab never sees this dataset. signOut() in
+// lib/auth/store.ts wipes every `forma-rfi:*` key.
 
 import type { Rfi } from "./types";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 interface CachedPayload {
   v: number;
@@ -37,6 +46,16 @@ function getStorage(): Storage | undefined {
   }
 }
 
+// Strip the heavy fields that aren't needed to skip the rehydrate prompt
+// or render custom-field columns. comments are re-fetched on demand when
+// the Detail layout asks for them; extra is a debug bag.
+function leanRfi(r: Rfi): Rfi {
+  const out: Rfi = { ...r };
+  if (out.comments && out.comments.length > 0) out.comments = [];
+  if (out.extra && Object.keys(out.extra).length > 0) out.extra = {};
+  return out;
+}
+
 export function readHydrated(prefix: string, projectId: string): Rfi[] | undefined {
   const storage = getStorage();
   if (!storage || !projectId) return undefined;
@@ -56,13 +75,37 @@ export function readHydrated(prefix: string, projectId: string): Rfi[] | undefin
 export function writeHydrated(prefix: string, projectId: string, rfis: Rfi[]): void {
   const storage = getStorage();
   if (!storage || !projectId) return;
+  const payload: CachedPayload = {
+    v: SCHEMA_VERSION,
+    rfis: rfis.map(leanRfi),
+    storedAt: Date.now(),
+  };
+  let body: string;
   try {
-    const payload: CachedPayload = { v: SCHEMA_VERSION, rfis, storedAt: Date.now() };
-    storage.setItem(key(prefix, projectId), JSON.stringify(payload));
+    body = JSON.stringify(payload);
   } catch {
-    // QuotaExceededError on huge projects — drop silently. The in-memory
-    // TanStack cache still has it for the rest of the session; we just
-    // can't survive a reload. Better than nuking other entries.
+    return;
+  }
+  try {
+    storage.setItem(key(prefix, projectId), body);
+  } catch {
+    // QuotaExceededError on enormous projects — best-effort: drop our
+    // own previous entries and retry once, then give up. The in-memory
+    // TanStack cache (gcTime: Infinity) still has the full dataset for
+    // navigation; we just lose Cmd-R survivability.
+    try {
+      const drop: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i);
+        if (k && k.startsWith("forma-rfi:") && k !== key(prefix, projectId)) {
+          drop.push(k);
+        }
+      }
+      for (const k of drop) storage.removeItem(k);
+      storage.setItem(key(prefix, projectId), body);
+    } catch {
+      // Still over quota — give up silently.
+    }
   }
 }
 

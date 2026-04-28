@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -34,10 +35,15 @@ export default function LandingPage() {
           aria-hidden
           className="absolute right-0 top-0 h-full w-1.5 bg-[color:var(--brand-accent)]"
         />
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
-          Bailey Partnership
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-[color:var(--brand-primary)] sm:text-4xl">
+        <Image
+          src="/logo-colour.png"
+          alt="Bailey Partnership"
+          width={220}
+          height={64}
+          priority
+          className="h-14 w-auto sm:h-16"
+        />
+        <h1 className="mt-6 text-3xl font-semibold text-[color:var(--brand-primary)] sm:text-4xl">
           Forma RFI Report Generator
         </h1>
         <p className="mt-4 max-w-prose text-[color:var(--brand-ink-soft)]">

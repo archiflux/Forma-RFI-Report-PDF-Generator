@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/store";
@@ -35,9 +36,13 @@ export default function AuthedLayout({
       <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className="hidden h-9 w-1.5 rounded-full bg-[color:var(--brand-accent)] sm:inline-block"
+            <Image
+              src="/icon-colour.png"
+              alt="Bailey Partnership"
+              width={36}
+              height={36}
+              priority
+              className="h-9 w-9 rounded-md object-contain"
             />
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">

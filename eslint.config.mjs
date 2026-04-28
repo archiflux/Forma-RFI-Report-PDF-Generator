@@ -12,4 +12,12 @@ export default [
   {
     ignores: [".next/**", "node_modules/**", "coverage/**"],
   },
+  {
+    // @react-pdf/renderer's <Image> is a PDF primitive, not a DOM <img>.
+    // It has no `alt` prop and the screen-reader rule doesn't apply.
+    files: ["src/lib/report/export/pdf*.tsx"],
+    rules: {
+      "jsx-a11y/alt-text": "off",
+    },
+  },
 ];

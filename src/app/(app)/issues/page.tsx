@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useIssuesData } from "@/lib/aps/use-issues-data";
 import { RfiGrid } from "@/components/rfi-grid";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ function MetadataBanner({ attrsMissingTitles }: { attrsMissingTitles: boolean })
 }
 
 function IssuesInner() {
+  const router = useRouter();
   const params = useSearchParams();
   const hubId = params.get("hubId") ?? "";
   const projectId = params.get("projectId") ?? "";
@@ -86,7 +87,7 @@ function IssuesInner() {
               disabled={isLoading || items.length === 0}
               onClick={() => {
                 const qs = new URLSearchParams({ hubId, projectId }).toString();
-                window.location.assign(`/issues/builder?${qs}`);
+                router.push(`/issues/builder?${qs}`);
               }}
             >
               Build report →

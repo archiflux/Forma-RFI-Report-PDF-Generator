@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { buildStatusLabelMap } from "@/lib/aps/workflow";
 import { useRfiData } from "@/lib/aps/use-rfi-data";
 import { RfiGrid } from "@/components/rfi-grid";
@@ -41,6 +41,7 @@ function MetadataBanner({
 }
 
 function RfisInner() {
+  const router = useRouter();
   const params = useSearchParams();
   const hubId = params.get("hubId") ?? "";
   const projectId = params.get("projectId") ?? "";
@@ -111,8 +112,12 @@ function RfisInner() {
             <Button
               disabled={isLoading || rfis.length === 0}
               onClick={() => {
+                // router.push keeps the SPA alive — a full reload would
+                // wipe TanStack Query's in-memory cache and force the user
+                // to re-hydrate the project (potentially several minutes
+                // on a 600+ RFI project).
                 const qs = new URLSearchParams({ hubId, projectId }).toString();
-                window.location.assign(`/builder?${qs}`);
+                router.push(`/builder?${qs}`);
               }}
             >
               Build report →

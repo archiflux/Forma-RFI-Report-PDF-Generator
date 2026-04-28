@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   title: "Forma RFI Report Generator",
   description:
     "Read-only branded PDF/CSV RFI reports from Autodesk Forma (formerly ACC).",
+  icons: {
+    icon: "/icon-colour.png",
+    apple: "/icon-colour.png",
+  },
 };
 
 export default function RootLayout({
