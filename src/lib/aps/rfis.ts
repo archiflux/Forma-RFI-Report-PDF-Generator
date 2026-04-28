@@ -257,18 +257,39 @@ interface RawRfiAttachment {
   permittedActions?: unknown;
 }
 
+// APS RFI v3 comment author: usually `createdBy: { id, type }` (no name —
+// names live in the project user roster). Older / sibling shapes:
+// `createdBy: "<userId>"` (bare string), or a richer party object with
+// name / email already populated.
+type RawRfiCommentAuthor = RawRfiParty | string | null;
+
 interface RawRfiComment {
   id?: string;
   commentId?: string;
   body?: string;
   text?: string;
-  createdBy?: RawRfiParty | null;
-  author?: RawRfiParty | null;
-  user?: RawRfiParty | null;
+  createdBy?: RawRfiCommentAuthor;
+  createdById?: string;
+  author?: RawRfiCommentAuthor;
+  user?: RawRfiCommentAuthor;
+  userId?: string;
   createdAt?: string;
   attachments?: RawRfiAttachment[];
   attachmentType?: string;
   isOfficialResponse?: boolean;
+}
+
+function normalizeCommentAuthor(
+  raw: RawRfiCommentAuthor | undefined,
+): { id: string; name: string } | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  if (typeof raw === "string") {
+    if (!raw) return undefined;
+    // Bare user-id reference. The project user roster will resolve this
+    // into a display name later via applyUserRoster.
+    return { id: raw, name: raw };
+  }
+  return normalizeParty(raw);
 }
 
 // Fields we explicitly model and extract from the RFI payload. We use a
@@ -673,7 +694,16 @@ export async function getRfiComments(
       if (!raw || typeof raw !== "object") return [];
       const id = raw.id ?? raw.commentId;
       if (typeof id !== "string" || !id) return [];
-      const author = normalizeParty(raw.createdBy ?? raw.author ?? raw.user);
+      const author =
+        normalizeCommentAuthor(raw.createdBy) ??
+        normalizeCommentAuthor(raw.author) ??
+        normalizeCommentAuthor(raw.user) ??
+        // Fallback to bare-id sibling fields some APS shapes return.
+        (typeof raw.createdById === "string" && raw.createdById
+          ? { id: raw.createdById, name: raw.createdById }
+          : typeof raw.userId === "string" && raw.userId
+            ? { id: raw.userId, name: raw.userId }
+            : undefined);
       const comment: RfiComment = {
         id,
         body: raw.body ?? raw.text ?? "",
@@ -838,6 +868,23 @@ export function applyUserRoster(
     });
     return changed ? out : xs;
   };
+  // Comments carry an `author` party that's almost always id-only when the
+  // detail endpoint returns it — APS doesn't bundle names with comment
+  // payloads, so without the roster every comment renders as the raw id
+  // (or "Unknown" when even the id is missing). Resolving here means the
+  // detail PDF and any future comment UI both get real names for free.
+  const fixComments = (cs: Rfi["comments"]): Rfi["comments"] => {
+    if (!cs || cs.length === 0) return cs;
+    let changed = false;
+    const out = cs.map((c) => {
+      if (!c.author) return c;
+      const next = fix(c.author);
+      if (next === c.author) return c;
+      changed = true;
+      return { ...c, author: next };
+    });
+    return changed ? out : cs;
+  };
   return rfis.map((r) => {
     const assignees = fixList(r.assignees);
     const ballInCourt = fixList(r.ballInCourt);
@@ -845,13 +892,15 @@ export function applyUserRoster(
     const distributionList = fixList(r.distributionList);
     const watchers = fixList(r.watchers);
     const manager = r.manager ? fix(r.manager) : r.manager;
+    const comments = fixComments(r.comments);
     if (
       assignees === r.assignees &&
       ballInCourt === r.ballInCourt &&
       coReviewers === r.coReviewers &&
       distributionList === r.distributionList &&
       watchers === r.watchers &&
-      manager === r.manager
+      manager === r.manager &&
+      comments === r.comments
     ) {
       return r;
     }
@@ -863,6 +912,7 @@ export function applyUserRoster(
       distributionList,
       watchers,
       manager,
+      comments,
     };
   });
 }

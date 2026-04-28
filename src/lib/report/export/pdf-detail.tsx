@@ -3,6 +3,7 @@
 import {
   Document,
   Font,
+  Image,
   Link,
   Page,
   StyleSheet,
@@ -49,6 +50,10 @@ export interface DetailPdfInput {
   totalBeforeFilter: number;
   totalAfterFilter: number;
   itemKind?: "rfi" | "issue";
+  // Bailey Partnership wordmark, pre-fetched as a data URI by the export
+  // pipeline so @react-pdf can embed it without a runtime network call.
+  // Optional — falls back to a typographic header when missing.
+  logoDataUri?: string;
 }
 
 const PAGE_DIMENSIONS = {
@@ -59,7 +64,7 @@ const PAGE_DIMENSIONS = {
 function makeStyles(brand: Brand) {
   return StyleSheet.create({
     page: {
-      paddingTop: 40,
+      paddingTop: 64,
       paddingBottom: 56,
       paddingHorizontal: 40,
       fontSize: 9,
@@ -73,50 +78,86 @@ function makeStyles(brand: Brand) {
       width: 64,
       marginBottom: 10,
     },
-    brandEyebrow: {
-      color: brand.accent,
-      fontSize: 8,
-      textTransform: "uppercase",
-      letterSpacing: 1.2,
-      fontFamily: "Helvetica-Bold",
+    coverHero: {
+      backgroundColor: brand.primary,
+      paddingTop: 64,
+      paddingBottom: 56,
+      paddingHorizontal: 56,
+    },
+    coverLogo: {
+      width: 220,
+      height: 64,
+      objectFit: "contain",
+      marginBottom: 32,
+    },
+    coverAccentBar: {
+      height: 6,
+      width: 88,
+      backgroundColor: brand.accent,
+      marginBottom: 22,
     },
     coverTitle: {
-      fontSize: 24,
+      fontSize: 32,
       fontFamily: "Helvetica-Bold",
-      marginTop: 4,
-      color: brand.primary,
+      color: "#ffffff",
+      lineHeight: 1.15,
     },
     coverProject: {
-      fontSize: 14,
-      marginTop: 18,
-      color: brand.ink,
+      fontSize: 16,
+      marginTop: 14,
+      color: "#ffffff",
+      opacity: 0.9,
+    },
+    coverBody: {
+      paddingTop: 36,
+      paddingHorizontal: 56,
     },
     coverMetaGrid: {
-      marginTop: 30,
       flexDirection: "row",
       flexWrap: "wrap",
     },
-    coverMetaCell: { width: "50%", marginBottom: 14 },
+    coverMetaCell: { width: "50%", marginBottom: 18 },
     coverMetaLabel: {
       fontSize: 8,
       color: brand.muted,
       textTransform: "uppercase",
       letterSpacing: 1,
+      fontFamily: "Helvetica-Bold",
     },
-    coverMetaValue: { fontSize: 10, color: brand.ink, marginTop: 2 },
+    coverMetaValue: {
+      fontSize: 11,
+      color: brand.ink,
+      marginTop: 3,
+      fontFamily: "Helvetica-Bold",
+    },
 
+    // Fixed header — logo on the left, project name on the right.
     pageHeader: {
-      marginBottom: 18,
+      position: "absolute",
+      top: 24,
+      left: 40,
+      right: 40,
       flexDirection: "row",
       justifyContent: "space-between",
-      alignItems: "flex-end",
+      alignItems: "center",
       borderBottomWidth: 1,
       borderBottomColor: "#e5e7eb",
       borderBottomStyle: "solid",
-      paddingBottom: 6,
+      paddingBottom: 8,
     },
-    pageHeaderTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: brand.primary },
-    pageHeaderMeta: { fontSize: 7, color: brand.muted },
+    pageHeaderLogo: { width: 80, height: 24, objectFit: "contain" },
+    pageHeaderLogoFallback: {
+      fontSize: 9,
+      fontFamily: "Helvetica-Bold",
+      color: brand.primary,
+    },
+    pageHeaderProject: {
+      fontSize: 9,
+      fontFamily: "Helvetica-Bold",
+      color: brand.primary,
+      textAlign: "right",
+      maxWidth: "60%",
+    },
 
     rfiHeader: {
       marginTop: 4,
@@ -236,20 +277,31 @@ function makeStyles(brand: Brand) {
       borderBottomStyle: "dashed",
     },
 
+    // Fixed footer — document name (left), page count (centre), generated
+    // date (right). Three flex children with equal flex so the centre
+    // pageNumber stays centred regardless of the doc-name length.
     footer: {
       position: "absolute",
       bottom: 24,
       left: 40,
       right: 40,
       flexDirection: "row",
-      justifyContent: "space-between",
-      fontSize: 7,
+      alignItems: "center",
+      fontSize: 7.5,
       color: brand.muted,
       borderTopWidth: 0.5,
       borderTopColor: "#e5e7eb",
       borderTopStyle: "solid",
       paddingTop: 6,
     },
+    footerLeft: { flex: 1, textAlign: "left" },
+    footerCenter: {
+      flex: 1,
+      textAlign: "center",
+      fontFamily: "Helvetica-Bold",
+      color: brand.primary,
+    },
+    footerRight: { flex: 1, textAlign: "right" },
   });
 }
 
@@ -291,6 +343,7 @@ export function DetailPdf({
   totalBeforeFilter,
   totalAfterFilter,
   itemKind = "rfi",
+  logoDataUri,
 }: DetailPdfInput) {
   const styles = makeStyles(brand);
   const size: "A4" | "A3" = template.pageSize === "A3" ? "A3" : "A4";
@@ -303,11 +356,36 @@ export function DetailPdf({
   const itemNounPlural = itemKind === "issue" ? "Issues" : "RFIs";
   const linkBase = itemKind === "issue" ? issueUrl : rfiUrl;
   const showComments = template.detailIncludeComments ?? false;
+  const generatedLabel = generatedAt.toISOString().slice(0, 10);
 
   // Hide the broad question/officialResponse meta cells if they're already
   // selected fields; we render them as full sections lower down.
   const fieldsForMeta = template.fields.filter(
     (f) => f !== "question" && f !== "officialResponse" && f !== "suggestedAnswer",
+  );
+
+  const PageHeader = (
+    <View style={styles.pageHeader} fixed>
+      {logoDataUri ? (
+        <Image src={logoDataUri} style={styles.pageHeaderLogo} />
+      ) : (
+        <Text style={styles.pageHeaderLogoFallback}>{brand.name}</Text>
+      )}
+      <Text style={styles.pageHeaderProject}>{projectName}</Text>
+    </View>
+  );
+
+  const PageFooter = (
+    <View style={styles.footer} fixed>
+      <Text style={styles.footerLeft}>{template.name}</Text>
+      <Text
+        style={styles.footerCenter}
+        render={({ pageNumber, totalPages }) =>
+          `Page ${pageNumber} of ${totalPages}`
+        }
+      />
+      <Text style={styles.footerRight}>{generatedLabel}</Text>
+    </View>
   );
 
   return (
@@ -316,59 +394,57 @@ export function DetailPdf({
       author={brand.name}
       subject={`${itemNoun} report — ${projectName}`}
     >
-      {/* Cover page */}
-      <Page size={size} orientation={orientation} style={styles.page}>
-        <View>
-          <View style={styles.accentRule} />
-          <Text style={styles.brandEyebrow}>{brand.name}</Text>
+      {/* Cover page — full-bleed brand band with the logo, title and
+          project, then a metadata grid below. No fixed header on the
+          cover because the hero band is the visual identity. */}
+      <Page
+        size={size}
+        orientation={orientation}
+        style={[styles.page, { paddingTop: 0, paddingHorizontal: 0 }]}
+      >
+        <View style={styles.coverHero}>
+          {logoDataUri ? (
+            <Image src={logoDataUri} style={styles.coverLogo} />
+          ) : null}
+          <View style={styles.coverAccentBar} />
           <Text style={styles.coverTitle}>{template.name}</Text>
           <Text style={styles.coverProject}>{projectName}</Text>
         </View>
 
-        <View style={styles.coverMetaGrid}>
-          <View style={styles.coverMetaCell}>
-            <Text style={styles.coverMetaLabel}>Generated</Text>
-            <Text style={styles.coverMetaValue}>
-              {generatedAt.toISOString().slice(0, 10)}
-            </Text>
-          </View>
-          <View style={styles.coverMetaCell}>
-            <Text style={styles.coverMetaLabel}>{itemNounPlural} in report</Text>
-            <Text style={styles.coverMetaValue}>
-              {totalAfterFilter.toLocaleString()} of {totalBeforeFilter.toLocaleString()}
-            </Text>
-          </View>
-          <View style={styles.coverMetaCell}>
-            <Text style={styles.coverMetaLabel}>Layout</Text>
-            <Text style={styles.coverMetaValue}>
-              Detail{showComments ? " · with comments" : ""}
-            </Text>
-          </View>
-          <View style={styles.coverMetaCell}>
-            <Text style={styles.coverMetaLabel}>Groups</Text>
-            <Text style={styles.coverMetaValue}>
-              {groups.length > 1 ? String(groups.length) : "—"}
-            </Text>
+        <View style={styles.coverBody}>
+          <View style={styles.coverMetaGrid}>
+            <View style={styles.coverMetaCell}>
+              <Text style={styles.coverMetaLabel}>Generated</Text>
+              <Text style={styles.coverMetaValue}>{generatedLabel}</Text>
+            </View>
+            <View style={styles.coverMetaCell}>
+              <Text style={styles.coverMetaLabel}>{itemNounPlural} in report</Text>
+              <Text style={styles.coverMetaValue}>
+                {totalAfterFilter.toLocaleString()} of {totalBeforeFilter.toLocaleString()}
+              </Text>
+            </View>
+            <View style={styles.coverMetaCell}>
+              <Text style={styles.coverMetaLabel}>Layout</Text>
+              <Text style={styles.coverMetaValue}>
+                Detail{showComments ? " · with comments" : ""}
+              </Text>
+            </View>
+            <View style={styles.coverMetaCell}>
+              <Text style={styles.coverMetaLabel}>Groups</Text>
+              <Text style={styles.coverMetaValue}>
+                {groups.length > 1 ? String(groups.length) : "—"}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.footer} fixed>
-          <Text>{brand.name} · {projectName}</Text>
-          <Text
-            render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-          />
-        </View>
+        {PageFooter}
       </Page>
 
       {/* Empty-state page when filters exclude everything. */}
       {totalAfterFilter === 0 ? (
         <Page size={size} orientation={orientation} style={styles.page}>
-          <View style={styles.pageHeader} fixed>
-            <Text style={styles.pageHeaderTitle}>{template.name}</Text>
-            <Text style={styles.pageHeaderMeta}>
-              {projectName} · {generatedAt.toISOString().slice(0, 10)}
-            </Text>
-          </View>
+          {PageHeader}
           <Text
             style={{
               marginTop: 30,
@@ -379,12 +455,7 @@ export function DetailPdf({
           >
             No {itemNounPlural.toLowerCase()} match the current filters.
           </Text>
-          <View style={styles.footer} fixed>
-            <Text>{brand.name} · {projectName}</Text>
-            <Text
-              render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-            />
-          </View>
+          {PageFooter}
         </Page>
       ) : null}
 
@@ -405,12 +476,7 @@ export function DetailPdf({
               style={styles.page}
               wrap
             >
-              <View style={styles.pageHeader} fixed>
-                <Text style={styles.pageHeaderTitle}>{template.name}</Text>
-                <Text style={styles.pageHeaderMeta}>
-                  {projectName} · {generatedAt.toISOString().slice(0, 10)}
-                </Text>
-              </View>
+              {PageHeader}
 
               {showGroupHeading ? (
                 <Text style={styles.sectionHeading}>
@@ -516,12 +582,7 @@ export function DetailPdf({
                 </View>
               ) : null}
 
-              <View style={styles.footer} fixed>
-                <Text>{brand.name} · {projectName}</Text>
-                <Text
-                  render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-                />
-              </View>
+              {PageFooter}
             </Page>
           );
         }),

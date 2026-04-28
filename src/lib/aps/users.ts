@@ -28,25 +28,48 @@ const MAX_TOTAL = 5000;
 // GET /construction/admin/v1/projects/:p/users — paginated user roster.
 // Returns id + display name for every member of the project, which we use
 // to resolve assignedTo[] references (which are id-only) into named parties.
+//
+// The construction-admin endpoint is admin-gated. When it 401/403s (every
+// non-admin user), we fall back to /bim360/admin/v1/projects/:p/users which
+// is readable by any project member. The two endpoints return the same
+// shape modulo id-keying — we tolerate that in normalizeUser.
 export async function getProjectUsers(
   client: ApsClient,
   projectId: string,
 ): Promise<ProjectUser[]> {
   const p = normaliseProjectIdForRfi(projectId);
+  const primary = await tryFetchUsers(
+    client,
+    `/construction/admin/v1/projects/${encodeURIComponent(p)}/users`,
+  );
+  if (primary !== "denied") return primary;
+  // Fallback for non-admins. Same path under the bim360-admin namespace
+  // permits any project member to enumerate fellow members.
+  const fallback = await tryFetchUsers(
+    client,
+    `/bim360/admin/v1/projects/${encodeURIComponent(p)}/users`,
+  );
+  return fallback === "denied" ? [] : fallback;
+}
+
+async function tryFetchUsers(
+  client: ApsClient,
+  path: string,
+): Promise<ProjectUser[] | "denied"> {
   const out: ProjectUser[] = [];
   let offset = 0;
   for (;;) {
     let res: RawProjectUsersResponse;
     try {
       res = await client.request<RawProjectUsersResponse>({
-        path: `/construction/admin/v1/projects/${encodeURIComponent(p)}/users`,
+        path,
         query: { limit: PAGE, offset },
       });
     } catch (e) {
-      // Member listing is permission-gated. Non-admins commonly hit 403.
-      // Degrade silently so unresolved-id assignees still appear.
-      if (e instanceof ApsError && (e.status === 401 || e.status === 403)) {
-        return out;
+      if (e instanceof ApsError && (e.status === 401 || e.status === 403 || e.status === 404)) {
+        // 404 means the endpoint doesn't exist on this tenant — same
+        // outcome from the caller's perspective.
+        return out.length > 0 ? out : "denied";
       }
       throw e;
     }
