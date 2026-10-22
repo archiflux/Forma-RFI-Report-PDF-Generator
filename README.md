@@ -73,6 +73,36 @@ design.
 A more detailed architecture lives in
 [`.claude/skills/forma-rfi-report/SKILL.md`](./.claude/skills/forma-rfi-report/SKILL.md).
 
+## Dashboards (Issues / BCF workflow)
+
+After choosing a hub, the app opens a **template catalogue** modelled on
+Forma Insight's Power BI templates.
+
+- **Issues dashboard** (`/dashboard?hubId=…&p=<projectIds>`): pick any number
+  of projects and see KPIs (outstanding, overdue, average days to close,
+  share pinned to a model), status by project, created vs closed per month,
+  age of outstanding issues, and breakdowns by type, root cause and assignee.
+  Click a bar to filter. The selection is in the URL, so colleagues with
+  Forma access can open the same view.
+- **Project sets**: save a named selection of projects. Sets are stored in
+  `localStorage` keyed by the signed-in Autodesk user id, so they persist
+  across sessions but only on that browser. They hold project ids and names
+  only, no issue data.
+- **Data probe** (`/probe`): calls ~20 read-only APS endpoints (Issues, BCF
+  2.1, RFIs, Forms, Assets, Submittals, Reviews, Photos, Meetings, Cost,
+  Model Coordination, Locations, members) for one project and reports status,
+  record counts and which fields carry data. "Copy summary" copies field
+  names and counts only, never values.
+- **Snapshots and the public viewer** (`/view`): the dashboard can download a
+  redacted JSON snapshot (people's names replaced with Person 1, 2…,
+  descriptions and custom fields off by default). `/view` opens a snapshot
+  without signing in and makes no network calls. A demo dataset is built in.
+  Snapshots are point-in-time and do not refresh.
+
+Issues data comes from `GET /construction/issues/v1/projects/:p/issues`
+plus `issue-types?include=subtypes` and
+`issue-root-cause-categories?include=rootcauses` for labels. All GET.
+
 ## Autodesk Forma vs Autodesk Construction Cloud — naming note
 
 On **17 February 2026**, Autodesk announced that **Autodesk Construction Cloud

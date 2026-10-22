@@ -47,3 +47,15 @@ h4 {
   background: var(--brand-accent);
   color: var(--brand-primary);
 }
+
+/* Dashboard chart roles (dataviz reference palette, light mode; the app has
+   no dark theme). Validated: adjacent CVD dE >= 9.1. Aqua and yellow sit
+   below 3:1 on white, so every chart using them also shows numbers. */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --status-critical: #d03b3b;
+  --chart-grid: #e3e6eb;
+}

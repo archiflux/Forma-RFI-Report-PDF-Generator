@@ -93,7 +93,7 @@ function HubGroup({ kind, hubs }: { kind: HubKind; hubs: Hub[] }) {
         {hubs.map((hub) => (
           <li key={hub.id}>
             <Link
-              href={`/projects?hubId=${encodeURIComponent(hub.id)}`}
+              href={`/templates?hubId=${encodeURIComponent(hub.id)}`}
               aria-disabled={kind === "personal"}
               className={
                 kind === "acc"
