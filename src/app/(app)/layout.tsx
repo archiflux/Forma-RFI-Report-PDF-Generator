@@ -2,7 +2,9 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/store";
 
@@ -49,10 +51,13 @@ export default function AuthedLayout({
                 Bailey Partnership
               </p>
               <h1 className="text-base font-semibold text-[color:var(--brand-primary)] sm:text-lg">
-                Forma RFI Reports
+                Forma Dashboards
               </h1>
             </div>
           </div>
+          <Suspense fallback={null}>
+            <HubNav />
+          </Suspense>
           <Button
             variant="ghost"
             size="sm"
@@ -69,5 +74,27 @@ export default function AuthedLayout({
         {children}
       </div>
     </div>
+  );
+}
+
+// Hub-scoped navigation. Only shown once a hub is in the URL.
+function HubNav() {
+  const hubId = useSearchParams().get("hubId");
+  if (!hubId) return null;
+  const q = `?hubId=${encodeURIComponent(hubId)}`;
+  const links = [
+    ["Templates", "/templates"],
+    ["Issues dashboard", "/dashboard"],
+    ["RFI reports", "/projects"],
+    ["Data probe", "/probe"],
+  ] as const;
+  return (
+    <nav className="ml-auto hidden gap-4 text-sm md:flex">
+      {links.map(([label, href]) => (
+        <Link key={href} href={`${href}${q}`} className="font-medium text-[color:var(--brand-secondary)] hover:text-[color:var(--brand-primary)]">
+          {label}
+        </Link>
+      ))}
+    </nav>
   );
 }
