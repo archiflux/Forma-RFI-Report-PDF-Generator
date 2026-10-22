@@ -5,6 +5,7 @@ import {
   ageing,
   applyFilters,
   countBy,
+  isOutstanding,
   kpis,
   monthlyTrend,
   statusByProject,
@@ -49,7 +50,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
   const k = useMemo(() => kpis(issues, now), [issues, now]);
   const byType = useMemo(() => countBy(issues, (i) => i.typeName), [issues]);
   const byCause = useMemo(() => countBy(issues, (i) => i.rootCause), [issues]);
-  const byAssignee = useMemo(() => countBy(issues.filter((i) => i.status !== "closed"), (i) => i.assignee?.name ?? "Unassigned"), [issues]);
+  const byAssignee = useMemo(() => countBy(issues.filter(isOutstanding), (i) => i.assignee?.name ?? "Unassigned"), [issues]);
   const byStatus = useMemo(() => countBy(issues, (i) => statusLabel(i.status), 12), [issues]);
   const projects = useMemo(() => statusByProject(issues, now), [issues, now]);
   const trend = useMemo(() => monthlyTrend(issues), [issues]);

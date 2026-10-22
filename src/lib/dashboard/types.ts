@@ -39,6 +39,11 @@ export interface DatasetProject {
   id: string;
   name: string;
   issueCount: number;
+  // Issues API returned 404: the Issues tool isn't activated in this project
+  // (Docs-only, template or archived projects). Not an error.
+  issuesUnavailable?: boolean;
+  // Members the signed-in user could read; 0 means names can't be resolved.
+  memberCount?: number;
   error?: string;
 }
 

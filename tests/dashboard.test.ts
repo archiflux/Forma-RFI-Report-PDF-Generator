@@ -14,6 +14,7 @@ import { makeSnapshot, parseSnapshot } from "@/lib/dashboard/snapshot";
 import { demoDataset } from "@/lib/dashboard/demo";
 import { fieldCoverage } from "@/lib/aps/probe";
 import { EMPTY_FILTERS, type IssueRecord } from "@/lib/dashboard/types";
+import { buildUserRoster, type ProjectUser } from "@/lib/aps/users";
 
 const NOW = new Date("2026-10-22T12:00:00Z");
 
@@ -21,7 +22,15 @@ const ctx = {
   projectId: "p1",
   projectName: "Project One",
   lookups: { types: { t1: "Design" }, subtypes: { s1: "Clash" }, rootCauses: { r1: "Coordination" } },
-  users: { u1: "Alex Smith" },
+  directory: {
+    // Issues reference people by Autodesk id; the roster is keyed by both
+    // the project user id and the Autodesk id.
+    people: buildUserRoster([
+      { id: "proj-guid-1", name: "Alex Smith", autodeskId: "GWJJ9C7MQG439PNK" } as ProjectUser,
+    ]),
+    companies: new Map([["c1", "Acme Ltd"]]),
+    roles: new Map([["r9", "Architect"]]),
+  },
   attrNames: { a1: "Package" },
 };
 
@@ -57,9 +66,9 @@ describe("normaliseIssue", () => {
         issueTypeId: "t1",
         issueSubtypeId: "s1",
         rootCauseId: "r1",
-        assignedTo: "u1",
+        assignedTo: "GWJJ9C7MQG439PNK",
         assignedToType: "user",
-        createdBy: "u1",
+        createdBy: "GWJJ9C7MQG439PNK",
         createdAt: "2026-09-01T00:00:00Z",
         linkedDocuments: [{ type: "TwoDVectorPushpin" }],
         customAttributes: [{ attributeDefinitionId: "a1", value: "M&E" }],
@@ -72,18 +81,25 @@ describe("normaliseIssue", () => {
       typeName: "Design",
       subtypeName: "Clash",
       rootCause: "Coordination",
-      assignee: { id: "u1", name: "Alex Smith", kind: "user" },
+      assignee: { id: "GWJJ9C7MQG439PNK", name: "Alex Smith", kind: "user" },
       createdBy: "Alex Smith",
       hasViewpoint: true,
       custom: { Package: "M&E" },
     });
   });
 
-  it("falls back for unknown ids and labels companies", () => {
-    const n = normaliseIssue({ id: "i2", assignedTo: "abcdef123456", assignedToType: "company" }, ctx);
+  it("resolves company and role assignees", () => {
+    expect(normaliseIssue({ id: "a", assignedTo: "c1", assignedToType: "company" }, ctx)?.assignee?.name).toBe("Acme Ltd");
+    expect(normaliseIssue({ id: "b", assignedTo: "r9", assignedToType: "role" }, ctx)?.assignee?.name).toBe("Architect");
+  });
+
+  it("labels unresolved ids instead of showing them raw", () => {
+    const n = normaliseIssue({ id: "i2", assignedTo: "ZZZZ9999XXXX", assignedToType: "user", createdBy: "QQQQ1111" }, ctx);
     expect(n?.typeName).toBe("Unspecified");
     expect(n?.rootCause).toBe("Not set");
-    expect(n?.assignee).toEqual({ id: "abcdef123456", name: "company abcdef12", kind: "company" });
+    expect(n?.assignee?.name).toBe("Unknown user (ZZZZ99)");
+    expect(n?.createdBy).toBe("Unknown user (QQQQ11)");
+    expect(normaliseIssue({ id: "c", assignedTo: "c404abc", assignedToType: "company" }, ctx)?.assignee?.name).toBe("Company (c404ab)");
   });
 
   it("drops records without an id", () => {

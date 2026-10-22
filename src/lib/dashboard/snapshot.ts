@@ -44,7 +44,9 @@ export function makeSnapshot(ds: DashboardDataset, o: SnapshotOptions, now = new
     generatedAt: now.toISOString(),
     hubId: "",
     ...(o.title ? { title: o.title } : {}),
-    projects: ds.projects.map(({ id, name, issueCount }) => ({ id, name, issueCount })),
+    projects: ds.projects
+      .filter((p) => !p.issuesUnavailable && !p.error)
+      .map(({ id, name, issueCount }) => ({ id, name, issueCount })),
     issues,
   };
 }
@@ -83,7 +85,14 @@ const DatasetSchema = z.object({
   hubId: z.string(),
   title: z.string().optional(),
   projects: z.array(
-    z.object({ id: z.string(), name: z.string(), issueCount: z.number(), error: z.string().optional() }),
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      issueCount: z.number(),
+      issuesUnavailable: z.boolean().optional(),
+      memberCount: z.number().optional(),
+      error: z.string().optional(),
+    }),
   ),
   issues: z.array(IssueSchema),
 });
