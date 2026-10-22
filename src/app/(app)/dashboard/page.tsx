@@ -12,6 +12,7 @@ import { useDashboardData } from "@/lib/dashboard/use-dashboard-data";
 import { ProjectPicker } from "@/components/dashboard/project-picker";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 import { SnapshotPanel } from "@/components/dashboard/snapshot-panel";
+import { ProjectNotices } from "@/components/dashboard/project-notices";
 
 function Dashboard() {
   const params = useSearchParams();
@@ -87,13 +88,7 @@ function Dashboard() {
             All templates
           </Link>
         </div>
-        {dataset.projects.some((p) => p.error) ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-            {dataset.projects.filter((p) => p.error).map((p) => (
-              <p key={p.id}>{p.name}: {p.error}</p>
-            ))}
-          </div>
-        ) : null}
+        <ProjectNotices projects={dataset.projects} />
         {chosen.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[color:var(--brand-border)] p-10 text-center text-sm text-[color:var(--brand-muted)]">
             Tick one or more projects, or load a saved set, to build the dashboard.

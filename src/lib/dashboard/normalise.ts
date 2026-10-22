@@ -1,11 +1,12 @@
 import type { IssueLookups } from "@/lib/aps/issues-meta";
+import type { ProjectDirectory } from "@/lib/aps/users";
 import type { AssigneeKind, IssueRecord } from "./types";
 
 export interface NormaliseContext {
   projectId: string;
   projectName: string;
   lookups: IssueLookups;
-  users: Record<string, string>;
+  directory: ProjectDirectory;
   // Custom attribute titles keyed by definition id.
   attrNames: Record<string, string>;
 }
@@ -57,6 +58,16 @@ export function normaliseIssue(raw: unknown, ctx: NormaliseContext): IssueRecord
     ? (kindRaw as AssigneeKind)
     : "unknown";
   const assigneeId = str(r.assignedTo);
+  const dir = ctx.directory;
+  const assigneeName = (id: string): string => {
+    const known =
+      kind === "company" ? dir.companies.get(id) : kind === "role" ? dir.roles.get(id) : dir.people.get(id);
+    if (known) return known;
+    // Unresolved: usually someone removed from the project, or a member list
+    // this user isn't allowed to read. Keep the id short and labelled.
+    const label = kind === "company" ? "Company" : kind === "role" ? "Role" : "Unknown user";
+    return `${label} (${id.slice(0, 6)})`;
+  };
 
   const custom: Record<string, string> = {};
   for (const c of r.customAttributes ?? []) {
@@ -88,12 +99,14 @@ export function normaliseIssue(raw: unknown, ctx: NormaliseContext): IssueRecord
       ? {
           assignee: {
             id: assigneeId,
-            name: ctx.users[assigneeId] ?? (kind === "user" ? assigneeId : `${kind} ${assigneeId.slice(0, 8)}`),
+            name: assigneeName(assigneeId),
             kind,
           },
         }
       : {}),
-    ...(str(r.createdBy) ? { createdBy: ctx.users[r.createdBy as string] ?? r.createdBy } : {}),
+    ...(str(r.createdBy)
+      ? { createdBy: dir.people.get(r.createdBy as string) ?? `Unknown user (${(r.createdBy as string).slice(0, 6)})` }
+      : {}),
     createdAt: r.createdAt ?? "",
     ...(str(r.dueDate) ? { dueDate: r.dueDate as string } : {}),
     ...(str(r.closedAt) ? { closedAt: r.closedAt as string } : {}),

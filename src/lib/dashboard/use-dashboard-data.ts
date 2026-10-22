@@ -5,8 +5,9 @@ import { useQueries } from "@tanstack/react-query";
 import { useApsClient } from "@/lib/aps/use-client";
 import { getIssueLookups, scrapeRawIssues } from "@/lib/aps/issues-meta";
 import { listIssueCustomAttributes } from "@/lib/aps/issues";
-import { getProjectUsers } from "@/lib/aps/users";
+import { getProjectDirectory, type ProjectDirectory } from "@/lib/aps/users";
 import type { ApsClient } from "@/lib/aps/client";
+import { ApsError } from "@/lib/aps/types";
 import { normaliseIssue } from "./normalise";
 import type { DashboardDataset, DatasetProject, IssueRecord } from "./types";
 
@@ -21,24 +22,37 @@ async function loadProject(
   client: ApsClient,
   project: { id: string; name: string },
 ): Promise<ProjectLoad> {
-  const [raw, lookups, users, attrs] = await Promise.all([
-    scrapeRawIssues(client, project.id),
+  let raw: unknown[];
+  try {
+    raw = await scrapeRawIssues(client, project.id);
+  } catch (e) {
+    // 404 = Issues tool not activated in this project. Skip the lookups.
+    if (e instanceof ApsError && e.status === 404) {
+      return { project: { id: project.id, name: project.name, issueCount: 0, issuesUnavailable: true }, issues: [] };
+    }
+    throw e;
+  }
+  const emptyDir: ProjectDirectory = { people: new Map(), companies: new Map(), roles: new Map() };
+  const [lookups, directory, attrs] = await Promise.all([
     getIssueLookups(client, project.id),
-    getProjectUsers(client, project.id).catch(() => []),
+    getProjectDirectory(client, project.id).catch(() => emptyDir),
     listIssueCustomAttributes(client, project.id).catch(() => []),
   ]);
   const ctx = {
     projectId: project.id,
     projectName: project.name,
     lookups,
-    users: Object.fromEntries(users.map((u) => [u.id, u.name])),
+    directory,
     attrNames: Object.fromEntries(attrs.map((a) => [a.id, a.name])),
   };
   const issues = raw.flatMap((r) => {
     const n = normaliseIssue(r, ctx);
     return n ? [n] : [];
   });
-  return { project: { id: project.id, name: project.name, issueCount: issues.length }, issues };
+  return {
+    project: { id: project.id, name: project.name, issueCount: issues.length, memberCount: directory.people.size },
+    issues,
+  };
 }
 
 // Loads Issues for every selected project in parallel (TanStack Query caps

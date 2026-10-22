@@ -15,11 +15,9 @@ interface RawProjectUser {
   name?: string;
   firstName?: string;
   lastName?: string;
-}
-
-interface RawProjectUsersResponse {
-  results?: RawProjectUser[];
-  pagination?: { limit?: number; offset?: number; totalResults?: number };
+  companyId?: string | null;
+  companyName?: string | null;
+  roles?: Array<{ id?: string; name?: string }> | null;
 }
 
 const PAGE = 100;
@@ -37,6 +35,10 @@ export async function getProjectUsers(
   client: ApsClient,
   projectId: string,
 ): Promise<ProjectUser[]> {
+  return (await getRawProjectUsers(client, projectId)).map(normalizeUser);
+}
+
+async function getRawProjectUsers(client: ApsClient, projectId: string): Promise<RawProjectUser[]> {
   const p = normaliseProjectIdForRfi(projectId);
   const primary = await tryFetchUsers(
     client,
@@ -52,16 +54,59 @@ export async function getProjectUsers(
   return fallback === "denied" ? [] : fallback;
 }
 
-async function tryFetchUsers(
+export interface ProjectDirectory {
+  // Keyed by every id a user is known by (project id, Autodesk id, email).
+  people: Map<string, string>;
+  companies: Map<string, string>;
+  roles: Map<string, string>;
+}
+
+// People, companies and roles for one project, for resolving Issues
+// assignees (assignedToType user | company | role). Companies and roles
+// come off the member records, topped up from the companies endpoint when
+// the caller is allowed to read it.
+export async function getProjectDirectory(
   client: ApsClient,
-  path: string,
-): Promise<ProjectUser[] | "denied"> {
-  const out: ProjectUser[] = [];
+  projectId: string,
+): Promise<ProjectDirectory> {
+  const p = normaliseProjectIdForRfi(projectId);
+  const [raw, companies] = await Promise.all([
+    getRawProjectUsers(client, projectId),
+    tryFetchPaged<{ id?: string; name?: string }>(
+      client,
+      `/construction/admin/v1/projects/${encodeURIComponent(p)}/companies`,
+    ),
+  ]);
+  const dir: ProjectDirectory = {
+    people: buildUserRoster(raw.map(normalizeUser)),
+    companies: new Map(),
+    roles: new Map(),
+  };
+  for (const c of companies === "denied" ? [] : companies) {
+    if (c.id && c.name) dir.companies.set(c.id, c.name);
+  }
+  for (const u of raw) {
+    if (u.companyId && u.companyName && !dir.companies.has(u.companyId)) {
+      dir.companies.set(u.companyId, u.companyName);
+    }
+    for (const r of u.roles ?? []) {
+      if (r?.id && r.name) dir.roles.set(r.id, r.name);
+    }
+  }
+  return dir;
+}
+
+function tryFetchUsers(client: ApsClient, path: string): Promise<RawProjectUser[] | "denied"> {
+  return tryFetchPaged<RawProjectUser>(client, path);
+}
+
+async function tryFetchPaged<T>(client: ApsClient, path: string): Promise<T[] | "denied"> {
+  const out: T[] = [];
   let offset = 0;
   for (;;) {
-    let res: RawProjectUsersResponse;
+    let res: { results?: T[] };
     try {
-      res = await client.request<RawProjectUsersResponse>({
+      res = await client.request<{ results?: T[] }>({
         path,
         query: { limit: PAGE, offset },
       });
@@ -73,7 +118,7 @@ async function tryFetchUsers(
       }
       throw e;
     }
-    const page = (res.results ?? []).map(normalizeUser);
+    const page = res.results ?? [];
     out.push(...page);
     if (page.length < PAGE) break;
     offset += PAGE;
