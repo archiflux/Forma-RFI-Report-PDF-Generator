@@ -31,7 +31,11 @@ const ctx = {
     companies: new Map([["c1", "Acme Ltd"]]),
     roles: new Map([["r9", "Architect"]]),
   },
-  attrNames: { a1: "Package" },
+  attrs: {
+    a1: { name: "Package", options: {} },
+    a2: { name: "Discipline", options: { o1: "Structural", o2: "MEP" } },
+  },
+  locations: { l1: "Block A > Level 2" },
 };
 
 function issue(over: Partial<IssueRecord>): IssueRecord {
@@ -71,7 +75,11 @@ describe("normaliseIssue", () => {
         createdBy: "GWJJ9C7MQG439PNK",
         createdAt: "2026-09-01T00:00:00Z",
         linkedDocuments: [{ type: "TwoDVectorPushpin" }],
-        customAttributes: [{ attributeDefinitionId: "a1", value: "M&E" }],
+        locationId: "l1",
+        customAttributes: [
+          { attributeDefinitionId: "a1", value: "M&E" },
+          { attributeDefinitionId: "a2", value: "o2" },
+        ],
       },
       ctx,
     );
@@ -84,7 +92,8 @@ describe("normaliseIssue", () => {
       assignee: { id: "GWJJ9C7MQG439PNK", name: "Alex Smith", kind: "user" },
       createdBy: "Alex Smith",
       hasViewpoint: true,
-      custom: { Package: "M&E" },
+      location: "Block A > Level 2",
+      custom: { Package: "M&E", Discipline: "MEP" },
     });
   });
 
@@ -237,6 +246,21 @@ describe("probe field coverage", () => {
       { field: "a", share: 1 },
       { field: "b", share: 0.5 },
       { field: "c", share: 0 },
+    ]);
+  });
+});
+
+describe("issue attribute definitions", () => {
+  it("maps Issues title/dataType/list options onto the shared parser", async () => {
+    const { issueAttrToRaw } = await import("@/lib/aps/issues");
+    const { parseAttributeDefs } = await import("@/lib/aps/rfis");
+    const defs = parseAttributeDefs([
+      issueAttrToRaw({ id: "a2", title: "Discipline", dataType: "list", metadata: { list: { options: [{ id: "o1", value: "Structural" }] } } }),
+      issueAttrToRaw({ id: "a3", title: "Cost", dataType: "numeric" }),
+    ]);
+    expect(defs).toEqual([
+      { id: "a2", name: "Discipline", dataType: "singleChoice", values: [{ id: "o1", label: "Structural" }] },
+      { id: "a3", name: "Cost", dataType: "numeric" },
     ]);
   });
 });

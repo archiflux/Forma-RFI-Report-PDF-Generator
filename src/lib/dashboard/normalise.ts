@@ -7,8 +7,10 @@ export interface NormaliseContext {
   projectName: string;
   lookups: IssueLookups;
   directory: ProjectDirectory;
-  // Custom attribute titles keyed by definition id.
-  attrNames: Record<string, string>;
+  // Custom attribute title and list-option labels, keyed by definition id.
+  attrs: Record<string, { name: string; options: Record<string, string> }>;
+  // Location id -> breadcrumb.
+  locations: Record<string, string>;
 }
 
 interface RawIssue {
@@ -20,6 +22,7 @@ interface RawIssue {
   issueTypeId?: string;
   issueSubtypeId?: string;
   rootCauseId?: string | null;
+  locationId?: string | null;
   locationDetails?: string | null;
   assignedTo?: string | null;
   assignedToType?: string | null;
@@ -73,9 +76,14 @@ export function normaliseIssue(raw: unknown, ctx: NormaliseContext): IssueRecord
   for (const c of r.customAttributes ?? []) {
     const id = c?.attributeDefinitionId;
     if (!id) continue;
-    const text = valueText(c.value);
+    const def = ctx.attrs[id];
+    const raw = c.value;
+    const mapped = def && Object.keys(def.options).length
+      ? (Array.isArray(raw) ? raw : [raw]).map((v) => def.options[String(v)] ?? valueText(v))
+      : raw;
+    const text = valueText(mapped);
     if (!text) continue;
-    custom[ctx.attrNames[id] ?? c.title ?? id] = text;
+    custom[def?.name ?? c.title ?? id] = text;
   }
 
   const typeName = (r.issueTypeId && ctx.lookups.types[r.issueTypeId]) || "Unspecified";
@@ -94,7 +102,10 @@ export function normaliseIssue(raw: unknown, ctx: NormaliseContext): IssueRecord
     typeName,
     subtypeName,
     rootCause,
-    ...(str(r.locationDetails) ? { location: r.locationDetails as string } : {}),
+    ...(() => {
+      const loc = (r.locationId && ctx.locations[r.locationId]) || str(r.locationDetails);
+      return loc ? { location: loc } : {};
+    })(),
     ...(assigneeId
       ? {
           assignee: {

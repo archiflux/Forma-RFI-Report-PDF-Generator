@@ -39,6 +39,26 @@ export interface IssueSearchRequest {
   offset?: number;
 }
 
+// Issues attribute definitions differ from RFI ones: `title` not `name`,
+// `dataType` of list | text | paragraph | numeric, and list choices under
+// metadata.list.options as { id, value }. Issue payloads store the option id.
+export interface RawIssueAttrDef {
+  id?: string;
+  title?: string;
+  dataType?: string;
+  metadata?: { list?: { options?: Array<{ id?: string; value?: string }> } } | null;
+}
+
+export function issueAttrToRaw(d: RawIssueAttrDef): RawAttrDef {
+  const options = d.metadata?.list?.options ?? [];
+  return {
+    ...(d.id ? { id: d.id } : {}),
+    ...(d.title ? { name: d.title } : {}),
+    ...(d.dataType ? { type: d.dataType } : {}),
+    ...(options.length ? { possibleValues: options.map((o) => ({ id: o.id, label: o.value })) } : {}),
+  };
+}
+
 interface RawIssueListResponse {
   results?: unknown[];
   pagination?: { limit?: number; offset?: number; totalResults?: number };
@@ -50,10 +70,11 @@ export async function listIssueCustomAttributes(
 ): Promise<CustomAttributeDef[]> {
   const p = normaliseProjectIdForRfi(projectId);
   try {
-    const res = await client.request<{ results?: RawAttrDef[] }>({
+    const res = await client.request<{ results?: RawIssueAttrDef[] }>({
       path: `/construction/issues/v1/projects/${encodeURIComponent(p)}/issue-attribute-definitions`,
+      query: { limit: 200 },
     });
-    return parseAttributeDefs(res.results);
+    return parseAttributeDefs((res.results ?? []).map(issueAttrToRaw));
   } catch (e) {
     // Schema endpoint can 401/403 even for project admins on some tenants.
     // Fall back to inferring from per-issue payloads in useIssuesData.

@@ -55,6 +55,19 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
   const projects = useMemo(() => statusByProject(issues, now), [issues, now]);
   const trend = useMemo(() => monthlyTrend(issues), [issues]);
   const ages = useMemo(() => ageing(issues, now), [issues, now]);
+  const byLocation = useMemo(() => countBy(issues, (i) => i.location ?? "Not set"), [issues]);
+  // Custom fields present in the data, most-populated first.
+  const customFields = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const i of all) for (const k of Object.keys(i.custom)) m.set(k, (m.get(k) ?? 0) + 1);
+    return [...m.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  }, [all]);
+  const [field, setField] = useState("");
+  const activeField = field || customFields[0]?.label || "";
+  const byCustom = useMemo(
+    () => (activeField ? countBy(issues, (i) => i.custom[activeField] ?? "Not set") : []),
+    [issues, activeField],
+  );
   const filtered = issues.length !== all.length;
 
   return (
@@ -109,6 +122,29 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
         <Panel title="Issues by root cause">
           <BarList data={byCause} />
         </Panel>
+        <Panel title="Issues by location">
+          <BarList data={byLocation} />
+        </Panel>
+        {customFields.length ? (
+          <Panel
+            title="Issues by custom field"
+            action={
+              <select
+                value={activeField}
+                onChange={(e) => setField(e.target.value)}
+                className="min-h-8 max-w-[14rem] rounded-lg border border-[color:var(--brand-border)] bg-white px-2 text-xs"
+              >
+                {customFields.map((c) => (
+                  <option key={c.label} value={c.label}>
+                    {c.label} ({c.count})
+                  </option>
+                ))}
+              </select>
+            }
+          >
+            <BarList data={byCustom} />
+          </Panel>
+        ) : null}
       </div>
 
       <Panel title={`Issue register (${issues.length})`}>
