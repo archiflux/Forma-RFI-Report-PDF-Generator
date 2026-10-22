@@ -6,6 +6,11 @@ describe("classifyHub", () => {
     expect(classifyHub("hubs:autodesk.bim360:Account")).toBe("acc");
   });
 
+  it("tolerates a post-rebrand Forma discriminator", () => {
+    expect(classifyHub("hubs:autodesk.forma:Account")).toBe("acc");
+    expect(classifyHub("hubs:autodesk.construction:Account")).toBe("acc");
+  });
+
   it("identifies personal / Fusion hubs", () => {
     expect(classifyHub("hubs:autodesk.core:Hub")).toBe("personal");
     expect(classifyHub("hubs:autodesk.a360:PersonalHub")).toBe("personal");
