@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useApsClient } from "@/lib/aps/use-client";
-import { getIssueLookups, scrapeRawIssues } from "@/lib/aps/issues-meta";
+import { getIssueLookups, getLocationNames, scrapeRawIssues } from "@/lib/aps/issues-meta";
 import { listIssueCustomAttributes } from "@/lib/aps/issues";
 import { getProjectDirectory, type ProjectDirectory } from "@/lib/aps/users";
 import type { ApsClient } from "@/lib/aps/client";
@@ -33,17 +33,21 @@ async function loadProject(
     throw e;
   }
   const emptyDir: ProjectDirectory = { people: new Map(), companies: new Map(), roles: new Map() };
-  const [lookups, directory, attrs] = await Promise.all([
+  const [lookups, directory, attrs, locations] = await Promise.all([
     getIssueLookups(client, project.id),
     getProjectDirectory(client, project.id).catch(() => emptyDir),
     listIssueCustomAttributes(client, project.id).catch(() => []),
+    getLocationNames(client, project.id).catch(() => ({})),
   ]);
   const ctx = {
     projectId: project.id,
     projectName: project.name,
     lookups,
     directory,
-    attrNames: Object.fromEntries(attrs.map((a) => [a.id, a.name])),
+    attrs: Object.fromEntries(
+      attrs.map((a) => [a.id, { name: a.name, options: Object.fromEntries((a.values ?? []).map((v) => [v.id, v.label])) }]),
+    ),
+    locations,
   };
   const issues = raw.flatMap((r) => {
     const n = normaliseIssue(r, ctx);

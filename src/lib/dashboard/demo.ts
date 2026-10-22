@@ -54,7 +54,8 @@ export function demoDataset(now = new Date("2026-10-22T09:00:00Z")): DashboardDa
         commentCount: Math.floor(r() * 6),
         attachmentCount: Math.floor(r() * 3),
         hasViewpoint: r() < 0.6,
-        custom: {},
+        location: `Block ${pick(["A", "B", "C"])} > Level ${1 + Math.floor(r() * 4)}`,
+        custom: { Discipline: pick(["Architecture", "Structure", "MEP", "Civils"]) },
       });
     }
   });

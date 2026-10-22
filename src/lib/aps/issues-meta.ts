@@ -95,3 +95,43 @@ export async function scrapeRawIssues(
   }
   return out;
 }
+
+interface RawLocationNode {
+  id?: string;
+  parentId?: string | null;
+  name?: string;
+  type?: string;
+}
+
+// Location id -> breadcrumb ("Block A > Level 2"). The tree's root node is
+// the project itself, so it is left out of the path. Best-effort: projects
+// without a locations tree just leave ids unresolved.
+export async function getLocationNames(client: ApsClient, projectId: string): Promise<Record<string, string>> {
+  const p = encodeURIComponent(normaliseProjectIdForRfi(projectId));
+  const nodes: RawLocationNode[] = [];
+  let offset = 0;
+  for (;;) {
+    const res = await tryGet<{ results?: RawLocationNode[] }>(
+      client,
+      `/construction/locations/v2/projects/${p}/trees/default/nodes`,
+      { limit: "500", offset: String(offset) },
+    );
+    const page = res?.results ?? [];
+    nodes.push(...page);
+    if (page.length < 500 || nodes.length >= 20000) break;
+    offset += 500;
+  }
+  const byId = new Map(nodes.filter((n) => n.id).map((n) => [n.id as string, n]));
+  const out: Record<string, string> = {};
+  for (const n of byId.values()) {
+    const parts: string[] = [];
+    let cur: RawLocationNode | undefined = n;
+    let guard = 0;
+    while (cur && cur.parentId && guard++ < 20) {
+      if (cur.name) parts.unshift(cur.name);
+      cur = byId.get(cur.parentId);
+    }
+    if (parts.length) out[n.id as string] = parts.join(" > ");
+  }
+  return out;
+}
