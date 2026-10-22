@@ -59,7 +59,7 @@ export default function HubsPage() {
         </p>
       ) : (
         <>
-          {noAccHubs ? <NoAccHubsPanel /> : null}
+          {noAccHubs ? <NoAccHubsPanel hubs={q.data ?? []} /> : null}
 
           {groups
             ? KIND_ORDER.filter((k) => groups[k].length > 0).map((kind) => (
@@ -122,7 +122,7 @@ function HubGroup({ kind, hubs }: { kind: HubKind; hubs: Hub[] }) {
   );
 }
 
-function NoAccHubsPanel() {
+function NoAccHubsPanel({ hubs }: { hubs: Hub[] }) {
   const cfg = loadPublicConfig();
   const [copied, setCopied] = useState(false);
 
@@ -185,6 +185,19 @@ function NoAccHubsPanel() {
           {copied ? "Copied!" : "Copy Client ID"}
         </button>
       </div>
+      <p className="mt-4 text-xs text-amber-900">
+        Autodesk returned {hubs.length} hub{hubs.length === 1 ? "" : "s"} for this sign-in
+        {hubs.length ? ":" : "."}
+      </p>
+      {hubs.length ? (
+        <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
+          {hubs.map((h) => (
+            <li key={h.id}>
+              {h.name} <code className="text-[11px]">{h.extensionType ?? "no type"}</code>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

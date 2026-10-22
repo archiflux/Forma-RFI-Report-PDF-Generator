@@ -21,7 +21,16 @@ interface RawHubsResponse {
 export function classifyHub(extensionType: string | undefined): HubKind {
   if (!extensionType) return "unknown";
   const t = extensionType.toLowerCase();
-  if (t.includes("bim360") || t.includes("acc") || t.includes("construction")) {
+  // "forma" and a trailing ":account" cover a post-rebrand discriminator
+  // (e.g. "hubs:autodesk.forma:Account") so a rename on Autodesk's side
+  // doesn't hide every business hub.
+  if (
+    t.includes("bim360") ||
+    t.includes("acc") ||
+    t.includes("construction") ||
+    t.includes("forma") ||
+    t.endsWith(":account")
+  ) {
     return "acc";
   }
   if (
