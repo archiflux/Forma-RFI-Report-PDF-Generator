@@ -174,7 +174,7 @@ export function monthlyCounts<T>(items: T[], dateOf: (i: T) => string | undefine
   return gapFill([...m.keys()]).map((month) => ({ month, count: m.get(month) ?? 0 }));
 }
 
-function gapFill(keys: string[]): string[] {
+export function gapFill(keys: string[]): string[] {
   const months = [...new Set(keys)].sort();
   if (!months.length) return [];
   const out: string[] = [];

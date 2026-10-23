@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useApsClient } from "@/lib/aps/use-client";
 import { listProjects } from "@/lib/aps/projects";
-import { PROBE_TARGETS, runProbe, type ProbeResult } from "@/lib/aps/probe";
+import { PROBE_TARGETS, runDataConnectorCheck, runProbe, type ProbeResult } from "@/lib/aps/probe";
 
 // Field names and counts only — never values — so the summary is safe to
 // paste into a chat or ticket.
@@ -15,7 +15,8 @@ function summarise(results: ProbeResult[]): string {
   const lines = ["| Area | Endpoint | Status | Records | Fields with data |", "|---|---|---|---|---|"];
   for (const r of results) {
     const fields = r.coverage.filter((c) => c.share > 0).map((c) => `${c.field} ${Math.round(c.share * 100)}%`).join(", ");
-    lines.push(`| ${r.group} | ${r.label} | ${r.status} | ${r.total ?? r.count ?? "-"} | ${fields || r.message || "-"} |`);
+    const notes = r.notes?.length ? ` Notes: ${r.notes.join("; ")}` : "";
+    lines.push(`| ${r.group} | ${r.label} | ${r.status} | ${r.total ?? r.count ?? "-"} | ${fields || r.message || "-"}${notes} |`);
   }
   return lines.join("\n");
 }
@@ -40,6 +41,8 @@ function Probe() {
       out.push(...batch);
       setResults([...out]);
     }
+    out.push(...(await runDataConnectorCheck(client, hubId)));
+    setResults([...out]);
     setRunning(false);
   }
 
@@ -58,7 +61,7 @@ function Probe() {
           <option value="">Choose a project…</option>
           {(projectsQ.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <Button onClick={run} disabled={!projectId || running}>{running ? `Probing ${results.length}/${PROBE_TARGETS.length}…` : "Run probe"}</Button>
+        <Button onClick={run} disabled={!projectId || running}>{running ? `Probing ${results.length}/${PROBE_TARGETS.length + 4}…` : "Run probe"}</Button>
         {results.length && !running ? (
           <Button
             variant="secondary"
@@ -99,6 +102,9 @@ function Probe() {
                   <td className="py-2 pr-3 text-right tabular-nums">{r.total ?? r.count ?? "-"}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{r.ms}</td>
                   <td className="py-2">
+                    {r.notes?.length ? (
+                      <ul className="mb-1 list-disc pl-4">{r.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+                    ) : null}
                     {r.status === 200 ? (
                       <details>
                         <summary className="cursor-pointer">{r.coverage.filter((c) => c.share > 0).length} of {r.coverage.length} fields have data</summary>

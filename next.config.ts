@@ -28,7 +28,9 @@ const headers: NextConfig["headers"] = async () => [
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: blob: https:",
           "font-src 'self' data:",
-          `connect-src 'self' ${APS}`,
+          // data: lets @react-pdf/renderer load its inlined WebAssembly
+          // (yoga layout) instead of falling back after a CSP refusal.
+          `connect-src 'self' data: ${APS}`,
           "frame-ancestors 'none'",
           "base-uri 'self'",
           "form-action 'self' https://developer.api.autodesk.com",

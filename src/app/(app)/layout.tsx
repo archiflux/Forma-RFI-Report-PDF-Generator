@@ -37,24 +37,9 @@ export default function AuthedLayout({
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/icon-colour.png"
-              alt="Bailey Partnership"
-              width={36}
-              height={36}
-              priority
-              className="h-9 w-9 rounded-md object-contain"
-            />
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
-                Bailey Partnership
-              </p>
-              <h1 className="text-base font-semibold text-[color:var(--brand-primary)] sm:text-lg">
-                Forma Dashboards
-              </h1>
-            </div>
-          </div>
+          <Suspense fallback={<Brand href="/hubs" />}>
+            <HomeLink />
+          </Suspense>
           <Suspense fallback={null}>
             <HubNav />
           </Suspense>
@@ -86,6 +71,8 @@ function HubNav() {
     ["Templates", "/templates"],
     ["Issues", "/dashboard"],
     ["Forms", "/forms-dashboard"],
+    ["Reviews", "/reviews-dashboard"],
+    ["RFIs", "/rfis-dashboard"],
     ["RFI reports", "/projects"],
     ["Data probe", "/probe"],
   ] as const;
@@ -98,4 +85,34 @@ function HubNav() {
       ))}
     </nav>
   );
+}
+
+function Brand({ href }: { href: string }) {
+  return (
+    <Link href={href} className="flex items-center gap-3" title="Back to dashboard templates">
+      <Image
+        src="/icon-colour.png"
+        alt="Bailey Partnership"
+        width={36}
+        height={36}
+        priority
+        className="h-9 w-9 rounded-md object-contain"
+      />
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
+          Bailey Partnership
+        </p>
+        <h1 className="text-base font-semibold text-[color:var(--brand-primary)] sm:text-lg">
+          Forma Dashboards
+        </h1>
+      </div>
+    </Link>
+  );
+}
+
+// Logo returns to the template catalogue for the current hub, or to the hub
+// picker when no hub is selected yet.
+function HomeLink() {
+  const hubId = useSearchParams().get("hubId");
+  return <Brand href={hubId ? `/templates?hubId=${encodeURIComponent(hubId)}` : "/hubs"} />;
 }

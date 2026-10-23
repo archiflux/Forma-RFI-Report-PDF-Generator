@@ -1,23 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { countBy, monthlyCounts } from "@/lib/dashboard/aggregate";
-import { formStatusLabel, isFormOpen, isFormOverdue } from "@/lib/forms/normalise";
-import type { FormRecord, FormsDataset } from "@/lib/forms/types";
+import { formStatusLabel } from "@/lib/forms/normalise";
+import type { FormsDataset } from "@/lib/forms/types";
+import { applyFormFilters, EMPTY_FORM_FILTERS, formBreakdowns, formKpis, type FormFilters } from "@/lib/forms/aggregate";
+import { buildFormsReport } from "@/lib/forms/report";
+import { PdfButton } from "@/components/dashboard/pdf-button";
 import { BarList } from "@/components/dashboard/bar-list";
 import { MultiSelect } from "@/components/dashboard/multi-select";
 import { Panel } from "@/components/dashboard/panel";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import { FormsTable } from "./forms-table";
-
-interface Filters {
-  projectIds: string[];
-  templates: string[];
-  statuses: string[];
-  search: string;
-}
-
-const EMPTY: Filters = { projectIds: [], templates: [], statuses: [], search: "" };
 
 function opts(values: string[], fmt: (v: string) => string = (v) => v) {
   return [...new Set(values)].sort().map((v) => ({ value: v, label: fmt(v) }));
@@ -38,40 +31,14 @@ function Tile({ label, value, alert }: { label: string; value: number; alert?: b
   );
 }
 
-export function applyFormFilters(forms: FormRecord[], f: Filters): FormRecord[] {
-  const q = f.search.trim().toLowerCase();
-  return forms.filter(
-    (x) =>
-      (!f.projectIds.length || f.projectIds.includes(x.projectId)) &&
-      (!f.templates.length || f.templates.includes(x.templateName)) &&
-      (!f.statuses.length || f.statuses.includes(x.status)) &&
-      (!q || `${x.formNum} ${x.name} ${x.templateName}`.toLowerCase().includes(q)),
-  );
-}
-
 export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }) {
-  const [f, setF] = useState<Filters>(EMPTY);
+  const [f, setF] = useState<FormFilters>(EMPTY_FORM_FILTERS);
   const all = dataset.forms;
   const forms = useMemo(() => applyFormFilters(all, f), [all, f]);
-  const set = (patch: Partial<Filters>) => setF((cur) => ({ ...cur, ...patch }));
+  const set = (patch: Partial<FormFilters>) => setF((cur) => ({ ...cur, ...patch }));
 
-  const k = useMemo(() => {
-    const in7 = new Date(now.getTime() + 7 * 86_400_000).toISOString().slice(0, 10);
-    const today = now.toISOString().slice(0, 10);
-    return {
-      total: forms.length,
-      open: forms.filter(isFormOpen).length,
-      overdue: forms.filter((x) => isFormOverdue(x, now)).length,
-      dueSoon: forms.filter((x) => isFormOpen(x) && x.dueDate && x.dueDate.slice(0, 10) >= today && x.dueDate.slice(0, 10) <= in7).length,
-      templates: new Set(forms.map((x) => x.templateName)).size,
-    };
-  }, [forms, now]);
-  const byTemplate = useMemo(() => countBy(forms, (x) => x.templateName), [forms]);
-  const byStatus = useMemo(() => countBy(forms, (x) => formStatusLabel(x.status), 12), [forms]);
-  const byCreator = useMemo(() => countBy(forms, (x) => x.createdBy ?? "Unknown"), [forms]);
-  const byProject = useMemo(() => countBy(forms, (x) => x.projectName, 15), [forms]);
-  const overdueByTemplate = useMemo(() => countBy(forms.filter((x) => isFormOverdue(x, now)), (x) => x.templateName), [forms, now]);
-  const trend = useMemo(() => monthlyCounts(forms, (x) => x.formDate ?? x.createdAt), [forms]);
+  const k = useMemo(() => formKpis(forms, now), [forms, now]);
+  const { byTemplate, byStatus, byCreator, byProject, overdueByTemplate, trend } = useMemo(() => formBreakdowns(forms, now), [forms, now]);
 
   return (
     <div className="space-y-4">
@@ -86,8 +53,21 @@ export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }
           onChange={(e) => set({ search: e.target.value })}
           className="min-h-9 w-56 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 text-xs"
         />
+        <div className="ml-auto">
+          <PdfButton
+            build={(includeRegister) =>
+              buildFormsReport({
+                forms,
+                filters: f,
+                projectNames: Object.fromEntries(dataset.projects.map((p) => [p.id, p.name])),
+                now,
+                includeRegister,
+              })
+            }
+          />
+        </div>
         {forms.length !== all.length ? (
-          <button type="button" className="text-xs text-[color:var(--brand-secondary)] underline" onClick={() => setF(EMPTY)}>
+          <button type="button" className="text-xs text-[color:var(--brand-secondary)] underline" onClick={() => setF(EMPTY_FORM_FILTERS)}>
             Reset filters ({forms.length} of {all.length})
           </button>
         ) : null}

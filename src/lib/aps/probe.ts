@@ -56,6 +56,8 @@ export interface ProbeResult {
   coverage: Array<{ field: string; share: number }>;
   sample?: unknown;
   message?: string;
+  // Extra plain-text findings (e.g. file names); safe to copy.
+  notes?: string[];
 }
 
 function recordsOf(body: unknown): unknown[] | null {
@@ -132,4 +134,73 @@ export async function runProbe(
       message: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+// Data Connector (hub-wide extracts). Jobs are only readable by the user
+// who created the request and needs Executive Overview or project admin
+// rights. Walks: requests -> latest job -> file listing -> one signed URL.
+// All GET; the signed URL itself is not downloaded here.
+export async function runDataConnectorCheck(client: ApsClient, hubId: string): Promise<ProbeResult[]> {
+  const account = encodeURIComponent(hubId.replace(/^b\./, ""));
+  const base = `/data-connector/v1/accounts/${account}`;
+  const group = "Data Connector (hub-wide)";
+  const out: ProbeResult[] = [];
+  const step = async (id: string, label: string, path: string, query?: Record<string, string>) => {
+    const started = performance.now();
+    try {
+      const body = await client.request<unknown>({ path, query });
+      const records = recordsOf(body);
+      const r: ProbeResult = {
+        id, group, label, path, status: 200, ms: Math.round(performance.now() - started),
+        count: records?.length ?? null, total: totalOf(body), coverage: records ? fieldCoverage(records) : [],
+        sample: records ? records[0] : body,
+      };
+      out.push(r);
+      return { r, body, records };
+    } catch (e) {
+      out.push({
+        id, group, label, path, status: e instanceof ApsError ? e.status : "error", ms: Math.round(performance.now() - started),
+        count: null, total: null, coverage: [], message: e instanceof Error ? e.message : String(e),
+      });
+      return null;
+    }
+  };
+
+  const reqs = await step("dc-requests", "My extraction requests", `${base}/requests`, { limit: "50", sort: "desc" });
+  const requests = (reqs?.records ?? []) as Array<{ id?: string; description?: string; scheduleInterval?: string; serviceGroups?: string[]; createdAt?: string; isActive?: boolean }>;
+  if (!reqs) return out;
+  if (!requests.length) {
+    (out[out.length - 1] as ProbeResult).notes = ["No extraction requests created by you. Create one in Forma > Insight > Data Connector, then run the probe again."];
+    return out;
+  }
+  (out[out.length - 1] as ProbeResult).notes = requests.slice(0, 10).map(
+    (r) => `${r.description || r.id}: ${r.scheduleInterval ?? "?"}${r.isActive === false ? " (inactive)" : ""}, services ${(r.serviceGroups ?? []).join(", ") || "all"}`,
+  );
+  const latestReq = [...requests].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))[0];
+  if (!latestReq?.id) return out;
+
+  const jobs = await step("dc-jobs", "Runs of the newest request", `${base}/requests/${encodeURIComponent(latestReq.id)}/jobs`, { limit: "20", sort: "desc" });
+  const jobList = (jobs?.records ?? []) as Array<{ id?: string; status?: string; completionStatus?: string; completedAt?: string; startedAt?: string }>;
+  if (jobs) {
+    (out[out.length - 1] as ProbeResult).notes = jobList.slice(0, 5).map((j) => `${j.status ?? "?"}${j.completionStatus ? ` / ${j.completionStatus}` : ""}, finished ${j.completedAt ?? "not yet"}`);
+  }
+  const done = jobList.find((j) => (j.status ?? "").toLowerCase() === "complete" && (j.completionStatus ?? "success").toLowerCase() === "success")
+    ?? jobList.find((j) => j.completedAt);
+  if (!done?.id) return out;
+
+  const listing = await step("dc-listing", "Files in the latest finished run", `${base}/jobs/${encodeURIComponent(done.id)}/data-listing`);
+  const files = (listing ? (recordsOf(listing.body) ?? (Array.isArray(listing.body) ? listing.body : [])) : []) as Array<{ name?: string; size?: number }>;
+  if (listing) {
+    (out[out.length - 1] as ProbeResult).notes = files.map((f) => `${f.name}${typeof f.size === "number" ? ` (${Math.round(f.size / 1024)} KB)` : ""}`);
+  }
+  const small = [...files].filter((f) => f.name).sort((a, b) => (a.size ?? 0) - (b.size ?? 0))[0];
+  if (!small?.name) return out;
+  const url = await step("dc-signed-url", `Download link for ${small.name}`, `${base}/jobs/${encodeURIComponent(done.id)}/data/${encodeURIComponent(small.name)}`);
+  if (url) {
+    const signed = (url.body as { signedUrl?: string })?.signedUrl;
+    const r = out[out.length - 1] as ProbeResult;
+    r.sample = undefined; // don't keep a live signed URL around
+    r.notes = [signed ? `Signed URL host: ${new URL(signed).host}` : "No signedUrl in response"];
+  }
+  return out;
 }

@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { isOverdue, statusLabel } from "@/lib/dashboard/aggregate";
 import type { IssueRecord } from "@/lib/dashboard/types";
+import { issueUrl } from "@/lib/aps/links";
+import { FormaLink } from "./forma-link";
 
 type Col = { key: string; label: string; get: (i: IssueRecord) => string };
 
@@ -62,7 +64,7 @@ export function IssueTable({ issues, now }: { issues: IssueRecord[]; now: Date }
                   <td className="max-w-[12rem] truncate py-1.5 pr-3" title={i.projectName}>{i.projectName}</td>
                   <td className="py-1.5 pr-3 tabular-nums">{i.displayId}</td>
                   <td className="max-w-[22rem] py-1.5 pr-3" title={i.description}>
-                    <span className="font-medium text-[color:var(--brand-primary)]">{i.title}</span>
+                    <FormaLink href={issueUrl(i.projectId, i.id)}>{i.title}</FormaLink>
                     {i.hasViewpoint ? <span className="ml-1.5 rounded bg-[color:var(--brand-canvas)] px-1 text-[10px] text-[color:var(--brand-muted)]">pinned</span> : null}
                   </td>
                   <td className="py-1.5 pr-3">{i.subtypeName}</td>

@@ -6,7 +6,8 @@ import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useDashboardData } from "@/lib/dashboard/use-dashboard-data";
 import { SelectionSidebar } from "@/components/dashboard/selection-sidebar";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
-import { SnapshotPanel } from "@/components/dashboard/snapshot-panel";
+import { SharePanel } from "@/components/dashboard/share-panel";
+import { makeSnapshot } from "@/lib/dashboard/snapshot";
 import { ProjectNotices } from "@/components/dashboard/project-notices";
 
 function Dashboard() {
@@ -47,7 +48,20 @@ function Dashboard() {
         ) : (
           <>
             <DashboardView dataset={dataset} now={now} />
-            <SnapshotPanel dataset={dataset} />
+            <SharePanel
+              kind="issues"
+              itemCount={dataset.issues.length}
+              defaultTitle="Issues dashboard"
+              redactionNote="replace people's names with Person 1, Person 2 and leave out descriptions and custom fields."
+              buildData={(redacted) =>
+                makeSnapshot(
+                  dataset,
+                  redacted
+                    ? { includeDescriptions: false, anonymisePeople: true, includeCustomFields: false }
+                    : { includeDescriptions: true, anonymisePeople: false, includeCustomFields: true },
+                )
+              }
+            />
           </>
         )}
       </div>

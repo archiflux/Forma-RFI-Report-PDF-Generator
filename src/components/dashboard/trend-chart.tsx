@@ -50,7 +50,7 @@ export function TrendChart({
   const ih = H - PAD.top - PAD.bottom;
   const x = (i: number) => PAD.left + (i / (data.length - 1)) * iw;
   const y = (v: number) => PAD.top + ih - (v / max) * ih;
-  const ticks = [0, Math.round(max / 2), max];
+  const ticks = [...new Set([0, Math.round(max / 2), max])];
   const every = Math.ceil(data.length / 8);
   const last = data[data.length - 1] as Row;
   // End labels: with two series keep them at least 12 units apart so they
