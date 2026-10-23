@@ -37,6 +37,9 @@ export const PROBE_TARGETS: ProbeTarget[] = [
   { id: "meetings", group: "Meetings", label: "Meeting minutes", path: (p) => `/construction/meetings/v1/projects/${p}/meetings`, query: { limit: "50" } },
   { id: "cost-budgets", group: "Cost", label: "Cost budgets", path: (p) => `/cost/v1/containers/${p}/budgets`, query: { limit: "50" } },
   { id: "mc-modelsets", group: "Model coordination", label: "Model sets", path: (p) => `/bim360/modelset/v3/containers/${p}/modelsets` },
+  // Lists every project in the account, joined or not. Account admins only;
+  // others get 403. Account id is the hub id without its "b." prefix.
+  { id: "account-projects", group: "Account", label: "All projects in account (account admins only)", path: (_p, hubId) => `/construction/admin/v1/accounts/${hubId.replace(/^b\./, "")}/projects`, query: { limit: "200" } },
   { id: "dm-topfolders", group: "Docs", label: "Top folders", path: (_p, hubId, bp) => `/project/v1/hubs/${hubId}/projects/${bp}/topFolders` },
 ];
 

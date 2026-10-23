@@ -84,7 +84,8 @@ function HubNav() {
   const q = `?hubId=${encodeURIComponent(hubId)}`;
   const links = [
     ["Templates", "/templates"],
-    ["Issues dashboard", "/dashboard"],
+    ["Issues", "/dashboard"],
+    ["Forms", "/forms-dashboard"],
     ["RFI reports", "/projects"],
     ["Data probe", "/probe"],
   ] as const;
