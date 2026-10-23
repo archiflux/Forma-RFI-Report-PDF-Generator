@@ -13,6 +13,7 @@ import {
   STATUS_BUCKETS,
 } from "./aggregate";
 import type { DashboardFilters, IssueRecord } from "./types";
+import { describeCustom } from "@/lib/custom/filter";
 
 function day(iso?: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-GB") : "";
@@ -25,6 +26,8 @@ export function buildIssuesReport(input: {
   projectCount: number;
   now: Date;
   includeRegister: boolean;
+  // Register row cap; the PDF uses the default, CSV passes Infinity.
+  maxRegisterRows?: number;
   title?: string;
 }): DashboardReport {
   const { issues, filters: f, now } = input;
@@ -32,6 +35,7 @@ export function buildIssuesReport(input: {
   const projects = statusByProject(issues, now);
   const register = capRows(
     [...issues].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    input.maxRegisterRows,
   );
   return {
     title: input.title ?? "Issues dashboard",
@@ -45,6 +49,7 @@ export function buildIssuesReport(input: {
       ["Created from", f.createdFrom],
       ["Created to", f.createdTo],
       ["Search", f.search.trim() || undefined],
+      ...describeCustom(f.custom ?? {}),
     ]),
     kpis: [
       { label: "Issues", value: String(k.total) },
@@ -100,6 +105,7 @@ export function buildIssuesReport(input: {
               ]),
               links: register.rows.map((i) => (i.projectId.startsWith("demo-") ? undefined : issueUrl(i.projectId, i.id))),
               totalRows: register.totalRows,
+              isRegister: true,
             },
           ]
         : []),

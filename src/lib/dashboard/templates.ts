@@ -2,7 +2,7 @@
 // Templates" page. `href` builds the route for a hub; templates without one
 // are planned and list the probe areas that decide whether they're viable.
 
-export type TemplateStatus = "live" | "report" | "planned";
+export type TemplateStatus = "live" | "planned";
 
 export interface DashboardTemplate {
   id: string;
@@ -34,15 +34,6 @@ export const TEMPLATES: DashboardTemplate[] = [
     href: (h) => `/rfis-dashboard?hubId=${encodeURIComponent(h)}`,
   },
   {
-    id: "rfis",
-    title: "RFI Report",
-    description: "Field-level RFI reports with custom attributes, exported as branded PDF or CSV. One project at a time.",
-    scope: ["Project"],
-    status: "report",
-    probeAreas: ["RFIs"],
-    href: (h) => `/projects?hubId=${encodeURIComponent(h)}`,
-  },
-  {
     id: "forms",
     title: "Forms Dashboard",
     description: "Forms across any set of projects: open and overdue forms, monthly volume, and breakdowns by template, status, project and creator.",
@@ -51,7 +42,6 @@ export const TEMPLATES: DashboardTemplate[] = [
     probeAreas: ["Forms"],
     href: (h) => `/forms-dashboard?hubId=${encodeURIComponent(h)}`,
   },
-  { id: "assets", title: "Assets Dashboard", description: "Asset registers and commissioning progress by category and status.", scope: ["Project", "Hub"], status: "planned", probeAreas: ["Assets"] },
   {
     id: "reviews",
     title: "Reviews Dashboard",
@@ -61,7 +51,13 @@ export const TEMPLATES: DashboardTemplate[] = [
     probeAreas: ["Reviews"],
     href: (h) => `/reviews-dashboard?hubId=${encodeURIComponent(h)}`,
   },
-  { id: "submittals", title: "Submittals Dashboard", description: "Submittal items by status, ball in court and due date.", scope: ["Project", "Hub"], status: "planned", probeAreas: ["Submittals"] },
-  { id: "photos", title: "Photos Dashboard", description: "Photo capture over time, by type and location.", scope: ["Project", "Hub"], status: "planned", probeAreas: ["Photos"] },
-  { id: "model-coordination", title: "Model Coordination", description: "Clash groups and model set coverage.", scope: ["Project"], status: "planned", probeAreas: ["Model coordination"] },
+  {
+    id: "submittals",
+    title: "Submittals Dashboard",
+    description: "Submittal items across any set of projects: open and overdue items, ball in court, workflow stage, type and response. Not yet tested against live data.",
+    scope: ["Project", "Hub"],
+    status: "live",
+    probeAreas: ["Submittals"],
+    href: (h) => `/submittals-dashboard?hubId=${encodeURIComponent(h)}`,
+  },
 ];

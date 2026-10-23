@@ -17,6 +17,7 @@ import { IssueTable } from "./issue-table";
 import { KpiTiles } from "./kpi-tiles";
 import { MultiSelect } from "./multi-select";
 import { Panel } from "./panel";
+import { CustomFieldFilter } from "./custom-field-filter";
 import { PdfButton } from "./pdf-button";
 import { buildIssuesReport } from "@/lib/dashboard/report";
 import { ProjectStatus, StatusLegend } from "./project-status";
@@ -36,6 +37,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
   const [f, setF] = useState<DashboardFilters>(EMPTY_FILTERS);
   const all = dataset.issues;
   const issues = useMemo(() => applyFilters(all, f), [all, f]);
+  const customs = useMemo(() => all.map((i) => i.custom), [all]);
   const set = (patch: Partial<DashboardFilters>) => setF((cur) => ({ ...cur, ...patch }));
 
   const k = useMemo(() => kpis(issues, now), [issues, now]);
@@ -74,6 +76,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
           <span>to</span>
           <input type="date" value={f.createdTo ?? ""} onChange={(e) => set({ createdTo: e.target.value || undefined })} className="text-xs" />
         </label>
+        <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => set({ custom: v })} />
         <input
           type="search"
           placeholder="Search title, #, location"
@@ -83,7 +86,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
         />
         <div className="ml-auto">
           <PdfButton
-            build={(includeRegister) =>
+            build={(includeRegister, maxRegisterRows) =>
               buildIssuesReport({
                 issues,
                 filters: f,
@@ -91,6 +94,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
                 projectCount: new Set(issues.map((i) => i.projectId)).size,
                 now,
                 includeRegister,
+                maxRegisterRows,
                 ...(dataset.title ? { title: dataset.title } : {}),
               })
             }

@@ -1,7 +1,7 @@
 // Shared (hosted) snapshot. The body is gzipped JSON of a SharedSnapshot;
 // the meta record is what the owner sees in "My shared links".
 
-export type SnapshotKind = "issues" | "forms" | "reviews" | "rfis";
+export type SnapshotKind = "issues" | "forms" | "reviews" | "rfis" | "submittals";
 
 export interface SnapshotMeta {
   id: string;

@@ -29,6 +29,8 @@ export type ReportSection =
       links?: Array<string | undefined>;
       // Total rows before any cap, so the PDF can say "first N of M".
       totalRows?: number;
+      // The dashboard's main register; CSV export uses this table.
+      isRegister?: boolean;
     };
 
 export interface DashboardReport {
@@ -45,8 +47,8 @@ export const PDF_SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"] as const;
 
 export const MAX_PDF_TABLE_ROWS = 2000;
 
-export function capRows<T>(rows: T[], max = MAX_PDF_TABLE_ROWS): { rows: T[]; totalRows: number } {
-  return { rows: rows.slice(0, max), totalRows: rows.length };
+export function capRows<T>(rows: T[], max: number = MAX_PDF_TABLE_ROWS): { rows: T[]; totalRows: number } {
+  return { rows: Number.isFinite(max) ? rows.slice(0, max) : rows, totalRows: rows.length };
 }
 
 // Human-readable list of active filters for the report header.
@@ -56,4 +58,15 @@ export function describeFilters(parts: Array<[string, string[] | string | undefi
     if (Array.isArray(v) ? v.length : v) out.push(`${label}: ${Array.isArray(v) ? v.join(", ") : v}`);
   }
   return out.length ? out : ["No filters (everything loaded)"];
+}
+
+// Register as CSV: report columns plus a Forma link column. UTF-8 BOM so
+// Excel on Windows reads accents correctly; CRLF line endings.
+export function registerCsv(report: DashboardReport): string | null {
+  const t = report.sections.find((x) => x.kind === "table" && x.isRegister);
+  if (!t || t.kind !== "table") return null;
+  const esc = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const lines = [[...t.columns, "Forma link"].map(esc).join(",")];
+  t.rows.forEach((r, i) => lines.push([...r, t.links?.[i] ?? ""].map(esc).join(",")));
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
 }

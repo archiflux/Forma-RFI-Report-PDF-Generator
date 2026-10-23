@@ -1,5 +1,6 @@
 import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
 import type { BaseRecord, GenericConfig, GenericFilters } from "./types";
+import { describeCustom, matchesCustom } from "@/lib/custom/filter";
 
 export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>, f: GenericFilters): T[] {
   const q = f.search.trim().toLowerCase();
@@ -7,8 +8,9 @@ export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: Gener
     if (f.projectIds.length && !f.projectIds.includes(t.projectId)) return false;
     for (const dim of cfg.filters) {
       const sel = f.dims[dim.id];
-      if (sel?.length && !sel.includes(dim.valueOf(t))) return false;
+      if (sel?.length && !sel.includes(String(dim.valueOf(t) ?? ""))) return false;
     }
+    if (cfg.customOf && !matchesCustom(cfg.customOf(t), f.custom ?? {})) return false;
     return !q || cfg.searchText(t).toLowerCase().includes(q);
   });
 }
@@ -17,7 +19,7 @@ export function sortRows<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>
   const col = cfg.columns[column] ?? cfg.columns[0];
   if (!col) return items;
   const key = col.sortValue ?? ((t: T) => col.value(t, now));
-  return [...items].sort((a, b) => key(a).localeCompare(key(b)) * dir);
+  return [...items].sort((a, b) => String(key(a) ?? "").localeCompare(String(key(b) ?? "")) * dir);
 }
 
 // Alias helper for redaction: the same name always maps to the same alias.
@@ -36,11 +38,13 @@ export function buildGenericReport<T extends BaseRecord>(input: {
   projectNames: Record<string, string>;
   now: Date;
   includeRegister: boolean;
+  // Register row cap; the PDF uses the default, CSV passes Infinity.
+  maxRegisterRows?: number;
   title?: string;
 }): DashboardReport {
   const { cfg, items, filters: f, now } = input;
   const projectCount = new Set(items.map((t) => t.projectId)).size;
-  const register = capRows(sortRows(items, cfg, cfg.defaultSort.column, cfg.defaultSort.dir, now));
+  const register = capRows(sortRows(items, cfg, cfg.defaultSort.column, cfg.defaultSort.dir, now), input.maxRegisterRows);
   return {
     title: input.title ?? cfg.title,
     subtitle: `${items.length} ${cfg.noun} across ${projectCount} project${projectCount === 1 ? "" : "s"}`,
@@ -49,6 +53,7 @@ export function buildGenericReport<T extends BaseRecord>(input: {
       ["Projects", f.projectIds.map((id) => input.projectNames[id] ?? id)],
       ...cfg.filters.map((d): [string, string[]] => [d.label, (f.dims[d.id] ?? []).map((v) => (d.format ? d.format(v) : v))]),
       ["Search", f.search.trim() || undefined],
+      ...describeCustom(f.custom ?? {}),
     ]),
     kpis: cfg.kpis(items, now),
     sections: [
@@ -69,6 +74,7 @@ export function buildGenericReport<T extends BaseRecord>(input: {
               rows: register.rows.map((t) => cfg.columns.map((c) => c.value(t, now))),
               links: register.rows.map((t) => cfg.linkOf(t)),
               totalRows: register.totalRows,
+              isRegister: true,
             },
           ]
         : []),

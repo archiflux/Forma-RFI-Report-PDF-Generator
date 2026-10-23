@@ -1,5 +1,6 @@
 import type { ApsClient } from "./client";
 import type { Hub, HubKind } from "./types";
+import { sortByName } from "./projects";
 
 interface RawHubsResponse {
   data?: Array<{
@@ -45,7 +46,7 @@ export function classifyHub(extensionType: string | undefined): HubKind {
 
 export async function listHubs(client: ApsClient): Promise<Hub[]> {
   const res = await client.request<RawHubsResponse>({ path: "/project/v1/hubs" });
-  return (res.data ?? []).map((h) => {
+  return sortByName((res.data ?? []).map((h) => {
     const extensionType = h.attributes?.extension?.type;
     return {
       id: h.id,
@@ -54,5 +55,5 @@ export async function listHubs(client: ApsClient): Promise<Hub[]> {
       extensionType,
       kind: classifyHub(extensionType),
     };
-  });
+  }));
 }

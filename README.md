@@ -1,118 +1,82 @@
-# Forma RFI Report Generator
+# Forma Dashboards
 
-A read-only web app for **Bailey Partnership** that lets our project teams log
-into Autodesk Forma (formerly Autodesk Construction Cloud / ACC) with their
-own account and generate **branded, fine-tuned RFI reports** as **PDF** or
-**CSV** — filtered, sorted, and grouped by any built-in or custom RFI field
-across any project we have access to.
-
-> **Status:** Planning / scaffolding. Nothing to run yet. See
-> [Roadmap](#roadmap).
+A read-only web app for **Bailey Partnership**. Project teams sign in to
+Autodesk Forma (formerly Autodesk Construction Cloud / ACC) with their own
+account and get dashboards across any set of projects they can access:
+**Issues** (the BCF issue workflow), **RFIs**, **Forms** and **Reviews**.
+Every dashboard can be filtered, exported as a branded **PDF** or a **CSV**
+register, and shared as a link that opens without a Forma sign-in.
 
 ---
-
-## Why this exists
-
-Forma's built-in RFI report publisher forces a bad trade-off:
-
-- **Detailed reports** include every custom field but cap out at **50 RFIs**.
-- **Summary reports** raise the cap to ~1000 but strip out the custom fields
-  Bailey Partnership has added — which is exactly the data the reports need.
-- Neither path supports **fine-grained filtering/sorting by multiple custom
-  fields at once**, and neither produces a branded deliverable we can hand to
-  a client.
-
-This app closes that gap by talking to the Forma REST APIs directly, pulling
-the RFIs the user can already see, and rendering them into a report **we**
-design.
 
 ## What it does (and, deliberately, doesn't)
 
 **Does:**
-- Sign users in with their own Autodesk account (OAuth 3-legged + PKCE — no
-  shared credentials, no API keys to manage).
-- List hubs and projects the signed-in user belongs to.
-- Scrape all RFIs from the chosen project, including every custom attribute.
-- Let the user pick which fields to include, filter on any combination of
-  fields (including custom ones), sort, and group.
-- Save report "templates" locally and reuse them across projects.
-- Export as **PDF** (primary, branded) or **CSV** (data-first).
-- Apply Bailey Partnership branding (logo, colours, cover pages) — or any
-  other brand pack — via a swappable `Brand` object.
+- Sign users in with their own Autodesk account (OAuth 3-legged + PKCE, no
+  shared credentials).
+- Let each user pick projects (alphabetical) and save named project sets.
+- Load each module's records for the selected projects and show KPIs,
+  monthly trends, breakdowns (click to filter) and a register that links
+  every record back to Forma.
+- Export the filtered view as a PDF report or the register as CSV, in the
+  browser.
+- Publish hosted snapshots for people without Forma access, redacted or
+  not, with an expiry.
 
 **Does NOT:**
-- Write, edit, create, delete, or transition anything in Forma. Ever.
-  The app requests **only read scopes** and the fetch client blocks every
-  HTTP verb except `GET` and the single documented read-style
-  `POST .../search:rfis` request.
-- Store any API keys or client secrets in the repository, in `.env` files,
-  in `localStorage`, or anywhere else sketchy. See [Security](#security).
-- Ship RFI data through any server we run. Reports are generated
-  **entirely in the browser**.
+- Write, edit, create, delete, or transition anything in Forma. The fetch
+  client and the `/api/aps` proxy block every HTTP verb except `GET` and
+  the documented read-style `POST .../search:rfis`.
+- Store secrets in the repository or in `localStorage`. See
+  [Security](#security).
+- Send Forma data to any server we run, **except** when a user explicitly
+  publishes a shared link (stored in a private Vercel Blob store; see
+  below).
 
-## How it works
-
-```
- User ──▶ Sign in with Autodesk ──▶ APS 3LO PKCE ──▶ access_token (in memory)
-                                                         │
-                                                         ▼
-                                          Hubs → Projects → RFI search
-                                             (APS RFI v3 API)
-                                                         │
-                                                         ▼
-                              Field picker · Filters · Sort · Grouping · Brand
-                                                         │
-                                                         ▼
-                                        @react-pdf/renderer   ·   papaparse
-                                                 │                    │
-                                                 ▼                    ▼
-                                             PDF file             CSV file
-                                           (download)           (download)
-```
-
-A more detailed architecture lives in
-[`.claude/skills/forma-rfi-report/SKILL.md`](./.claude/skills/forma-rfi-report/SKILL.md).
-
-## Dashboards (Issues / BCF workflow)
+## Dashboards
 
 After choosing a hub, the app opens a **template catalogue** modelled on
 Forma Insight's Power BI templates.
 
-- **Issues dashboard** (`/dashboard?hubId=…&p=<projectIds>`): pick any number
-  of projects and see KPIs (outstanding, overdue, average days to close,
-  share pinned to a model), status by project, created vs closed per month,
-  age of outstanding issues, and breakdowns by type, root cause and assignee.
-  Click a bar to filter. The selection is in the URL, so colleagues with
-  Forma access can open the same view.
-- **Project sets**: save a named selection of projects. Sets are stored in
-  `localStorage` keyed by the signed-in Autodesk user id, so they persist
-  across sessions but only on that browser. They hold project ids and names
-  only, no issue data.
-- **Data probe** (`/probe`): calls ~20 read-only APS endpoints (Issues, BCF
-  2.1, RFIs, Forms, Assets, Submittals, Reviews, Photos, Meetings, Cost,
-  Model Coordination, Locations, members) for one project and reports status,
-  record counts and which fields carry data. "Copy summary" copies field
-  names and counts only, never values.
-- **Shared links** (`/view?s=<id>`): any dashboard can publish its current
-  data as a hosted snapshot that opens without a Forma sign-in. The
-  publisher chooses whether to redact (people's names become Person 1,
-  Person 2; issue descriptions and custom fields are dropped) and an expiry
-  of 7, 30 or 90 days. "My shared links" lists, copies and deletes them.
-  Snapshots are point-in-time and do not refresh.
-- **PDF report**: every dashboard has "Download PDF report", which renders
-  what is on screen (filters applied) as an A4 landscape PDF, optionally
-  with the register. Built in the browser.
+| Dashboard | Route | Data (all GET unless noted) |
+|---|---|---|
+| Issues | `/dashboard` | `/construction/issues/v1/.../issues`, issue types, root causes, custom attribute definitions, locations |
+| RFIs | `/rfis-dashboard` | `POST .../search:rfis` (read-shaped), project members |
+| Forms | `/forms-dashboard` | `/construction/forms/v1/.../forms`, form templates |
+| Reviews | `/reviews-dashboard` | `/construction/reviews/v1/.../reviews`, workflows |
+| Submittals | `/submittals-dashboard` | `/construction/submittals/v2/.../items`, item types, metadata (not yet tested against live data) |
+
+- The project selection is in the URL (`?hubId=…&p=<ids>`), so colleagues
+  with Forma access can open the same view.
+- **Project sets** are stored in `localStorage` keyed by the signed-in
+  Autodesk user id: they persist on that browser only and hold project ids
+  and names, no Forma data.
+- Projects where a tool isn't switched on (the API returns 404) are listed
+  as skipped, not as errors.
+- **Data probe** (`/probe`): calls read-only APS endpoints for one project
+  (plus the account-wide project list and Data Connector) and reports
+  status, record counts and which fields carry data. "Copy summary" copies
+  field names and counts only, never values.
+- **Data availability scan** (on `/probe`): counts records per tool
+  (Issues, RFIs, Forms, Reviews, Submittals) in every project you belong
+  to, one `limit=1` request per tool per project.
+- **Shared links** (`/view?s=<id>`): publish the current data as a hosted
+  snapshot that opens without a Forma sign-in. The publisher chooses whether
+  to redact (people's names become Person 1, Person 2; issue descriptions
+  and custom fields are dropped) and an expiry of 7, 30 or 90 days. "My
+  shared links" lists, copies and deletes them. Snapshots don't refresh.
 
 ### Setting up shared links (Vercel)
 
 Shared links are the one feature that stores data on a server.
 
-1. In Vercel, open the project, go to **Storage**, create a **Blob** store
-   with **private** access and connect it to the project. Vercel adds
-   `BLOB_READ_WRITE_TOKEN` automatically.
-2. Add `SHARE_ALLOWED_EMAIL_DOMAINS` = `bailey-p.net` (comma-separate
-   several). Only Autodesk accounts with these email domains can publish.
-   Without it, publishing is refused in production.
+1. In Vercel, open the project, go to **Storage** and create a **Blob**
+   store: access **Private**, environment variable prefix left as `BLOB`,
+   and tick **Add a read-write token env var**. That gives the project
+   `BLOB_READ_WRITE_TOKEN`, which the app looks for.
+2. Optional: set `SHARE_ALLOWED_EMAIL_DOMAINS` to change who can publish.
+   By default only Autodesk accounts at `bailey-p.net` or `baileyp.co.uk`
+   can. Separate several domains with commas.
 3. Redeploy.
 
 Publishing checks the user's Autodesk token against
@@ -149,7 +113,7 @@ has been renamed **Forma Site Design** — that is *not* what we integrate with.
 | Data fetching / cache | TanStack Query v5 |
 | Auth | Autodesk Platform Services 3LO with PKCE |
 | PDF | `@react-pdf/renderer` |
-| CSV | `papaparse` |
+| CSV | small built-in writer (UTF-8 BOM, CRLF) |
 | Forms / validation | react-hook-form + zod |
 | Testing | Vitest + Playwright |
 | Hosting | Vercel or Cloudflare Pages (static + optional edge BFF) |
@@ -342,40 +306,23 @@ network error. For production hosting, pick Vercel or Cloudflare Pages.
   returns a CORS preflight failure; the fix is a small proxy route, not
   disabling CORS. Open an issue and we'll add a proxy for that endpoint only.
 
-## Roadmap
-
-| Phase | Goal | Status |
-|---|---|---|
-| **0. Scaffold** | Next.js + Tailwind + TS strict + CI + read-only contract test | ✅ done |
-| **1. Auth** | Sign in with Autodesk (PKCE), sign out, silent refresh, hub + project picker | ✅ done |
-| **2. Scrape** | RFI list with full pagination, custom-attribute resolver, raw table view with text filter | ✅ done |
-| **3. Builder** | Field picker, multi-field filter builder, sort, group-by, save/load templates in localStorage, import/export as JSON | ✅ done |
-| **4. Export** | PDF (`@react-pdf/renderer`) and CSV (`papaparse`) — branded cover, grouped sections, A4/Letter, portrait/landscape, BOM'd UTF-8 CSV with RFC 4180 CRLF | ✅ done |
-| **5. Brand** | Logo upload, additional brand packs, brand switcher in the builder | 🔜 next |
-| **6. Polish** | Multi-project batch reports, shareable template JSON, optional BFF for long-lived sessions, better empty/error states | pending |
-
-We'll cut a release at the end of each phase and dogfood it on a real project
-before starting the next one.
-
-## Project structure (target)
+## Project structure
 
 ```
-.
-├── README.md                         ← this file
-├── .claude/skills/forma-rfi-report/
-│   └── SKILL.md                      ← contributor / architecture guide
-├── .env.example                      ← NEXT_PUBLIC_APS_CLIENT_ID only
-├── src/
-│   ├── app/                          ← Next.js routes
-│   ├── lib/aps/                      ← APS API client (GET-only)
-│   ├── lib/brands/                   ← brand packs (default, bailey-partnership)
-│   ├── lib/templates/                ← report template store
-│   ├── components/                   ← UI (field picker, filter builder, ...)
-│   └── reports/                      ← pdf/ + csv/ renderers
-└── tests/                            ← including the read-only contract test
+src/
+├── app/(app)/            signed-in pages: hubs, templates, dashboards, probe
+├── app/view/             public shared-link viewer (no sign-in)
+├── app/api/aps/          read-only APS proxy
+├── app/api/share/        shared-link publish / fetch / delete
+├── components/dashboard/ shared UI: picker, charts, PDF/CSV, share panel
+├── components/generic/   config-driven dashboard (RFIs, Reviews)
+├── lib/aps/              APS clients (GET-only) and the probe
+├── lib/dashboard/        Issues dataset, aggregation, project sets
+├── lib/{forms,reviews,rfis-dash}/  per-module normalisers and configs
+├── lib/report/dashboard/ report model, PDF renderer, CSV
+└── lib/share/            shared-link storage and handlers
+tests/                    includes the read-only contract test
 ```
-
-See `SKILL.md` §10 for the full, annotated layout.
 
 ## Contributing
 

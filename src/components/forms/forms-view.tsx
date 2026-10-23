@@ -55,13 +55,14 @@ export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }
         />
         <div className="ml-auto">
           <PdfButton
-            build={(includeRegister) =>
+            build={(includeRegister, maxRegisterRows) =>
               buildFormsReport({
                 forms,
                 filters: f,
                 projectNames: Object.fromEntries(dataset.projects.map((p) => [p.id, p.name])),
                 now,
                 includeRegister,
+                maxRegisterRows,
               })
             }
           />

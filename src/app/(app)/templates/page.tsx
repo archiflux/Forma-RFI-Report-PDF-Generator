@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TEMPLATES, type TemplateStatus } from "@/lib/dashboard/templates";
 
-const BADGE: Record<TemplateStatus, string> = { live: "Dashboard", report: "Report", planned: "Planned" };
+const BADGE: Record<TemplateStatus, string> = { live: "Dashboard", planned: "Planned" };
 
 function Catalogue() {
   const hubId = useSearchParams().get("hubId") ?? "";

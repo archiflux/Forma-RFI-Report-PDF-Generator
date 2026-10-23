@@ -7,7 +7,9 @@ import type { BaseRecord, GenericDataset } from "./types";
 const Schema = z.object({
   projects: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() }).passthrough()),
   items: z.array(
-    z.object({ key: z.string(), id: z.string(), projectId: z.string(), projectName: z.string() }).catchall(z.union([z.string(), z.number(), z.boolean(), z.undefined()])),
+    z
+      .object({ key: z.string(), id: z.string(), projectId: z.string(), projectName: z.string(), custom: z.record(z.string()).optional() })
+      .catchall(z.union([z.string(), z.number(), z.boolean(), z.undefined(), z.record(z.string())])),
   ),
 });
 
