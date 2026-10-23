@@ -113,13 +113,13 @@ export interface Count {
 }
 
 // Counts sorted descending; anything past `limit` folds into "Other".
-export function countBy(
-  issues: IssueRecord[],
-  keyOf: (i: IssueRecord) => string,
+export function countBy<T>(
+  items: T[],
+  keyOf: (i: T) => string,
   limit = 10,
 ): Count[] {
   const m = new Map<string, number>();
-  for (const i of issues) {
+  for (const i of items) {
     const k = keyOf(i) || "Not set";
     m.set(k, (m.get(k) ?? 0) + 1);
   }
@@ -163,6 +163,36 @@ export function statusByProject(issues: IssueRecord[], now: Date): ProjectStatus
   return [...m.values()].sort((a, b) => b.total - a.total);
 }
 
+// Count of items per calendar month (YYYY-MM), gap-filled between the
+// first and last month seen. Items with no date are skipped.
+export function monthlyCounts<T>(items: T[], dateOf: (i: T) => string | undefined): Array<{ month: string; count: number }> {
+  const m = new Map<string, number>();
+  for (const i of items) {
+    const d = dateOf(i);
+    if (d) m.set(d.slice(0, 7), (m.get(d.slice(0, 7)) ?? 0) + 1);
+  }
+  return gapFill([...m.keys()]).map((month) => ({ month, count: m.get(month) ?? 0 }));
+}
+
+function gapFill(keys: string[]): string[] {
+  const months = [...new Set(keys)].sort();
+  if (!months.length) return [];
+  const out: string[] = [];
+  let [y, m] = (months[0] as string).split("-").map(Number) as [number, number];
+  const last = months[months.length - 1] as string;
+  for (;;) {
+    const k = `${y}-${String(m).padStart(2, "0")}`;
+    out.push(k);
+    if (k >= last) break;
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return out;
+}
+
 export interface MonthPoint {
   month: string; // YYYY-MM
   created: number;
@@ -183,22 +213,11 @@ export function monthlyTrend(issues: IssueRecord[]): MonthPoint[] {
       closed.set(k, (closed.get(k) ?? 0) + 1);
     }
   }
-  const months = [...new Set([...created.keys(), ...closed.keys()])].sort();
-  if (!months.length) return [];
-  const out: MonthPoint[] = [];
-  let [y, m] = (months[0] as string).split("-").map(Number) as [number, number];
-  const last = months[months.length - 1] as string;
-  for (;;) {
-    const k = `${y}-${String(m).padStart(2, "0")}`;
-    out.push({ month: k, created: created.get(k) ?? 0, closed: closed.get(k) ?? 0 });
-    if (k >= last) break;
-    m++;
-    if (m > 12) {
-      m = 1;
-      y++;
-    }
-  }
-  return out;
+  return gapFill([...created.keys(), ...closed.keys()]).map((month) => ({
+    month,
+    created: created.get(month) ?? 0,
+    closed: closed.get(month) ?? 0,
+  }));
 }
 
 export const AGE_BUCKETS = ["0-7 days", "8-30 days", "31-90 days", "91-180 days", "Over 180 days"] as const;
