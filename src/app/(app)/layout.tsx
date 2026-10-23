@@ -71,6 +71,8 @@ function HubNav() {
     ["Templates", "/templates"],
     ["Issues", "/dashboard"],
     ["Forms", "/forms-dashboard"],
+    ["Reviews", "/reviews-dashboard"],
+    ["RFIs", "/rfis-dashboard"],
     ["RFI reports", "/projects"],
     ["Data probe", "/probe"],
   ] as const;

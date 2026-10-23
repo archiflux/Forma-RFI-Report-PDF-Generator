@@ -11,10 +11,18 @@ import { parseFormsDataset } from "@/lib/forms/snapshot";
 import { loadShared } from "@/lib/share/client";
 import type { DashboardDataset } from "@/lib/dashboard/types";
 import type { FormsDataset } from "@/lib/forms/types";
+import { GenericView } from "@/components/generic/generic-view";
+import { parseGenericDataset } from "@/lib/generic/snapshot";
+import type { GenericDataset } from "@/lib/generic/types";
+import { reviewsConfig } from "@/lib/reviews/config";
+import type { ReviewRecord } from "@/lib/reviews/normalise";
+import { rfisConfig, type RfiRecord } from "@/lib/rfis-dash/config";
 
 type Loaded =
   | { kind: "issues"; title: string; takenAt: string; expiresAt?: string; data: DashboardDataset }
-  | { kind: "forms"; title: string; takenAt: string; expiresAt?: string; data: FormsDataset };
+  | { kind: "forms"; title: string; takenAt: string; expiresAt?: string; data: FormsDataset }
+  | { kind: "reviews"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<ReviewRecord> }
+  | { kind: "rfis"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<RfiRecord> };
 
 // Public viewer. No Autodesk sign-in: data comes from a hosted link
 // (?s=<id>), a snapshot file the viewer opens, or the built-in demo.
@@ -32,6 +40,8 @@ function Viewer() {
         const base = { title: snap.title, takenAt: snap.createdAt, expiresAt: snap.expiresAt };
         if (snap.kind === "issues") setLoaded({ kind: "issues", ...base, data: parseSnapshot(snap.data) });
         else if (snap.kind === "forms") setLoaded({ kind: "forms", ...base, data: parseFormsDataset(snap.data) });
+        else if (snap.kind === "reviews") setLoaded({ kind: "reviews", ...base, data: parseGenericDataset<ReviewRecord>(snap.data) });
+        else if (snap.kind === "rfis") setLoaded({ kind: "rfis", ...base, data: parseGenericDataset<RfiRecord>(snap.data) });
         else setErr("This link is for a dashboard this viewer doesn't support yet.");
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
@@ -70,6 +80,10 @@ function Viewer() {
           <DashboardView dataset={loaded.data} now={now} />
         ) : loaded?.kind === "forms" ? (
           <FormsView dataset={loaded.data} now={now} />
+        ) : loaded?.kind === "reviews" ? (
+          <GenericView cfg={reviewsConfig} dataset={loaded.data} now={now} title={loaded.title} />
+        ) : loaded?.kind === "rfis" ? (
+          <GenericView cfg={rfisConfig} dataset={loaded.data} now={now} title={loaded.title} />
         ) : loading ? (
           <p className="text-sm text-[color:var(--brand-muted)]">Loading shared dashboard…</p>
         ) : (
