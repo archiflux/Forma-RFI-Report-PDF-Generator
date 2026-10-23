@@ -9,6 +9,7 @@ import { Panel } from "@/components/dashboard/panel";
 import { PdfButton } from "@/components/dashboard/pdf-button";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import { GenericTable } from "./generic-table";
+import { CustomFieldFilter } from "@/components/dashboard/custom-field-filter";
 
 function Tile({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
   return (
@@ -23,6 +24,7 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
   const [f, setF] = useState<GenericFilters>(EMPTY_GENERIC_FILTERS);
   const all = dataset.items;
   const items = useMemo(() => applyGenericFilters(all, cfg, f), [all, cfg, f]);
+  const customs = useMemo(() => (cfg.customOf ? all.map((t) => cfg.customOf?.(t)) : []), [all, cfg]);
   const setDim = (id: string, v: string[]) => setF((cur) => ({ ...cur, dims: { ...cur.dims, [id]: v } }));
   const kpis = useMemo(() => cfg.kpis(items, now), [cfg, items, now]);
   const trend = useMemo(() => cfg.trend.build(items), [cfg, items]);
@@ -46,6 +48,9 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
             onChange={(v) => setDim(d.id, v)}
           />
         ))}
+        {cfg.customOf ? (
+          <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => setF((cur) => ({ ...cur, custom: v }))} />
+        ) : null}
         <input
           type="search"
           placeholder="Search"

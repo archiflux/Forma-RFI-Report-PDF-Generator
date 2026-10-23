@@ -13,6 +13,7 @@ import {
   STATUS_BUCKETS,
 } from "./aggregate";
 import type { DashboardFilters, IssueRecord } from "./types";
+import { describeCustom } from "@/lib/custom/filter";
 
 function day(iso?: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-GB") : "";
@@ -48,6 +49,7 @@ export function buildIssuesReport(input: {
       ["Created from", f.createdFrom],
       ["Created to", f.createdTo],
       ["Search", f.search.trim() || undefined],
+      ...describeCustom(f.custom ?? {}),
     ]),
     kpis: [
       { label: "Issues", value: String(k.total) },

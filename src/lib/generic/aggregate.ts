@@ -1,5 +1,6 @@
 import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
 import type { BaseRecord, GenericConfig, GenericFilters } from "./types";
+import { describeCustom, matchesCustom } from "@/lib/custom/filter";
 
 export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>, f: GenericFilters): T[] {
   const q = f.search.trim().toLowerCase();
@@ -9,6 +10,7 @@ export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: Gener
       const sel = f.dims[dim.id];
       if (sel?.length && !sel.includes(String(dim.valueOf(t) ?? ""))) return false;
     }
+    if (cfg.customOf && !matchesCustom(cfg.customOf(t), f.custom ?? {})) return false;
     return !q || cfg.searchText(t).toLowerCase().includes(q);
   });
 }
@@ -51,6 +53,7 @@ export function buildGenericReport<T extends BaseRecord>(input: {
       ["Projects", f.projectIds.map((id) => input.projectNames[id] ?? id)],
       ...cfg.filters.map((d): [string, string[]] => [d.label, (f.dims[d.id] ?? []).map((v) => (d.format ? d.format(v) : v))]),
       ["Search", f.search.trim() || undefined],
+      ...describeCustom(f.custom ?? {}),
     ]),
     kpis: cfg.kpis(items, now),
     sections: [

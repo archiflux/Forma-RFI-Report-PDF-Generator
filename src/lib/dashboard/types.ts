@@ -64,6 +64,8 @@ export interface DashboardFilters {
   search: string;
   createdFrom?: string;
   createdTo?: string;
+  // Custom field name -> selected values.
+  custom: Record<string, string[]>;
 }
 
 export const EMPTY_FILTERS: DashboardFilters = {
@@ -72,4 +74,5 @@ export const EMPTY_FILTERS: DashboardFilters = {
   types: [],
   assignees: [],
   search: "",
+  custom: {},
 };

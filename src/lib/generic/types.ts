@@ -54,6 +54,8 @@ export interface GenericConfig<T extends BaseRecord> {
   noun: string; // plural, lower case: "reviews"
   filters: FilterDim<T>[];
   searchText: (t: T) => string;
+  // Custom field name -> display text; enables the custom-field filter.
+  customOf?: (t: T) => Record<string, string> | undefined;
   kpis: (items: T[], now: Date) => ReportKpi[];
   trend: {
     title: string;
@@ -73,6 +75,7 @@ export interface GenericFilters {
   projectIds: string[];
   dims: Record<string, string[]>;
   search: string;
+  custom: Record<string, string[]>;
 }
 
-export const EMPTY_GENERIC_FILTERS: GenericFilters = { projectIds: [], dims: {}, search: "" };
+export const EMPTY_GENERIC_FILTERS: GenericFilters = { projectIds: [], dims: {}, search: "", custom: {} };

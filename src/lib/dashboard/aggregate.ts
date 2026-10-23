@@ -3,6 +3,7 @@
 
 import type { DashboardFilters, IssueRecord } from "./types";
 import { projectCollator } from "@/lib/aps/projects";
+import { matchesCustom } from "@/lib/custom/filter";
 
 export type StatusBucket = "open" | "inProgress" | "completed" | "closed";
 
@@ -64,6 +65,7 @@ export function applyFilters(issues: IssueRecord[], f: DashboardFilters): IssueR
     if (f.assignees.length && !f.assignees.includes(i.assignee?.name ?? "Unassigned")) return false;
     if (f.createdFrom && i.createdAt.slice(0, 10) < f.createdFrom) return false;
     if (f.createdTo && i.createdAt.slice(0, 10) > f.createdTo) return false;
+    if (f.custom && !matchesCustom(i.custom, f.custom)) return false;
     if (q) {
       const hay = `${i.displayId} ${i.title} ${i.location ?? ""} ${i.assignee?.name ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
