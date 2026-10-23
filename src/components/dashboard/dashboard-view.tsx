@@ -17,6 +17,8 @@ import { IssueTable } from "./issue-table";
 import { KpiTiles } from "./kpi-tiles";
 import { MultiSelect } from "./multi-select";
 import { Panel } from "./panel";
+import { PdfButton } from "./pdf-button";
+import { buildIssuesReport } from "@/lib/dashboard/report";
 import { ProjectStatus, StatusLegend } from "./project-status";
 import { TrendChart } from "./trend-chart";
 
@@ -79,6 +81,21 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
           onChange={(e) => set({ search: e.target.value })}
           className="min-h-9 w-56 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 text-xs"
         />
+        <div className="ml-auto">
+          <PdfButton
+            build={(includeRegister) =>
+              buildIssuesReport({
+                issues,
+                filters: f,
+                projectNames: Object.fromEntries(dataset.projects.map((p) => [p.id, p.name])),
+                projectCount: new Set(issues.map((i) => i.projectId)).size,
+                now,
+                includeRegister,
+                ...(dataset.title ? { title: dataset.title } : {}),
+              })
+            }
+          />
+        </div>
         {filtered ? (
           <button type="button" className="text-xs text-[color:var(--brand-secondary)] underline" onClick={() => setF(EMPTY_FILTERS)}>
             Reset filters ({issues.length} of {all.length})

@@ -19,3 +19,14 @@ export function rfiUrl(projectId: string, rfiId: string): string {
 export function issueUrl(projectId: string, issueId: string): string {
   return `${FORMA_BASE}/issues/projects/${strip(projectId)}/${issueId}`;
 }
+
+// Patterns below are taken from the Forma web UI and haven't been confirmed
+// against Autodesk documentation; if one lands on the wrong page, fix it
+// here and every register picks it up.
+export function formUrl(projectId: string, formId: string): string {
+  return `${FORMA_BASE}/forms/projects/${strip(projectId)}/forms/${formId}`;
+}
+
+export function reviewUrl(projectId: string, reviewId: string): string {
+  return `https://acc.autodesk.com/docs/reviews/projects/${strip(projectId)}/reviews/${reviewId}`;
+}
