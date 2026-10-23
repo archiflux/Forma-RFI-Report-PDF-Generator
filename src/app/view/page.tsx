@@ -17,12 +17,14 @@ import type { GenericDataset } from "@/lib/generic/types";
 import { reviewsConfig } from "@/lib/reviews/config";
 import type { ReviewRecord } from "@/lib/reviews/normalise";
 import { rfisConfig, type RfiRecord } from "@/lib/rfis-dash/config";
+import { submittalsConfig, type SubmittalRecord } from "@/lib/submittals/config";
 
 type Loaded =
   | { kind: "issues"; title: string; takenAt: string; expiresAt?: string; data: DashboardDataset }
   | { kind: "forms"; title: string; takenAt: string; expiresAt?: string; data: FormsDataset }
   | { kind: "reviews"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<ReviewRecord> }
-  | { kind: "rfis"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<RfiRecord> };
+  | { kind: "rfis"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<RfiRecord> }
+  | { kind: "submittals"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<SubmittalRecord> };
 
 // Public viewer. No Autodesk sign-in: data comes from a hosted link
 // (?s=<id>), a snapshot file the viewer opens, or the built-in demo.
@@ -42,6 +44,7 @@ function Viewer() {
         else if (snap.kind === "forms") setLoaded({ kind: "forms", ...base, data: parseFormsDataset(snap.data) });
         else if (snap.kind === "reviews") setLoaded({ kind: "reviews", ...base, data: parseGenericDataset<ReviewRecord>(snap.data) });
         else if (snap.kind === "rfis") setLoaded({ kind: "rfis", ...base, data: parseGenericDataset<RfiRecord>(snap.data) });
+        else if (snap.kind === "submittals") setLoaded({ kind: "submittals", ...base, data: parseGenericDataset<SubmittalRecord>(snap.data) });
         else setErr("This link is for a dashboard this viewer doesn't support yet.");
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
@@ -84,6 +87,8 @@ function Viewer() {
           <GenericView cfg={reviewsConfig} dataset={loaded.data} now={now} title={loaded.title} />
         ) : loaded?.kind === "rfis" ? (
           <GenericView cfg={rfisConfig} dataset={loaded.data} now={now} title={loaded.title} />
+        ) : loaded?.kind === "submittals" ? (
+          <GenericView cfg={submittalsConfig} dataset={loaded.data} now={now} title={loaded.title} />
         ) : loading ? (
           <p className="text-sm text-[color:var(--brand-muted)]">Loading shared dashboard…</p>
         ) : (

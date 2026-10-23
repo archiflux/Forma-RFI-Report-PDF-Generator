@@ -9,7 +9,7 @@ import { APS_BASE_URL } from "@/lib/aps/config";
 import type { SnapshotStore } from "./store";
 import { EXPIRY_DAYS, MAX_SNAPSHOT_BYTES, type SharedSnapshot, type SnapshotKind, type SnapshotMeta } from "./types";
 
-const KINDS: readonly SnapshotKind[] = ["issues", "forms", "reviews", "rfis"];
+const KINDS: readonly SnapshotKind[] = ["issues", "forms", "reviews", "rfis", "submittals"];
 const ID_RE = /^[A-Za-z0-9_-]{20,64}$/;
 const MAX_UNZIPPED = 80 * 1024 * 1024;
 

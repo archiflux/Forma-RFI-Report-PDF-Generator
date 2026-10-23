@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useApsClient } from "@/lib/aps/use-client";
 import { listProjects } from "@/lib/aps/projects";
 import { PROBE_TARGETS, runDataConnectorCheck, runProbe, type ProbeResult } from "@/lib/aps/probe";
+import { ScanPanel } from "@/components/probe/scan-panel";
 
 // Field names and counts only — never values — so the summary is safe to
 // paste into a chat or ticket.
@@ -75,6 +76,7 @@ function Probe() {
           </Button>
         ) : null}
       </div>
+      <ScanPanel client={client} projects={projectsQ.data ?? []} />
       {results.length ? (
         <div className="overflow-x-auto rounded-2xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card">
           <table className="w-full min-w-[800px] text-xs">

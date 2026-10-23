@@ -51,5 +51,13 @@ export const TEMPLATES: DashboardTemplate[] = [
     probeAreas: ["Reviews"],
     href: (h) => `/reviews-dashboard?hubId=${encodeURIComponent(h)}`,
   },
-  { id: "submittals", title: "Submittals Dashboard", description: "Submittal items by status, ball in court and due date.", scope: ["Project", "Hub"], status: "planned", probeAreas: ["Submittals"] },
+  {
+    id: "submittals",
+    title: "Submittals Dashboard",
+    description: "Submittal items across any set of projects: open and overdue items, ball in court, workflow stage, type and response. Not yet tested against live data.",
+    scope: ["Project", "Hub"],
+    status: "live",
+    probeAreas: ["Submittals"],
+    href: (h) => `/submittals-dashboard?hubId=${encodeURIComponent(h)}`,
+  },
 ];

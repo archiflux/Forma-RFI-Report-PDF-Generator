@@ -49,7 +49,7 @@ export interface Column<T> {
 }
 
 export interface GenericConfig<T extends BaseRecord> {
-  kind: "reviews" | "rfis";
+  kind: "reviews" | "rfis" | "submittals";
   title: string;
   noun: string; // plural, lower case: "reviews"
   filters: FilterDim<T>[];

@@ -73,6 +73,7 @@ function HubNav() {
     ["Forms", "/forms-dashboard"],
     ["Reviews", "/reviews-dashboard"],
     ["RFIs", "/rfis-dashboard"],
+    ["Submittals", "/submittals-dashboard"],
     ["Data probe", "/probe"],
   ] as const;
   return (

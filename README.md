@@ -44,6 +44,7 @@ Forma Insight's Power BI templates.
 | RFIs | `/rfis-dashboard` | `POST .../search:rfis` (read-shaped), project members |
 | Forms | `/forms-dashboard` | `/construction/forms/v1/.../forms`, form templates |
 | Reviews | `/reviews-dashboard` | `/construction/reviews/v1/.../reviews`, workflows |
+| Submittals | `/submittals-dashboard` | `/construction/submittals/v2/.../items`, item types, metadata (not yet tested against live data) |
 
 - The project selection is in the URL (`?hubId=…&p=<ids>`), so colleagues
   with Forma access can open the same view.
@@ -56,6 +57,9 @@ Forma Insight's Power BI templates.
   (plus the account-wide project list and Data Connector) and reports
   status, record counts and which fields carry data. "Copy summary" copies
   field names and counts only, never values.
+- **Data availability scan** (on `/probe`): counts records per tool
+  (Issues, RFIs, Forms, Reviews, Submittals) in every project you belong
+  to, one `limit=1` request per tool per project.
 - **Shared links** (`/view?s=<id>`): publish the current data as a hosted
   snapshot that opens without a Forma sign-in. The publisher chooses whether
   to redact (people's names become Person 1, Person 2; issue descriptions
