@@ -14,13 +14,15 @@ export function buildFormsReport(input: {
   projectNames: Record<string, string>;
   now: Date;
   includeRegister: boolean;
+  // Register row cap; the PDF uses the default, CSV passes Infinity.
+  maxRegisterRows?: number;
   title?: string;
 }): DashboardReport {
   const { forms, filters: f, now } = input;
   const k = formKpis(forms, now);
   const b = formBreakdowns(forms, now);
   const projectCount = new Set(forms.map((x) => x.projectId)).size;
-  const register = capRows([...forms].sort((a, c) => (c.formDate ?? "").localeCompare(a.formDate ?? "")));
+  const register = capRows([...forms].sort((a, c) => (c.formDate ?? "").localeCompare(a.formDate ?? "")), input.maxRegisterRows);
   return {
     title: input.title ?? "Forms dashboard",
     subtitle: `${forms.length} forms across ${projectCount} project${projectCount === 1 ? "" : "s"}`,
@@ -64,6 +66,7 @@ export function buildFormsReport(input: {
               ]),
               links: register.rows.map((x) => formUrl(x.projectId, x.id)),
               totalRows: register.totalRows,
+              isRegister: true,
             },
           ]
         : []),

@@ -60,7 +60,7 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
         ) : null}
         <div className="ml-auto">
           <PdfButton
-            build={(includeRegister) =>
+            build={(includeRegister, maxRegisterRows) =>
               buildGenericReport({
                 cfg,
                 items,
@@ -68,6 +68,7 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
                 projectNames: Object.fromEntries(dataset.projects.map((p) => [p.id, p.name])),
                 now,
                 includeRegister,
+                maxRegisterRows,
                 ...(title ? { title } : {}),
               })
             }

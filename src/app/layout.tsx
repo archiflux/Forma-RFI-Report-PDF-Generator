@@ -13,9 +13,9 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "Forma RFI Report Generator",
+  title: "Forma Dashboards",
   description:
-    "Read-only branded PDF/CSV RFI reports from Autodesk Forma (formerly ACC).",
+    "Read-only dashboards for Issues, RFIs, Forms and Reviews across Autodesk Forma projects.",
   icons: {
     icon: "/icon-colour.png",
     apple: "/icon-colour.png",

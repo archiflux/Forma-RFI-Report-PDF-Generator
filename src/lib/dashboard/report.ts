@@ -25,6 +25,8 @@ export function buildIssuesReport(input: {
   projectCount: number;
   now: Date;
   includeRegister: boolean;
+  // Register row cap; the PDF uses the default, CSV passes Infinity.
+  maxRegisterRows?: number;
   title?: string;
 }): DashboardReport {
   const { issues, filters: f, now } = input;
@@ -32,6 +34,7 @@ export function buildIssuesReport(input: {
   const projects = statusByProject(issues, now);
   const register = capRows(
     [...issues].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    input.maxRegisterRows,
   );
   return {
     title: input.title ?? "Issues dashboard",
@@ -100,6 +103,7 @@ export function buildIssuesReport(input: {
               ]),
               links: register.rows.map((i) => (i.projectId.startsWith("demo-") ? undefined : issueUrl(i.projectId, i.id))),
               totalRows: register.totalRows,
+              isRegister: true,
             },
           ]
         : []),

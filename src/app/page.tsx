@@ -44,11 +44,12 @@ export default function LandingPage() {
           className="h-14 w-auto sm:h-16"
         />
         <h1 className="mt-6 text-3xl font-semibold text-[color:var(--brand-primary)] sm:text-4xl">
-          Forma RFI Report Generator
+          Forma Dashboards
         </h1>
         <p className="mt-4 max-w-prose text-[color:var(--brand-ink-soft)]">
-          Sign in with your Autodesk account to generate branded PDF or CSV RFI
-          reports from Autodesk Forma (formerly Autodesk Construction Cloud).
+          Sign in with your Autodesk account to see Issues, RFIs, Forms and
+          Reviews across your Autodesk Forma projects, export branded PDF
+          reports and share snapshots.
           This app is <strong>read-only</strong> — it cannot create, edit, or
           delete anything in Forma.
         </p>

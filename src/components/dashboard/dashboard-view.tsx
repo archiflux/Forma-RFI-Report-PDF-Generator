@@ -83,7 +83,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
         />
         <div className="ml-auto">
           <PdfButton
-            build={(includeRegister) =>
+            build={(includeRegister, maxRegisterRows) =>
               buildIssuesReport({
                 issues,
                 filters: f,
@@ -91,6 +91,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
                 projectCount: new Set(issues.map((i) => i.projectId)).size,
                 now,
                 includeRegister,
+                maxRegisterRows,
                 ...(dataset.title ? { title: dataset.title } : {}),
               })
             }

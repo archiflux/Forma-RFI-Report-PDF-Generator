@@ -36,11 +36,13 @@ export function buildGenericReport<T extends BaseRecord>(input: {
   projectNames: Record<string, string>;
   now: Date;
   includeRegister: boolean;
+  // Register row cap; the PDF uses the default, CSV passes Infinity.
+  maxRegisterRows?: number;
   title?: string;
 }): DashboardReport {
   const { cfg, items, filters: f, now } = input;
   const projectCount = new Set(items.map((t) => t.projectId)).size;
-  const register = capRows(sortRows(items, cfg, cfg.defaultSort.column, cfg.defaultSort.dir, now));
+  const register = capRows(sortRows(items, cfg, cfg.defaultSort.column, cfg.defaultSort.dir, now), input.maxRegisterRows);
   return {
     title: input.title ?? cfg.title,
     subtitle: `${items.length} ${cfg.noun} across ${projectCount} project${projectCount === 1 ? "" : "s"}`,
@@ -69,6 +71,7 @@ export function buildGenericReport<T extends BaseRecord>(input: {
               rows: register.rows.map((t) => cfg.columns.map((c) => c.value(t, now))),
               links: register.rows.map((t) => cfg.linkOf(t)),
               totalRows: register.totalRows,
+              isRegister: true,
             },
           ]
         : []),

@@ -42,13 +42,13 @@ export default function HubsPage() {
   return (
     <section>
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
-        Step 1 of 3
+        Step 1 of 2
       </p>
       <h2 className="mt-1 text-2xl font-semibold text-[color:var(--brand-primary)]">
         Choose a hub
       </h2>
       <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
-        Pick the Forma hub (account) you want to pull RFIs from.
+        Pick the Forma hub (account) whose projects you want to report on.
       </p>
 
       {q.isLoading ? (

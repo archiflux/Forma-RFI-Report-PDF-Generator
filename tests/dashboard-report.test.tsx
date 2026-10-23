@@ -55,3 +55,19 @@ describe("dashboard report model", () => {
     }
   }, 60_000);
 });
+
+describe("register CSV", () => {
+  it("exports every row with escaping, BOM and a Forma link column", async () => {
+    const { registerCsv } = await import("@/lib/report/dashboard/model");
+    const ds = demoDataset(NOW);
+    ds.issues[0] = { ...ds.issues[0]!, title: 'Say "hi", then\nleave' };
+    const r = buildIssuesReport({ issues: ds.issues, filters: EMPTY_FILTERS, projectNames: {}, projectCount: 4, now: NOW, includeRegister: true, maxRegisterRows: Infinity });
+    const csv = registerCsv(r) as string;
+    expect(csv.startsWith("﻿Title,Project,#")).toBe(true);
+    expect(csv.split("\r\n")[0]).toMatch(/,Forma link$/);
+    expect(csv).toContain('"Say ""hi"", then\nleave"');
+    // header + one line per issue + trailing CRLF
+    expect(csv.split("\r\n").length).toBe(ds.issues.length + 2);
+    expect(registerCsv({ ...r, sections: [] })).toBeNull();
+  });
+});
