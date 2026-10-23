@@ -6,6 +6,8 @@ import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useFormsData } from "@/lib/forms/use-forms-data";
 import { SelectionSidebar } from "@/components/dashboard/selection-sidebar";
 import { FormsView } from "@/components/forms/forms-view";
+import { SharePanel } from "@/components/dashboard/share-panel";
+import { redactForms } from "@/lib/forms/snapshot";
 
 function FormsDashboard() {
   const sel = useProjectSelection();
@@ -52,7 +54,20 @@ function FormsDashboard() {
             Tick one or more projects, or load a saved set, to build the dashboard.
           </p>
         ) : (
-          <FormsView dataset={dataset} now={now} />
+          <>
+            <FormsView dataset={dataset} now={now} />
+            <SharePanel
+              kind="forms"
+              itemCount={dataset.forms.length}
+              defaultTitle="Forms dashboard"
+              redactionNote="replace people's names with Person 1, Person 2."
+              buildData={(redacted) =>
+                redacted
+                  ? redactForms(dataset)
+                  : { projects: dataset.projects.filter((p) => !p.error && !p.formsUnavailable), forms: dataset.forms }
+              }
+            />
+          </>
         )}
       </div>
     </div>

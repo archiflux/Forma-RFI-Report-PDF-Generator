@@ -93,11 +93,32 @@ Forma Insight's Power BI templates.
   Model Coordination, Locations, members) for one project and reports status,
   record counts and which fields carry data. "Copy summary" copies field
   names and counts only, never values.
-- **Snapshots and the public viewer** (`/view`): the dashboard can download a
-  redacted JSON snapshot (people's names replaced with Person 1, 2…,
-  descriptions and custom fields off by default). `/view` opens a snapshot
-  without signing in and makes no network calls. A demo dataset is built in.
+- **Shared links** (`/view?s=<id>`): any dashboard can publish its current
+  data as a hosted snapshot that opens without a Forma sign-in. The
+  publisher chooses whether to redact (people's names become Person 1,
+  Person 2; issue descriptions and custom fields are dropped) and an expiry
+  of 7, 30 or 90 days. "My shared links" lists, copies and deletes them.
   Snapshots are point-in-time and do not refresh.
+- **PDF report**: every dashboard has "Download PDF report", which renders
+  what is on screen (filters applied) as an A4 landscape PDF, optionally
+  with the register. Built in the browser.
+
+### Setting up shared links (Vercel)
+
+Shared links are the one feature that stores data on a server.
+
+1. In Vercel, open the project, go to **Storage**, create a **Blob** store
+   with **private** access and connect it to the project. Vercel adds
+   `BLOB_READ_WRITE_TOKEN` automatically.
+2. Add `SHARE_ALLOWED_EMAIL_DOMAINS` = `bailey-p.net` (comma-separate
+   several). Only Autodesk accounts with these email domains can publish.
+   Without it, publishing is refused in production.
+3. Redeploy.
+
+Publishing checks the user's Autodesk token against
+`/userprofile/v1/users/@me` on the server. Viewing needs only the link,
+whose id is 144 random bits, and stops at expiry. Locally, snapshots are
+written to `.data/share/` instead of Blob.
 
 Issues data comes from `GET /construction/issues/v1/projects/:p/issues`
 plus `issue-types?include=subtypes` and
