@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Project } from "@/lib/aps/types";
 import type { ProjectSet } from "@/lib/dashboard/project-sets";
+import { sortByName } from "@/lib/aps/projects";
 
 export interface PickerProps {
   hubId: string;
@@ -23,7 +24,7 @@ export function ProjectPicker({ hubId, projects, selected, onChange, sets, onSav
     () => projects.filter((p) => p.name.toLowerCase().includes(q.trim().toLowerCase())),
     [projects, q],
   );
-  const hubSets = sets.filter((s) => s.hubId === hubId);
+  const hubSets = sortByName(sets.filter((s) => s.hubId === hubId));
 
   return (
     <div className="space-y-4">

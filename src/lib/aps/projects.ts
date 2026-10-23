@@ -15,11 +15,21 @@ export async function listProjects(
   const res = await client.request<RawProjectsResponse>({
     path: `/project/v1/hubs/${encodeURIComponent(hubId)}/projects`,
   });
-  return (res.data ?? []).map((p) => ({
-    id: p.id,
-    hubId,
-    name: p.attributes?.name ?? p.id,
-  }));
+  return sortByName(
+    (res.data ?? []).map((p) => ({
+      id: p.id,
+      hubId,
+      name: p.attributes?.name ?? p.id,
+    })),
+  );
+}
+
+// Alphabetical, numbers in natural order ("9 - X" before "10 - Y"),
+// ignoring case. Every project list in the app comes through here.
+export const projectCollator = new Intl.Collator("en-GB", { numeric: true, sensitivity: "base" });
+
+export function sortByName<T extends { name: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => projectCollator.compare(a.name, b.name));
 }
 
 // ACC/Forma RFI endpoints expect the project id WITHOUT the leading "b." prefix

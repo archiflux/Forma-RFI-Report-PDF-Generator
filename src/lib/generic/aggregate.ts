@@ -7,7 +7,7 @@ export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: Gener
     if (f.projectIds.length && !f.projectIds.includes(t.projectId)) return false;
     for (const dim of cfg.filters) {
       const sel = f.dims[dim.id];
-      if (sel?.length && !sel.includes(dim.valueOf(t))) return false;
+      if (sel?.length && !sel.includes(String(dim.valueOf(t) ?? ""))) return false;
     }
     return !q || cfg.searchText(t).toLowerCase().includes(q);
   });
@@ -17,7 +17,7 @@ export function sortRows<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>
   const col = cfg.columns[column] ?? cfg.columns[0];
   if (!col) return items;
   const key = col.sortValue ?? ((t: T) => col.value(t, now));
-  return [...items].sort((a, b) => key(a).localeCompare(key(b)) * dir);
+  return [...items].sort((a, b) => String(key(a) ?? "").localeCompare(String(key(b) ?? "")) * dir);
 }
 
 // Alias helper for redaction: the same name always maps to the same alias.

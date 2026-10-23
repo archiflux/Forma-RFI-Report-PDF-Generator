@@ -6,6 +6,7 @@ import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
 import { aliaser } from "@/lib/generic/aggregate";
 import type { BaseRecord, GenericConfig } from "@/lib/generic/types";
 import type { ProjectLoader } from "@/lib/generic/use-generic-data";
+import { asText } from "@/lib/generic/text";
 
 export interface RfiRecord extends BaseRecord {
   number: string;
@@ -35,23 +36,26 @@ export function partyName(p: RfiParty, lookup: ReadonlyMap<string, string>): str
 
 export function toRfiRecord(r: Rfi, projectId: string, projectName: string, lookup: ReadonlyMap<string, string> = new Map()): RfiRecord {
   const bic = (r.ballInCourt.length ? r.ballInCourt : r.assignees).map((p) => partyName(p, lookup)).join(", ");
+  const priority = asText(r.priority);
+  const discipline = asText(r.discipline);
+  const category = asText(r.category);
   return {
     key: `${projectId}:${r.id}`,
     id: r.id,
     projectId,
     projectName,
-    number: r.number,
-    title: r.title,
-    status: r.status || "unknown",
-    ...(r.priority ? { priority: r.priority } : {}),
-    ...(r.discipline ? { discipline: r.discipline } : {}),
-    ...(r.category ? { category: r.category } : {}),
+    number: asText(r.number) ?? "",
+    title: asText(r.title) ?? "",
+    status: asText(r.status) ?? "unknown",
+    ...(priority ? { priority } : {}),
+    ...(discipline ? { discipline } : {}),
+    ...(category ? { category } : {}),
     ...(bic ? { ballInCourt: bic } : {}),
     ...(r.manager ? { manager: partyName(r.manager, lookup) } : {}),
-    createdAt: r.createdAt,
-    ...(r.dueDate ? { dueDate: r.dueDate } : {}),
-    ...(r.respondedAt ? { respondedAt: r.respondedAt } : {}),
-    ...(r.closedAt ? { closedAt: r.closedAt } : {}),
+    createdAt: asText(r.createdAt) ?? "",
+    ...(asText(r.dueDate) ? { dueDate: asText(r.dueDate) as string } : {}),
+    ...(asText(r.respondedAt) ? { respondedAt: asText(r.respondedAt) as string } : {}),
+    ...(asText(r.closedAt) ? { closedAt: asText(r.closedAt) as string } : {}),
   };
 }
 

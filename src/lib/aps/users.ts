@@ -61,30 +61,20 @@ export interface ProjectDirectory {
   roles: Map<string, string>;
 }
 
-// People, companies and roles for one project, for resolving Issues
-// assignees (assignedToType user | company | role). Companies and roles
-// come off the member records, topped up from the companies endpoint when
-// the caller is allowed to read it.
+// People, companies and roles for one project, for resolving assignees
+// (Issues assignedToType user | company | role). Companies and roles come
+// off the member records; the separate companies endpoint 404s on project
+// level, so it isn't called.
 export async function getProjectDirectory(
   client: ApsClient,
   projectId: string,
 ): Promise<ProjectDirectory> {
-  const p = normaliseProjectIdForRfi(projectId);
-  const [raw, companies] = await Promise.all([
-    getRawProjectUsers(client, projectId),
-    tryFetchPaged<{ id?: string; name?: string }>(
-      client,
-      `/construction/admin/v1/projects/${encodeURIComponent(p)}/companies`,
-    ),
-  ]);
+  const raw = await getRawProjectUsers(client, projectId);
   const dir: ProjectDirectory = {
     people: buildUserRoster(raw.map(normalizeUser)),
     companies: new Map(),
     roles: new Map(),
   };
-  for (const c of companies === "denied" ? [] : companies) {
-    if (c.id && c.name) dir.companies.set(c.id, c.name);
-  }
   for (const u of raw) {
     if (u.companyId && u.companyName && !dir.companies.has(u.companyId)) {
       dir.companies.set(u.companyId, u.companyName);

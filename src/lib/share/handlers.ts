@@ -18,10 +18,21 @@ export interface ShareEnv {
   production: boolean;
 }
 
+// Bailey Partnership's two email domains. SHARE_ALLOWED_EMAIL_DOMAINS
+// (comma-separated) replaces this list when set.
+export const DEFAULT_ALLOWED_DOMAINS = ["bailey-p.net", "baileyp.co.uk"];
+
+export function parseDomains(raw: string | undefined): string[] | null {
+  const list = (raw ?? "")
+    .split(/[,\s;]+/)
+    .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
+  return list.length ? list : null;
+}
+
 export function readShareEnv(): ShareEnv {
-  const raw = process.env.SHARE_ALLOWED_EMAIL_DOMAINS;
   return {
-    allowedDomains: raw ? raw.split(",").map((d) => d.trim().toLowerCase()).filter(Boolean) : null,
+    allowedDomains: parseDomains(process.env.SHARE_ALLOWED_EMAIL_DOMAINS) ?? DEFAULT_ALLOWED_DOMAINS,
     production: process.env.NODE_ENV === "production",
   };
 }
@@ -47,7 +58,9 @@ export async function verifyUser(
   const email = (p.emailId ?? "").toLowerCase();
   if (!/^[A-Za-z0-9]+$/.test(userId)) return json(401, { error: "Could not identify your Autodesk account." });
   if (env.allowedDomains && !env.allowedDomains.some((d) => email.endsWith(`@${d}`))) {
-    return json(403, { error: "Your account isn't allowed to publish shared links." });
+    return json(403, {
+      error: `Shared links can only be created by ${env.allowedDomains.map((d) => `@${d}`).join(" or ")} accounts. You're signed in to Autodesk as ${email || "an account with no email"}.`,
+    });
   }
   return { userId, email };
 }

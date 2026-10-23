@@ -2,6 +2,7 @@
 // explicit `now` so tests (and published snapshots) are deterministic.
 
 import type { DashboardFilters, IssueRecord } from "./types";
+import { projectCollator } from "@/lib/aps/projects";
 
 export type StatusBucket = "open" | "inProgress" | "completed" | "closed";
 
@@ -120,7 +121,8 @@ export function countBy<T>(
 ): Count[] {
   const m = new Map<string, number>();
   for (const i of items) {
-    const k = keyOf(i) || "Not set";
+    // String() guards against non-text values slipping through a normaliser.
+    const k = String(keyOf(i) ?? "") || "Not set";
     m.set(k, (m.get(k) ?? 0) + 1);
   }
   const sorted = [...m.entries()]
@@ -160,7 +162,7 @@ export function statusByProject(issues: IssueRecord[], now: Date): ProjectStatus
     row.total++;
     if (isOverdue(i, now)) row.overdue++;
   }
-  return [...m.values()].sort((a, b) => b.total - a.total);
+  return [...m.values()].sort((a, b) => projectCollator.compare(a.projectName, b.projectName));
 }
 
 // Count of items per calendar month (YYYY-MM), gap-filled between the
@@ -169,13 +171,17 @@ export function monthlyCounts<T>(items: T[], dateOf: (i: T) => string | undefine
   const m = new Map<string, number>();
   for (const i of items) {
     const d = dateOf(i);
-    if (d) m.set(d.slice(0, 7), (m.get(d.slice(0, 7)) ?? 0) + 1);
+    const k = typeof d === "string" ? d.slice(0, 7) : "";
+    if (MONTH_RE.test(k)) m.set(k, (m.get(k) ?? 0) + 1);
   }
   return gapFill([...m.keys()]).map((month) => ({ month, count: m.get(month) ?? 0 }));
 }
 
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export function gapFill(keys: string[]): string[] {
-  const months = [...new Set(keys)].sort();
+  // Malformed keys (bad dates) would never meet the loop's end condition.
+  const months = [...new Set(keys)].filter((k) => MONTH_RE.test(k)).sort();
   if (!months.length) return [];
   const out: string[] = [];
   let [y, m] = (months[0] as string).split("-").map(Number) as [number, number];
@@ -204,14 +210,10 @@ export function monthlyTrend(issues: IssueRecord[]): MonthPoint[] {
   const created = new Map<string, number>();
   const closed = new Map<string, number>();
   for (const i of issues) {
-    if (i.createdAt) {
-      const k = i.createdAt.slice(0, 7);
-      created.set(k, (created.get(k) ?? 0) + 1);
-    }
-    if (i.closedAt) {
-      const k = i.closedAt.slice(0, 7);
-      closed.set(k, (closed.get(k) ?? 0) + 1);
-    }
+    const c = i.createdAt?.slice(0, 7) ?? "";
+    if (MONTH_RE.test(c)) created.set(c, (created.get(c) ?? 0) + 1);
+    const d = i.closedAt?.slice(0, 7) ?? "";
+    if (MONTH_RE.test(d)) closed.set(d, (closed.get(d) ?? 0) + 1);
   }
   return gapFill([...created.keys(), ...closed.keys()]).map((month) => ({
     month,

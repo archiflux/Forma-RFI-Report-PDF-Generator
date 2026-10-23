@@ -3,11 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { fetchShared, listMine, publish, removeShared, type ShareEnv } from "@/lib/share/handlers";
+import { DEFAULT_ALLOWED_DOMAINS, fetchShared, listMine, parseDomains, publish, readShareEnv, removeShared, type ShareEnv } from "@/lib/share/handlers";
 import { FileStore } from "@/lib/share/store";
 import type { SharedSnapshot, SnapshotMeta } from "@/lib/share/types";
 
-const env: ShareEnv = { allowedDomains: ["bailey-p.net"], production: true };
+const env: ShareEnv = { allowedDomains: DEFAULT_ALLOWED_DOMAINS, production: true };
 
 // Fake APS /userprofile: token "alice" and "bob" are Bailey users, "eve" is not.
 const fakeFetch = (async (_url: string, init?: RequestInit) => {
@@ -16,6 +16,7 @@ const fakeFetch = (async (_url: string, init?: RequestInit) => {
     "Bearer alice": { userId: "ALICE1", emailId: "alice@bailey-p.net" },
     "Bearer bob": { userId: "BOB1", emailId: "bob@bailey-p.net" },
     "Bearer eve": { userId: "EVE1", emailId: "eve@example.com" },
+    "Bearer carol": { userId: "CAROL1", emailId: "Carol@BaileyP.co.uk" },
   };
   const p = who[auth];
   return p ? new Response(JSON.stringify(p)) : new Response("{}", { status: 401 });
@@ -46,6 +47,21 @@ describe("hosted snapshots", () => {
     expect((await publish(req("POST", "nobody", payload), store, env, fakeFetch)).status).toBe(401);
     const unconfigured: ShareEnv = { allowedDomains: null, production: true };
     expect((await publish(req("POST", "alice", payload), store, unconfigured, fakeFetch)).status).toBe(503);
+  });
+
+  it("accepts both Bailey domains and explains rejections", async () => {
+    expect((await publish(req("POST", "carol", payload), store, env, fakeFetch)).status).toBe(201);
+    const denied = await publish(req("POST", "eve", payload), store, env, fakeFetch);
+    expect(((await denied.json()) as { error: string }).error).toContain("eve@example.com");
+  });
+
+  it("parses the domain setting loosely and defaults when unset", () => {
+    expect(parseDomains(" @bailey-p.net; baileyp.co.uk ,")).toEqual(["bailey-p.net", "baileyp.co.uk"]);
+    expect(parseDomains("")).toBeNull();
+    const prev = process.env.SHARE_ALLOWED_EMAIL_DOMAINS;
+    delete process.env.SHARE_ALLOWED_EMAIL_DOMAINS;
+    expect(readShareEnv().allowedDomains).toEqual(DEFAULT_ALLOWED_DOMAINS);
+    if (prev !== undefined) process.env.SHARE_ALLOWED_EMAIL_DOMAINS = prev;
   });
 
   it("rejects unknown kinds", async () => {
