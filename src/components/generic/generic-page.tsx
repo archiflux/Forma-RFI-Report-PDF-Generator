@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useGenericData, type ProjectLoader } from "@/lib/generic/use-generic-data";
 import { useProjectLocations } from "@/lib/dashboard/use-project-locations";
@@ -20,10 +21,31 @@ function Notice({ tone, summary, items }: { tone: "error" | "info"; summary: str
   );
 }
 
-export function GenericPage<T extends BaseRecord>({ cfg, loader, intro }: { cfg: GenericConfig<T>; loader: ProjectLoader<T>; intro: string }) {
+// `enrich` adds a button that reloads with per-record detail (slower), for
+// fields the list endpoint leaves out, such as RFI custom fields.
+export function GenericPage<T extends BaseRecord>({
+  cfg,
+  loader,
+  intro,
+  enrich,
+}: {
+  cfg: GenericConfig<T>;
+  loader: ProjectLoader<T>;
+  intro: string;
+  enrich?: { label: string; note: string };
+}) {
   const sel = useProjectSelection();
   const { hubId, chosen } = sel;
-  const { dataset, loading, total } = useGenericData(cfg.kind, loader, chosen);
+  const [full, setFull] = useState(false);
+  const [progress, setProgress] = useState<Record<string, { done: number; total: number }>>({});
+  const onProgress = useCallback(
+    (id: string, done: number, total: number) => setProgress((p) => ({ ...p, [id]: { done, total } })),
+    [],
+  );
+  const { dataset, loading, fetching, total } = useGenericData(cfg.kind, loader, chosen, full, onProgress);
+  const detail = Object.entries(progress).filter(([id]) => chosen.some((p) => p.id === id));
+  const detailDone = detail.reduce((s, [, v]) => s + v.done, 0);
+  const detailTotal = detail.reduce((s, [, v]) => s + v.total, 0);
   const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
   const failed = dataset.projects.filter((p) => p.error);
@@ -47,6 +69,24 @@ export function GenericPage<T extends BaseRecord>({ cfg, loader, intro }: { cfg:
             All templates
           </Link>
         </div>
+        {enrich && chosen.length ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 py-2 text-xs">
+            {!full ? (
+              <>
+                <Button size="sm" variant="secondary" onClick={() => setFull(true)}>
+                  {enrich.label}
+                </Button>
+                <span className="text-[color:var(--brand-muted)]">{enrich.note}</span>
+              </>
+            ) : fetching ? (
+              <span>
+                Loading custom fields{detailTotal ? `: ${detailDone} of ${detailTotal}` : "…"}. You can keep using the dashboard meanwhile.
+              </span>
+            ) : (
+              <span>Custom fields loaded. Use &quot;+ Custom field filter&quot; above.</span>
+            )}
+          </div>
+        ) : null}
         <Notice tone="error" summary={`${failed.length} project${failed.length === 1 ? "" : "s"} failed to load`} items={failed.map((p) => `${p.name}: ${p.error}`)} />
         <Notice tone="info" summary={`${skipped.length} project${skipped.length === 1 ? "" : "s"} skipped: this tool isn't switched on`} items={skipped.map((p) => p.name)} />
         {chosen.length === 0 ? (
