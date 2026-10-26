@@ -11,6 +11,8 @@ export interface DashboardTemplate {
   scope: Array<"Project" | "Hub">;
   status: TemplateStatus;
   probeAreas: string[];
+  // Kept in code but not shown in the catalogue or nav.
+  hidden?: boolean;
   href?: (hubId: string) => string;
 }
 
@@ -55,6 +57,8 @@ export const TEMPLATES: DashboardTemplate[] = [
     id: "submittals",
     title: "Submittals Dashboard",
     description: "Submittal items across any set of projects: open and overdue items, ball in court, workflow stage, type and response. Not yet tested against live data.",
+    // Hidden October 2026: none of our projects use Submittals yet.
+    hidden: true,
     scope: ["Project", "Hub"],
     status: "live",
     probeAreas: ["Submittals"],
