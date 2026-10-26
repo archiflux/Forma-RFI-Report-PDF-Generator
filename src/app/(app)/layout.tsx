@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useCanProbe } from "@/lib/auth/use-can-probe";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/store";
 
@@ -65,6 +66,7 @@ export default function AuthedLayout({
 // Hub-scoped navigation. Only shown once a hub is in the URL.
 function HubNav() {
   const hubId = useSearchParams().get("hubId");
+  const { allowed: canProbe } = useCanProbe();
   if (!hubId) return null;
   const q = `?hubId=${encodeURIComponent(hubId)}`;
   const links = [
@@ -73,8 +75,8 @@ function HubNav() {
     ["Forms", "/forms-dashboard"],
     ["Reviews", "/reviews-dashboard"],
     ["RFIs", "/rfis-dashboard"],
-    ["Submittals", "/submittals-dashboard"],
-    ["Data probe", "/probe"],
+    // Submittals is hidden until a project uses it; see templates.ts.
+    ...(canProbe ? ([["Data probe", "/probe"]] as const) : []),
   ] as const;
   return (
     <nav className="ml-auto hidden gap-4 text-sm md:flex">

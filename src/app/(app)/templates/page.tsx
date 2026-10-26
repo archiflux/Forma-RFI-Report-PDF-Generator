@@ -4,30 +4,33 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TEMPLATES, type TemplateStatus } from "@/lib/dashboard/templates";
+import { useCanProbe } from "@/lib/auth/use-can-probe";
 
 const BADGE: Record<TemplateStatus, string> = { live: "Dashboard", planned: "Planned" };
 
 function Catalogue() {
   const hubId = useSearchParams().get("hubId") ?? "";
+  const { allowed: canProbe } = useCanProbe();
+  const templates = TEMPLATES.filter((t) => !t.hidden);
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-[color:var(--brand-primary)]">Dashboard templates</h2>
           <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
-            Planned templates go live once the probe confirms the data is available on our projects.
+            Pick a dashboard, then tick the projects you want to include.
           </p>
         </div>
-        {hubId ? (
+        {hubId && canProbe ? (
           <Link href={`/probe?hubId=${encodeURIComponent(hubId)}`} className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
             Run the data probe
           </Link>
-        ) : (
+        ) : !hubId ? (
           <Link href="/hubs" className="text-sm underline">Choose a hub first</Link>
-        )}
+        ) : null}
       </div>
-      <ul className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {TEMPLATES.map((t) => (
+      <ul className="mt-6 grid gap-4 md:grid-cols-2">
+        {templates.map((t) => (
           <li key={t.id} className="flex flex-col rounded-2xl border border-[color:var(--brand-border)] bg-white p-5 shadow-card">
             <div className="flex items-start justify-between gap-2">
               <p className="text-lg font-semibold text-[color:var(--brand-primary)]">{t.title}</p>

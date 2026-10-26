@@ -9,6 +9,7 @@ import { useApsClient } from "@/lib/aps/use-client";
 import { listProjects } from "@/lib/aps/projects";
 import { PROBE_TARGETS, runDataConnectorCheck, runProbe, type ProbeResult } from "@/lib/aps/probe";
 import { ScanPanel } from "@/components/probe/scan-panel";
+import { useCanProbe } from "@/lib/auth/use-can-probe";
 
 // Field names and counts only — never values — so the summary is safe to
 // paste into a chat or ticket.
@@ -134,6 +135,9 @@ function Probe() {
 }
 
 export default function ProbePage() {
+  const { allowed, loading } = useCanProbe();
+  if (loading) return <p className="text-sm">Loading…</p>;
+  if (!allowed) return <p className="text-sm text-[color:var(--brand-muted)]">The data probe isn&apos;t available for your account.</p>;
   return (
     <Suspense fallback={<p className="text-sm">Loading…</p>}>
       <Probe />
