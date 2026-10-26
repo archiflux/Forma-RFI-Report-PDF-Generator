@@ -3,6 +3,7 @@ import { Figtree } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Analytics } from "@vercel/analytics/next";
 
 // Figtree matches the typography used on the Bailey Partnership report cover.
 // `variable` exposes it as a CSS custom property so globals.css can compose it
