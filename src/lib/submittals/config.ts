@@ -1,3 +1,4 @@
+import { submittalUrl } from "@/lib/aps/links";
 import { getSubmittalLookups, scrapeRawSubmittals, type SubmittalLookups } from "@/lib/aps/submittals";
 import { getProjectDirectory } from "@/lib/aps/users";
 import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
@@ -169,7 +170,7 @@ export const submittalsConfig: GenericConfig<SubmittalRecord> = {
       width: 1.2,
     },
   ],
-  linkOf: (s) => `https://acc.autodesk.com/build/submittals/projects/${s.projectId.replace(/^b\./, "")}/items/${encodeURIComponent(s.id)}`,
+  linkOf: (s) => submittalUrl(s.projectId, s.id),
   defaultSort: { column: 8, dir: 1 },
   redactionNote: "replace people's names with Person 1, Person 2.",
   redact: (ds) => {
