@@ -59,3 +59,12 @@ h4 {
   --status-critical: #d03b3b;
   --chart-grid: #e3e6eb;
 }
+
+/* Extra categorical slots for donuts and stacked charts (dataviz reference
+   palette, fixed order; slots 1-6 validated adjacent-pair CVD dE >= 9.1).
+   "Other" is a neutral grey, never a generated hue. */
+:root {
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-other: #a3a9b2;
+}

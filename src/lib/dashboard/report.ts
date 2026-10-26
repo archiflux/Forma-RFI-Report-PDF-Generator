@@ -14,6 +14,7 @@ import {
 } from "./aggregate";
 import type { DashboardFilters, IssueRecord } from "./types";
 import { describeCustom } from "@/lib/custom/filter";
+import { topOverdue } from "@/lib/charts/series";
 
 function day(iso?: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-GB") : "";
@@ -32,6 +33,7 @@ export function buildIssuesReport(input: {
 }): DashboardReport {
   const { issues, filters: f, now } = input;
   const k = kpis(issues, now);
+  const late = topOverdue(issues, isOutstanding, (i) => i.dueDate, now);
   const projects = statusByProject(issues, now);
   const register = capRows(
     [...issues].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -75,6 +77,14 @@ export function buildIssuesReport(input: {
       { kind: "bars", title: "Open workload by assignee", data: countBy(issues.filter(isOutstanding), (i) => i.assignee?.name ?? "Unassigned") },
       { kind: "bars", title: "Issues by root cause", data: countBy(issues, (i) => i.rootCause) },
       { kind: "bars", title: "Issues by location", data: countBy(issues, (i) => i.location ?? "Not set") },
+      {
+        kind: "table",
+        title: "Top 10 most overdue open issues",
+        columns: ["Title", "Project", "#", "Assigned to", "Due", "Days overdue"],
+        widths: [3, 2, 0.6, 1.6, 1, 0.9],
+        rows: late.map((r) => [r.item.title, r.item.projectName, r.item.displayId, r.item.assignee?.name ?? "Unassigned", day(r.due), String(r.daysOverdue)]),
+        links: late.map((r) => (r.item.projectId.startsWith("demo-") ? undefined : issueUrl(r.item.projectId, r.item.id))),
+      },
       {
         kind: "table",
         title: "Status by project",

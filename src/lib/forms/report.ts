@@ -1,9 +1,10 @@
 import { formUrl } from "@/lib/aps/links";
 import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
 import { formBreakdowns, formKpis, type FormFilters } from "./aggregate";
-import { formStatusLabel, isFormOverdue } from "./normalise";
+import { formStatusLabel, isFormOpen, isFormOverdue } from "./normalise";
 import type { FormRecord } from "./types";
 import { describeCustom } from "@/lib/custom/filter";
+import { topOverdue } from "@/lib/charts/series";
 
 function day(iso?: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-GB") : "";
@@ -22,6 +23,7 @@ export function buildFormsReport(input: {
   const { forms, filters: f, now } = input;
   const k = formKpis(forms, now);
   const b = formBreakdowns(forms, now);
+  const late = topOverdue(forms, isFormOpen, (x) => x.dueDate, now);
   const projectCount = new Set(forms.map((x) => x.projectId)).size;
   const register = capRows([...forms].sort((a, c) => (c.formDate ?? "").localeCompare(a.formDate ?? "")), input.maxRegisterRows);
   return {
@@ -52,6 +54,14 @@ export function buildFormsReport(input: {
       { kind: "bars", title: "Overdue forms by template", data: b.overdueByTemplate },
       { kind: "bars", title: "Forms by project", data: b.byProject },
       { kind: "bars", title: "Forms by creator", data: b.byCreator },
+      {
+        kind: "table" as const,
+        title: "Top 10 most overdue open forms",
+        columns: ["Name", "Project", "#", "Created by", "Due", "Days overdue"],
+        widths: [3, 2, 0.6, 1.6, 1, 0.9],
+        rows: late.map((r) => [r.item.name || "(untitled)", r.item.projectName, r.item.formNum, r.item.createdBy ?? "", day(r.due), String(r.daysOverdue)]),
+        links: late.map((r) => formUrl(r.item.projectId, r.item.templateId, r.item.id)),
+      },
       ...(input.includeRegister
         ? [
             {

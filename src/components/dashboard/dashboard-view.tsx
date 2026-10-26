@@ -10,6 +10,9 @@ import {
   monthlyTrend,
   statusByProject,
   statusLabel,
+  BUCKET_LABEL,
+  STATUS_BUCKETS,
+  statusBucket,
 } from "@/lib/dashboard/aggregate";
 import { EMPTY_FILTERS, type DashboardDataset, type DashboardFilters } from "@/lib/dashboard/types";
 import { BarList } from "./bar-list";
@@ -20,6 +23,14 @@ import type { ProjectLocation } from "@/lib/aps/project-location";
 import { globePoints } from "@/lib/dashboard/globe";
 import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { Panel } from "./panel";
+import { Treemap } from "@/components/charts/treemap";
+import { Donut } from "@/components/charts/donut";
+import { Gauge } from "@/components/charts/gauge";
+import { StackedArea } from "@/components/charts/stacked-area";
+import { OverdueTable } from "@/components/charts/overdue-table";
+import { monthlyByCategory, topOverdue } from "@/lib/charts/series";
+import { issueUrl } from "@/lib/aps/links";
+import { BUCKET_COLOUR } from "./project-status";
 import { CustomFieldFilter } from "./custom-field-filter";
 import { DateRangeFilter } from "./date-range-filter";
 import { PdfButton } from "./pdf-button";
@@ -58,7 +69,13 @@ export function DashboardView({
   const byType = useMemo(() => countBy(issues, (i) => i.typeName), [issues]);
   const byCause = useMemo(() => countBy(issues, (i) => i.rootCause), [issues]);
   const byAssignee = useMemo(() => countBy(issues.filter(isOutstanding), (i) => i.assignee?.name ?? "Unassigned"), [issues]);
-  const byStatus = useMemo(() => countBy(issues, (i) => statusLabel(i.status), 12), [issues]);
+  const byStatus = useMemo(() => countBy(issues, (i) => statusLabel(i.status), 6), [issues]);
+  const byBucketMonth = useMemo(
+    () => monthlyByCategory(issues, (i) => i.createdAt, (i) => BUCKET_LABEL[statusBucket(i.status)]),
+    [issues],
+  );
+  const bucketOrder = STATUS_BUCKETS.map((b) => BUCKET_LABEL[b]).filter((l) => byBucketMonth.categories.includes(l));
+  const overdue = useMemo(() => topOverdue(issues, isOutstanding, (i) => i.dueDate, now), [issues, now]);
   const projects = useMemo(() => statusByProject(issues, now), [issues, now]);
   const trend = useMemo(() => monthlyTrend(issues), [issues]);
   const ages = useMemo(() => ageing(issues, now), [issues, now]);
@@ -129,28 +146,61 @@ export function DashboardView({
         </Panel>
       ) : null}
 
+      <div className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
+        <Panel title="Average days to close">
+          <Gauge value={k.avgDaysToClose} unit="days, created to closed" caption="Average days to close" />
+        </Panel>
+        <div className="lg:col-span-2">
+          <Panel title="Issues by status">
+            <Donut data={byStatus} centreLabel="issues" />
+          </Panel>
+        </div>
+      </div>
+
+      <Panel title="Issues by root cause">
+        <Treemap data={byCause} />
+      </Panel>
+
       <Panel title="Status by project" action={<StatusLegend />}>
         <ProjectStatus rows={projects} />
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+        <Panel title="Issues raised per month, by status today">
+          <StackedArea
+            rows={byBucketMonth.rows}
+            categories={bucketOrder}
+            colours={Object.fromEntries(STATUS_BUCKETS.map((b) => [BUCKET_LABEL[b], BUCKET_COLOUR[b]]))}
+          />
+        </Panel>
         <Panel title="Created vs closed per month">
           <TrendChart data={trend} />
         </Panel>
+        <div className="lg:col-span-2">
+          <Panel title="Top 10 most overdue open issues">
+            <OverdueTable
+              ownerLabel="Assigned to"
+              rows={overdue.map(({ item, due, daysOverdue }) => ({
+                key: item.key,
+                title: item.title,
+                ...(item.projectId.startsWith("demo-") ? {} : { href: issueUrl(item.projectId, item.id) }),
+                project: item.projectName,
+                number: item.displayId,
+                owner: item.assignee?.name ?? "Unassigned",
+                due,
+                daysOverdue,
+              }))}
+            />
+          </Panel>
+        </div>
         <Panel title="Age of outstanding issues">
           <BarList data={ages} />
         </Panel>
         <Panel title="Issues by type (click to filter)">
           <BarList data={byType} selected={f.types} onSelect={(v) => set({ types: toggle(f.types, v) })} />
         </Panel>
-        <Panel title="Issues by status">
-          <BarList data={byStatus} />
-        </Panel>
         <Panel title="Open workload by assignee (click to filter)">
           <BarList data={byAssignee} selected={f.assignees} onSelect={(v) => set({ assignees: toggle(f.assignees, v) })} />
-        </Panel>
-        <Panel title="Issues by root cause">
-          <BarList data={byCause} />
         </Panel>
         <Panel title="Issues by location">
           <BarList data={byLocation} />

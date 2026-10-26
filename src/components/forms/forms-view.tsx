@@ -17,6 +17,14 @@ import { globePoints } from "@/lib/dashboard/globe";
 import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { FormsTable } from "./forms-table";
 import { isFormOpen } from "@/lib/forms/normalise";
+import { Treemap } from "@/components/charts/treemap";
+import { Donut } from "@/components/charts/donut";
+import { StackedArea } from "@/components/charts/stacked-area";
+import { OpenClosedBars, type OpenClosedRow } from "@/components/charts/open-closed-bars";
+import { OverdueTable } from "@/components/charts/overdue-table";
+import { monthlyByCategory, topOverdue } from "@/lib/charts/series";
+import { formUrl } from "@/lib/aps/links";
+import { countBy } from "@/lib/dashboard/aggregate";
 
 function opts(values: string[], fmt: (v: string) => string = (v) => v) {
   return [...new Set(values)].sort().map((v) => ({ value: v, label: fmt(v) }));
@@ -50,10 +58,27 @@ export function FormsView({
   const all = dataset.forms;
   const forms = useMemo(() => applyFormFilters(all, f), [all, f]);
   const customs = useMemo(() => all.map((x) => x.custom), [all]);
+  const donut = useMemo(() => countBy(forms, (x) => formStatusLabel(x.status), 6), [forms]);
+  const tree = useMemo(() => countBy(forms, (x) => x.templateName, 20), [forms]);
+  const statusMonths = useMemo(() => monthlyByCategory(forms, (x) => x.formDate ?? x.createdAt, (x) => formStatusLabel(x.status)), [forms]);
+  const overdue = useMemo(() => topOverdue(forms, isFormOpen, (x) => x.dueDate, now), [forms, now]);
+  const projectRows = useMemo(() => {
+    const m = new Map<string, OpenClosedRow>();
+    const today = now.toISOString().slice(0, 10);
+    for (const x of forms) {
+      const r = m.get(x.projectId) ?? { id: x.projectId, name: x.projectName, open: 0, closed: 0, overdue: 0 };
+      if (isFormOpen(x)) {
+        r.open++;
+        if (x.dueDate && x.dueDate.slice(0, 10) < today) r.overdue++;
+      } else r.closed++;
+      m.set(x.projectId, r);
+    }
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, "en-GB", { numeric: true, sensitivity: "base" }));
+  }, [forms, now]);
   const set = (patch: Partial<FormFilters>) => setF((cur) => ({ ...cur, ...patch }));
 
   const k = useMemo(() => formKpis(forms, now), [forms, now]);
-  const { byTemplate, byStatus, byCreator, byProject, overdueByTemplate, trend } = useMemo(() => formBreakdowns(forms, now), [forms, now]);
+  const { byCreator, overdueByTemplate, trend } = useMemo(() => formBreakdowns(forms, now), [forms, now]);
 
   return (
     <div className="space-y-4">
@@ -111,21 +136,42 @@ export function FormsView({
         </Panel>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <Panel title="Forms by template (click to filter)">
+        <Treemap data={tree} selected={f.templates} onSelect={(v) => set({ templates: toggle(f.templates, v) })} />
+      </Panel>
+
+      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+        <Panel title="Forms by status">
+          <Donut data={donut} centreLabel="forms" />
+        </Panel>
+        <Panel title="Open and closed by project (click a project to filter)">
+          <OpenClosedBars rows={projectRows} selected={f.projectIds} onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })} />
+        </Panel>
+        <Panel title="Forms over time by status (form date)">
+          <StackedArea rows={statusMonths.rows} categories={statusMonths.categories} />
+        </Panel>
         <Panel title="Forms per month (by form date)">
           <TrendChart data={trend} series={[{ key: "count", label: "Forms", colour: "var(--series-1)" }]} ariaLabel="Forms per month" />
         </Panel>
-        <Panel title="Forms by template (click to filter)">
-          <BarList data={byTemplate} selected={f.templates} onSelect={(v) => set({ templates: toggle(f.templates, v) })} />
-        </Panel>
-        <Panel title="Forms by status">
-          <BarList data={byStatus} />
-        </Panel>
+        <div className="lg:col-span-2">
+          <Panel title="Top 10 most overdue open forms">
+            <OverdueTable
+              ownerLabel="Created by"
+              rows={overdue.map(({ item, due, daysOverdue }) => ({
+                key: item.key,
+                title: item.name,
+                href: formUrl(item.projectId, item.templateId, item.id),
+                project: item.projectName,
+                number: item.formNum,
+                ...(item.createdBy ? { owner: item.createdBy } : {}),
+                due,
+                daysOverdue,
+              }))}
+            />
+          </Panel>
+        </div>
         <Panel title="Overdue forms by template">
           <BarList data={overdueByTemplate} />
-        </Panel>
-        <Panel title="Forms by project">
-          <BarList data={byProject} />
         </Panel>
         <Panel title="Forms by creator">
           <BarList data={byCreator} />

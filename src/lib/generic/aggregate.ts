@@ -3,6 +3,23 @@ import type { BaseRecord, GenericConfig, GenericFilters } from "./types";
 import { describeCustom, matchesCustom } from "@/lib/custom/filter";
 import { inDateRange } from "@/lib/dashboard/date-range";
 import type { FilterDim } from "./types";
+import { topOverdue } from "@/lib/charts/series";
+import type { OpenClosedRow } from "@/components/charts/open-closed-bars";
+
+export function openClosedByProject<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>, now: Date): OpenClosedRow[] {
+  const m = new Map<string, OpenClosedRow>();
+  const today = now.toISOString().slice(0, 10);
+  for (const t of items) {
+    const r = m.get(t.projectId) ?? { id: t.projectId, name: t.projectName, open: 0, closed: 0, overdue: 0 };
+    if (cfg.isOpen(t)) {
+      r.open++;
+      const due = cfg.overdue?.dueOf(t)?.slice(0, 10);
+      if (due && due < today) r.overdue++;
+    } else r.closed++;
+    m.set(t.projectId, r);
+  }
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, "en-GB", { numeric: true, sensitivity: "base" }));
+}
 
 // Option values a record contributes for a filter dimension.
 export function dimValues<T>(dim: FilterDim<T>, t: T): string[] {
@@ -74,7 +91,32 @@ export function buildGenericReport<T extends BaseRecord>(input: {
         series: cfg.trend.series.map((s, i) => ({ key: s.key, label: s.label, colour: s.pdfColour || (PDF_SERIES[i] ?? "#2a78d6") })),
         data: cfg.trend.build(items),
       },
+      ...(cfg.donut ? [{ kind: "bars" as const, title: cfg.donut.title, data: cfg.donut.build(items) }] : []),
+      ...(cfg.treemap ? [{ kind: "bars" as const, title: cfg.treemap.title, data: cfg.treemap.build(items) }] : []),
       ...cfg.breakdowns.map((b) => ({ kind: "bars" as const, title: b.title, data: b.build(items, now) })),
+      {
+        kind: "table" as const,
+        title: "Open and closed by project",
+        columns: ["Project", "Open", "Overdue", "Closed", "Total"],
+        widths: [4, 1, 1, 1, 1],
+        rows: openClosedByProject(items, cfg, now).map((r) => [r.name, String(r.open), String(r.overdue), String(r.closed), String(r.open + r.closed)]),
+      },
+      ...(cfg.overdue
+        ? (() => {
+            const o = cfg.overdue;
+            const rows = topOverdue(items, cfg.isOpen, o.dueOf, now);
+            return [
+              {
+                kind: "table" as const,
+                title: o.title,
+                columns: ["Title", "Project", "#", o.ownerLabel, "Due", "Days overdue"],
+                widths: [3, 2, 0.6, 1.6, 1, 0.9],
+                rows: rows.map((r) => [o.titleOf(r.item), r.item.projectName, o.numberOf(r.item), o.ownerOf(r.item) ?? "", new Date(r.due).toLocaleDateString("en-GB"), String(r.daysOverdue)]),
+                links: rows.map((r) => cfg.linkOf(r.item)),
+              },
+            ];
+          })()
+        : []),
       ...(input.includeRegister
         ? [
             {

@@ -4,6 +4,7 @@ import { getProjectDirectory } from "@/lib/aps/users";
 import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
 import { aliaser } from "@/lib/generic/aggregate";
 import { asText } from "@/lib/generic/text";
+import { averageDays } from "@/lib/charts/series";
 import type { BaseRecord, GenericConfig } from "@/lib/generic/types";
 import type { ProjectLoader } from "@/lib/generic/use-generic-data";
 
@@ -149,13 +150,22 @@ export const submittalsConfig: GenericConfig<SubmittalRecord> = {
       return gapFill([...c.keys(), ...d.keys()]).map((month) => ({ month, created: c.get(month) ?? 0, closed: d.get(month) ?? 0 }));
     },
   },
+  donut: { title: "Items by status", build: (items) => countBy(items, (s) => s.status, 6) },
+  treemap: { title: "Items by type", build: (items) => countBy(items, (s) => s.type, 16), filterId: "type" },
+  gauge: { title: "Average days to close", unit: "days, created to closed", value: (items) => averageDays(items, (s) => s.createdAt, (s) => s.closedAt) },
+  statusOf: (s) => s.status,
+  overdue: {
+    title: "Top 10 most overdue submittal items",
+    dueOf: (s) => s.dueDate,
+    ownerLabel: "Ball in court",
+    ownerOf: (s) => s.ballInCourt,
+    numberOf: (s) => s.number,
+    titleOf: (s) => s.title,
+  },
   breakdowns: [
-    { title: "Items by status", build: (items) => countBy(items, (s) => s.status), filterId: "status" },
     { title: "Items by workflow stage", build: (items) => countBy(items, (s) => s.state), filterId: "state" },
     { title: "Open items: ball in court", build: (items) => countBy(items.filter(isSubmittalOpen), (s) => s.ballInCourt ?? "Not recorded") },
-    { title: "Items by type", build: (items) => countBy(items, (s) => s.type), filterId: "type" },
     { title: "Items by response", build: (items) => countBy(items, (s) => s.response ?? "No response yet") },
-    { title: "Items by project", build: (items) => countBy(items, (s) => s.projectName, 15) },
   ],
   columns: [
     { label: "Title", value: (s) => s.title, width: 3 },

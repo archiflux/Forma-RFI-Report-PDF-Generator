@@ -3,6 +3,7 @@ import { getReviewWorkflowNames, scrapeRawReviews } from "@/lib/aps/reviews";
 import { getProjectDirectory } from "@/lib/aps/users";
 import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
 import { aliaser } from "@/lib/generic/aggregate";
+import { averageDays } from "@/lib/charts/series";
 import type { GenericConfig } from "@/lib/generic/types";
 import type { ProjectLoader } from "@/lib/generic/use-generic-data";
 import { isReviewOpen, isReviewOverdue, normaliseReview, reviewStatusLabel, type ReviewRecord } from "./normalise";
@@ -68,11 +69,20 @@ export const reviewsConfig: GenericConfig<ReviewRecord> = {
       return months.map((month) => ({ month, started: s.get(month) ?? 0, finished: finished.get(month) ?? 0 }));
     },
   },
+  donut: { title: "Reviews by status", build: (items) => countBy(items, (r) => reviewStatusLabel(r.status), 6) },
+  treemap: { title: "Reviews by workflow", build: (items) => countBy(items, (r) => r.workflow, 16), filterId: "workflow" },
+  gauge: { title: "Average days to finish", unit: "days, started to finished", value: (items) => averageDays(items, (r) => r.createdAt, (r) => r.finishedAt) },
+  statusOf: (r) => reviewStatusLabel(r.status),
+  overdue: {
+    title: "Top 10 most overdue review steps",
+    dueOf: (r) => r.dueDate,
+    ownerLabel: "Waiting on",
+    ownerOf: (r) => r.nextActionBy,
+    numberOf: (r) => r.sequenceId,
+    titleOf: (r) => r.name,
+  },
   breakdowns: [
-    { title: "Reviews by status", build: (items) => countBy(items, (r) => reviewStatusLabel(r.status)), filterId: "status" },
-    { title: "Reviews by workflow", build: (items) => countBy(items, (r) => r.workflow), filterId: "workflow" },
     { title: "Open reviews waiting on", build: (items) => countBy(items.filter(isReviewOpen), (r) => r.nextActionBy ?? "Not recorded") },
-    { title: "Reviews by project", build: (items) => countBy(items, (r) => r.projectName, 15) },
     { title: "Reviews started by", build: (items) => countBy(items, (r) => r.createdBy ?? "Unknown") },
   ],
   columns: [
