@@ -1,32 +1,40 @@
-// Build user-facing Forma deep links so reports can point readers back to
-// the original record. ACC/Forma URLs follow the pattern:
+// Forma deep links, so registers, PDFs and CSVs point readers back to the
+// original record. Formats copied from the Forma web UI (October 2026):
 //
-//   https://acc.autodesk.com/build/rfis/projects/<projectId>/<rfiId>
-//   https://acc.autodesk.com/build/issues/projects/<projectId>/<issueId>
+//   Issue  /build/issues/projects/<project>/issues/<issueId>
+//   RFI    /build/rfis/projects/<project>?preview=<rfiId>
+//   Form   /build/forms/projects/<project>/field-reports/<templateId>/reports/<formId>
+//   Review /docs/reviews/projects/<project>/<reviewId>
 //
 // IDs in URLs are the Construction id (no "b." prefix). Inputs may carry the
-// prefix, so strip it to be safe.
-const FORMA_BASE = "https://acc.autodesk.com/build";
+// prefix, so strip it. If Autodesk changes a format, fix it here and every
+// register picks it up.
+const FORMA = "https://acc.autodesk.com";
 
 function strip(projectId: string): string {
-  return projectId.startsWith("b.") ? projectId.slice(2) : projectId;
+  return encodeURIComponent(projectId.startsWith("b.") ? projectId.slice(2) : projectId);
+}
+
+const id = encodeURIComponent;
+
+export function issueUrl(projectId: string, issueId: string): string {
+  return `${FORMA}/build/issues/projects/${strip(projectId)}/issues/${id(issueId)}`;
 }
 
 export function rfiUrl(projectId: string, rfiId: string): string {
-  return `${FORMA_BASE}/rfis/projects/${strip(projectId)}/${rfiId}`;
+  return `${FORMA}/build/rfis/projects/${strip(projectId)}?preview=${id(rfiId)}`;
 }
 
-export function issueUrl(projectId: string, issueId: string): string {
-  return `${FORMA_BASE}/issues/projects/${strip(projectId)}/${issueId}`;
-}
-
-// Patterns below are taken from the Forma web UI and haven't been confirmed
-// against Autodesk documentation; if one lands on the wrong page, fix it
-// here and every register picks it up.
-export function formUrl(projectId: string, formId: string): string {
-  return `${FORMA_BASE}/forms/projects/${strip(projectId)}/forms/${formId}`;
+// Needs the form's template id: forms open under their template.
+export function formUrl(projectId: string, templateId: string, formId: string): string {
+  return `${FORMA}/build/forms/projects/${strip(projectId)}/field-reports/${id(templateId)}/reports/${id(formId)}`;
 }
 
 export function reviewUrl(projectId: string, reviewId: string): string {
-  return `https://acc.autodesk.com/docs/reviews/projects/${strip(projectId)}/reviews/${reviewId}`;
+  return `${FORMA}/docs/reviews/projects/${strip(projectId)}/${id(reviewId)}`;
+}
+
+// Not yet confirmed: no project with submittal items has been checked.
+export function submittalUrl(projectId: string, itemId: string): string {
+  return `${FORMA}/build/submittals/projects/${strip(projectId)}/items/${id(itemId)}`;
 }

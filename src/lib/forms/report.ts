@@ -64,7 +64,7 @@ export function buildFormsReport(input: {
                 day(x.formDate),
                 `${day(x.dueDate)}${isFormOverdue(x, now) ? " (overdue)" : ""}`,
               ]),
-              links: register.rows.map((x) => formUrl(x.projectId, x.id)),
+              links: register.rows.map((x) => formUrl(x.projectId, x.templateId, x.id)),
               totalRows: register.totalRows,
               isRegister: true,
             },

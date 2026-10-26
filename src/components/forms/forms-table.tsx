@@ -63,7 +63,7 @@ export function FormsTable({ forms, now }: { forms: FormRecord[]; now: Date }) {
                 <tr key={f.key} className="border-t border-[color:var(--brand-border)] align-top">
                   <td className="max-w-[12rem] truncate py-1.5 pr-3" title={f.projectName}>{f.projectName}</td>
                   <td className="py-1.5 pr-3 tabular-nums">{f.formNum}</td>
-                  <td className="max-w-[20rem] py-1.5 pr-3"><FormaLink href={formUrl(f.projectId, f.id)}>{f.name || "(untitled)"}</FormaLink></td>
+                  <td className="max-w-[20rem] py-1.5 pr-3"><FormaLink href={formUrl(f.projectId, f.templateId, f.id)}>{f.name || "(untitled)"}</FormaLink></td>
                   <td className="py-1.5 pr-3">{f.templateName}</td>
                   <td className="py-1.5 pr-3">{formStatusLabel(f.status)}</td>
                   <td className="py-1.5 pr-3">{f.createdBy ?? ""}</td>
