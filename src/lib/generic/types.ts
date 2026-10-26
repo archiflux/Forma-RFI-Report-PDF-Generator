@@ -62,6 +62,8 @@ export interface GenericConfig<T extends BaseRecord> {
   // Custom field name -> display text; enables the custom-field filter.
   customOf?: (t: T) => Record<string, string> | undefined;
   kpis: (items: T[], now: Date) => ReportKpi[];
+  // Still open / outstanding; colours the project globe.
+  isOpen: (t: T) => boolean;
   trend: {
     title: string;
     series: Array<{ key: string; label: string; colour: string; pdfColour: string }>;

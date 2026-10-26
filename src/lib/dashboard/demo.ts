@@ -72,3 +72,12 @@ export function demoDataset(now = new Date("2026-10-22T09:00:00Z")): DashboardDa
     issues,
   };
 }
+
+// Made-up coordinates for the demo projects (south-west England), so the
+// demo shows the project globe.
+export const DEMO_LOCATIONS: Record<string, { lat: number; lon: number }> = {
+  "demo-1": { lat: 50.3755, lon: -4.1427 },
+  "demo-2": { lat: 50.7184, lon: -3.5339 },
+  "demo-3": { lat: 51.4545, lon: -2.5879 },
+  "demo-4": { lat: 50.2632, lon: -5.051 },
+};

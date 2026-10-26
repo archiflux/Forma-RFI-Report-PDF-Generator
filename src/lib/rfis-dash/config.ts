@@ -134,6 +134,7 @@ export const rfisConfig: GenericConfig<RfiRecord> = {
   dateFilter: { label: "Raised", get: (r) => r.createdAt },
   searchText: (r) => `${r.number} ${r.title} ${r.ballInCourt ?? ""} ${r.discipline ?? ""}`,
   customOf: (r) => r.custom,
+  isOpen: isRfiOpen,
   kpis: (items, now) => {
     const overdue = items.filter((r) => isRfiOverdue(r, now)).length;
     return [

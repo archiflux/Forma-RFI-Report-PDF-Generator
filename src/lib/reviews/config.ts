@@ -42,6 +42,7 @@ export const reviewsConfig: GenericConfig<ReviewRecord> = {
   ],
   dateFilter: { label: "Started", get: (r) => r.createdAt },
   searchText: (r) => `${r.sequenceId} ${r.name} ${r.workflow} ${r.createdBy ?? ""}`,
+  isOpen: isReviewOpen,
   kpis: (items, now) => {
     const overdue = items.filter((r) => isReviewOverdue(r, now)).length;
     return [

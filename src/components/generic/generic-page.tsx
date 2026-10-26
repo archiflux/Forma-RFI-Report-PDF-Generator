@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useGenericData, type ProjectLoader } from "@/lib/generic/use-generic-data";
+import { useProjectLocations } from "@/lib/dashboard/use-project-locations";
 import type { BaseRecord, GenericConfig } from "@/lib/generic/types";
 import { SelectionSidebar } from "@/components/dashboard/selection-sidebar";
 import { SharePanel } from "@/components/dashboard/share-panel";
@@ -23,6 +24,7 @@ export function GenericPage<T extends BaseRecord>({ cfg, loader, intro }: { cfg:
   const sel = useProjectSelection();
   const { hubId, chosen } = sel;
   const { dataset, loading, total } = useGenericData(cfg.kind, loader, chosen);
+  const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
   const failed = dataset.projects.filter((p) => p.error);
   const skipped = dataset.projects.filter((p) => p.unavailable);
@@ -53,7 +55,7 @@ export function GenericPage<T extends BaseRecord>({ cfg, loader, intro }: { cfg:
           </p>
         ) : (
           <>
-            <GenericView cfg={cfg} dataset={dataset} now={now} />
+            <GenericView cfg={cfg} dataset={dataset} now={now} locations={locations} />
             <SharePanel
               kind={cfg.kind}
               itemCount={dataset.items.length}

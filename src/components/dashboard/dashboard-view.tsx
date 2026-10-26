@@ -16,6 +16,9 @@ import { BarList } from "./bar-list";
 import { IssueTable } from "./issue-table";
 import { KpiTiles } from "./kpi-tiles";
 import { MultiSelect } from "./multi-select";
+import type { ProjectLocation } from "@/lib/aps/project-location";
+import { globePoints } from "@/lib/dashboard/globe";
+import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { Panel } from "./panel";
 import { CustomFieldFilter } from "./custom-field-filter";
 import { DateRangeFilter } from "./date-range-filter";
@@ -34,7 +37,17 @@ function toggle(list: string[], v: string): string[] {
 
 // Renders a DashboardDataset. Used by the live (signed-in) dashboard and by
 // the public snapshot viewer, so the two always look identical.
-export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now: Date }) {
+// `locations` (project id -> coordinates) turns on the project globe; the
+// public viewer leaves it out.
+export function DashboardView({
+  dataset,
+  now,
+  locations,
+}: {
+  dataset: DashboardDataset;
+  now: Date;
+  locations?: Record<string, ProjectLocation | null>;
+}) {
   const [f, setF] = useState<DashboardFilters>(EMPTY_FILTERS);
   const all = dataset.issues;
   const issues = useMemo(() => applyFilters(all, f), [all, f]);
@@ -104,6 +117,17 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
       </div>
 
       <KpiTiles k={k} />
+
+      {locations ? (
+        <Panel title="Projects on the map">
+          <ProjectGlobe
+            noun="issues"
+            {...globePoints(issues, dataset.projects, locations, isOutstanding)}
+            selected={f.projectIds}
+            onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })}
+          />
+        </Panel>
+      ) : null}
 
       <Panel title="Status by project" action={<StatusLegend />}>
         <ProjectStatus rows={projects} />

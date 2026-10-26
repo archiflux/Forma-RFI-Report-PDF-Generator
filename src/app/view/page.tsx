@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 import { FormsView } from "@/components/forms/forms-view";
-import { demoDataset } from "@/lib/dashboard/demo";
+import { DEMO_LOCATIONS, demoDataset } from "@/lib/dashboard/demo";
 import { parseSnapshot } from "@/lib/dashboard/snapshot";
 import { parseFormsDataset } from "@/lib/forms/snapshot";
 import { loadShared } from "@/lib/share/client";
@@ -80,7 +80,7 @@ function Viewer() {
       </header>
       <main className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-10">
         {loaded?.kind === "issues" ? (
-          <DashboardView dataset={loaded.data} now={now} />
+          <DashboardView dataset={loaded.data} now={now} {...(loaded.data.hubId === "demo" ? { locations: DEMO_LOCATIONS } : {})} />
         ) : loaded?.kind === "forms" ? (
           <FormsView dataset={loaded.data} now={now} />
         ) : loaded?.kind === "reviews" ? (

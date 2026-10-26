@@ -9,6 +9,9 @@ import { MultiSelect } from "@/components/dashboard/multi-select";
 import { Panel } from "@/components/dashboard/panel";
 import { PdfButton } from "@/components/dashboard/pdf-button";
 import { TrendChart } from "@/components/dashboard/trend-chart";
+import type { ProjectLocation } from "@/lib/aps/project-location";
+import { globePoints } from "@/lib/dashboard/globe";
+import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { GenericTable } from "./generic-table";
 import { CustomFieldFilter } from "@/components/dashboard/custom-field-filter";
 
@@ -21,7 +24,19 @@ function Tile({ label, value, alert }: { label: string; value: string; alert?: b
   );
 }
 
-export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: { cfg: GenericConfig<T>; dataset: GenericDataset<T>; now: Date; title?: string }) {
+export function GenericView<T extends BaseRecord>({
+  cfg,
+  dataset,
+  now,
+  title,
+  locations,
+}: {
+  cfg: GenericConfig<T>;
+  dataset: GenericDataset<T>;
+  now: Date;
+  title?: string;
+  locations?: Record<string, ProjectLocation | null>;
+}) {
   const [f, setF] = useState<GenericFilters>(EMPTY_GENERIC_FILTERS);
   const all = dataset.items;
   const items = useMemo(() => applyGenericFilters(all, cfg, f), [all, cfg, f]);
@@ -90,6 +105,19 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
           <Tile key={k.label} label={k.label} value={k.value} alert={k.alert} />
         ))}
       </div>
+
+      {locations ? (
+        <Panel title="Projects on the map">
+          <ProjectGlobe
+            noun={cfg.noun}
+            {...globePoints(items, dataset.projects, locations, cfg.isOpen)}
+            selected={f.projectIds}
+            onSelect={(id) =>
+              setF((cur) => ({ ...cur, projectIds: cur.projectIds.includes(id) ? cur.projectIds.filter((x) => x !== id) : [...cur.projectIds, id] }))
+            }
+          />
+        </Panel>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title={cfg.trend.title}>

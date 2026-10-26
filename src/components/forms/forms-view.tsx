@@ -12,7 +12,11 @@ import { BarList } from "@/components/dashboard/bar-list";
 import { MultiSelect } from "@/components/dashboard/multi-select";
 import { Panel } from "@/components/dashboard/panel";
 import { TrendChart } from "@/components/dashboard/trend-chart";
+import type { ProjectLocation } from "@/lib/aps/project-location";
+import { globePoints } from "@/lib/dashboard/globe";
+import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { FormsTable } from "./forms-table";
+import { isFormOpen } from "@/lib/forms/normalise";
 
 function opts(values: string[], fmt: (v: string) => string = (v) => v) {
   return [...new Set(values)].sort().map((v) => ({ value: v, label: fmt(v) }));
@@ -33,7 +37,15 @@ function Tile({ label, value, alert }: { label: string; value: number; alert?: b
   );
 }
 
-export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }) {
+export function FormsView({
+  dataset,
+  now,
+  locations,
+}: {
+  dataset: FormsDataset;
+  now: Date;
+  locations?: Record<string, ProjectLocation | null>;
+}) {
   const [f, setF] = useState<FormFilters>(EMPTY_FORM_FILTERS);
   const all = dataset.forms;
   const forms = useMemo(() => applyFormFilters(all, f), [all, f]);
@@ -87,6 +99,17 @@ export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }
         <Tile label="Due in 7 days" value={k.dueSoon} />
         <Tile label="Templates in use" value={k.templates} />
       </div>
+
+      {locations ? (
+        <Panel title="Projects on the map">
+          <ProjectGlobe
+            noun="forms"
+            {...globePoints(forms, dataset.projects, locations, isFormOpen)}
+            selected={f.projectIds}
+            onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })}
+          />
+        </Panel>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Forms per month (by form date)">

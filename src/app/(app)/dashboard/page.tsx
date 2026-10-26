@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useDashboardData } from "@/lib/dashboard/use-dashboard-data";
+import { useProjectLocations } from "@/lib/dashboard/use-project-locations";
 import { SelectionSidebar } from "@/components/dashboard/selection-sidebar";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 import { SharePanel } from "@/components/dashboard/share-panel";
@@ -14,6 +15,7 @@ function Dashboard() {
   const sel = useProjectSelection();
   const { hubId, chosen } = sel;
   const { dataset, loading, total } = useDashboardData(hubId, chosen);
+  const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
 
   if (!hubId) {
@@ -47,7 +49,7 @@ function Dashboard() {
           </p>
         ) : (
           <>
-            <DashboardView dataset={dataset} now={now} />
+            <DashboardView dataset={dataset} now={now} locations={locations} />
             <SharePanel
               kind="issues"
               itemCount={dataset.issues.length}
