@@ -96,8 +96,17 @@ export function ProjectGlobe({
       }
       setView((v) => ({ ...v, zoom: Math.min(60, Math.max(1, v.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))) }));
     };
+    // iOS Safari fires its own pinch gesture events; cancel them over the
+    // globe so pinching zooms the globe, not the page.
+    const stopGesture = (e: Event) => e.preventDefault();
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    el.addEventListener("gesturestart", stopGesture);
+    el.addEventListener("gesturechange", stopGesture);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("gesturestart", stopGesture);
+      el.removeEventListener("gesturechange", stopGesture);
+    };
   }, []);
 
   const projection = useMemo(
@@ -112,23 +121,66 @@ export function ProjectGlobe({
     .filter((p) => geoDistance([p.lon, p.lat], [view.lon, view.lat]) < Math.PI / 2)
     .sort((a, b) => b.total - a.total); // big dots underneath small ones
 
-  function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
+  // Active pointers, for two-finger pinch and pan on touch screens.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; zoom: number; mid: { x: number; y: number }; lon: number; lat: number } | null>(null);
+
+  function stopAnim() {
     if (anim.current) {
       cancelAnimationFrame(anim.current);
       anim.current = null;
     }
-    // Capture only once the pointer moves (below), so a plain click still
-    // reaches the project dot under it.
-    drag.current = { x: e.clientX, y: e.clientY, lon: view.lon, lat: view.lat, moved: false };
   }
-  function onPointerMove(e: React.PointerEvent<SVGSVGElement>) {
-    const d = drag.current;
-    if (!d) return;
+
+  // Degrees of rotation per screen pixel at the current zoom, so the point
+  // under the finger or cursor roughly follows it.
+  function degPerPx(zoom: number): number {
     const box = svgRef.current?.getBoundingClientRect();
     const k = box ? S / box.width : 1;
-    // Degrees per screen pixel shrink as you zoom in, so the point under the
-    // cursor roughly follows it at any zoom.
-    const deg = (k * 180) / (Math.PI * R * view.zoom);
+    return (k * 180) / (Math.PI * R * zoom);
+  }
+
+  function pinchState() {
+    const [a, b] = [...pointers.current.values()];
+    if (!a || !b) return null;
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  }
+
+  function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    stopAnim();
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      // Second finger down: switch from drag to pinch.
+      const st = pinchState();
+      for (const id of pointers.current.keys()) e.currentTarget.setPointerCapture(id);
+      if (st) pinch.current = { ...st, zoom: view.zoom, lon: view.lon, lat: view.lat };
+      drag.current = null;
+      justDragged.current = true;
+      return;
+    }
+    // Capture only once the pointer moves (below), so a plain click or tap
+    // still reaches the project dot under it.
+    drag.current = { x: e.clientX, y: e.clientY, lon: view.lon, lat: view.lat, moved: false };
+  }
+
+  function onPointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pinch.current;
+    if (p && pointers.current.size >= 2) {
+      const st = pinchState();
+      if (!st) return;
+      const zoom = Math.min(60, Math.max(1, p.zoom * (st.dist / p.dist)));
+      const deg = degPerPx(zoom);
+      setView({
+        zoom,
+        lon: p.lon - (st.mid.x - p.mid.x) * deg,
+        lat: Math.max(-89, Math.min(89, p.lat + (st.mid.y - p.mid.y) * deg)),
+      });
+      return;
+    }
+    const d = drag.current;
+    if (!d) return;
+    const deg = degPerPx(view.zoom);
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (!d.moved && Math.abs(dx) + Math.abs(dy) > 3) {
@@ -138,16 +190,23 @@ export function ProjectGlobe({
     if (!d.moved) return;
     setView((v) => ({ ...v, lon: d.lon - dx * deg, lat: Math.max(-89, Math.min(89, d.lat + dy * deg)) }));
   }
-  function onPointerUp() {
+
+  function onPointerUp(e: React.PointerEvent<SVGSVGElement>) {
+    pointers.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null;
+      // One finger left after a pinch: carry on as a drag from where it is,
+      // without jumping.
+      const rest = [...pointers.current.values()][0];
+      drag.current = rest ? { x: rest.x, y: rest.y, lon: view.lon, lat: view.lat, moved: true } : null;
+      return;
+    }
     justDragged.current = drag.current?.moved ?? false;
     drag.current = null;
   }
 
   const zoomBy = (f: number) => {
-    if (anim.current) {
-      cancelAnimationFrame(anim.current);
-      anim.current = null;
-    }
+    stopAnim();
     setView((v) => ({ ...v, zoom: Math.min(60, Math.max(1, v.zoom * f)) }));
   };
 
@@ -158,7 +217,7 @@ export function ProjectGlobe({
         <svg
           ref={svgRef}
           viewBox={`0 0 ${S} ${S}`}
-          className="h-auto w-full cursor-grab touch-none select-none active:cursor-grabbing"
+          className="h-auto w-full cursor-grab touch-pan-y select-none active:cursor-grabbing"
           role="img"
           aria-label={`Globe of projects sized by ${noun} and coloured by open ${noun}`}
           onPointerDown={onPointerDown}
@@ -230,7 +289,10 @@ export function ProjectGlobe({
               <span>{maxOpen}</span>
             </div>
           </div>
-          <p>Dot size shows total {noun} per project. Drag to spin, scroll or use +/− to zoom{onSelect ? ", click a project to filter" : ""}.</p>
+          <p>
+            Dot size shows total {noun} per project. Drag to spin, scroll or use +/− to zoom{onSelect ? ", click a project to filter" : ""}. On a
+            phone, pinch with two fingers to zoom.
+          </p>
           {unmapped ? (
             <p className="text-[color:var(--brand-muted)]">
               {unmapped} project{unmapped === 1 ? " has" : "s have"} no location set in Forma, so {unmapped === 1 ? "it isn't" : "they aren't"} shown.
