@@ -18,7 +18,7 @@ export function MultiSelect({
         <span className="text-[color:var(--brand-muted)]">{label}</span>
         <span className="max-w-[10rem] truncate font-semibold text-[color:var(--brand-primary)]">{summary}</span>
       </summary>
-      <div className="absolute z-30 mt-1 max-h-72 w-64 overflow-auto rounded-lg border border-[color:var(--brand-border)] bg-white p-2 shadow-card">
+      <div className="absolute z-30 mt-1 max-h-72 w-64 max-w-[80vw] overflow-auto rounded-lg border border-[color:var(--brand-border)] bg-white p-2 shadow-card">
         {value.length ? (
           <button type="button" className="mb-1 text-xs text-[color:var(--brand-secondary)] underline" onClick={() => onChange([])}>
             Clear

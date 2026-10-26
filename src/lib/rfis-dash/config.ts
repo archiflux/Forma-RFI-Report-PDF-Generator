@@ -1,6 +1,7 @@
 import { rfiUrl } from "@/lib/aps/links";
 import { getRfiById, listCustomAttributes, mergeCustomAttributes, rfisHaveCustomAttributes, scrapeAllRfis } from "@/lib/aps/rfis";
 import { createLimiter } from "@/lib/generic/limit";
+import { averageDays } from "@/lib/charts/series";
 import { getProjectDirectory } from "@/lib/aps/users";
 import type { CustomAttributeDef, Rfi, RfiParty } from "@/lib/aps/types";
 import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
@@ -199,13 +200,23 @@ export const rfisConfig: GenericConfig<RfiRecord> = {
       }));
     },
   },
+  donut: { title: "RFIs by status", build: (items) => countBy(items, (r) => rfiStatusLabel(r.status), 6) },
+  treemap: { title: "RFIs by category", build: (items) => countBy(items, (r) => r.category ?? "Not set", 16), filterId: "category" },
+  gauge: { title: "Average days to close", unit: "days, raised to closed", value: (items) => averageDays(items, (r) => r.createdAt, (r) => r.closedAt) },
+  statusOf: (r) => rfiStatusLabel(r.status),
+  overdue: {
+    title: "Top 10 most overdue RFIs awaiting a response",
+    // Responded RFIs aren't overdue, even if not yet closed.
+    dueOf: (r) => (r.respondedAt ? undefined : r.dueDate),
+    ownerLabel: "Ball in court",
+    ownerOf: (r) => r.ballInCourt,
+    numberOf: (r) => r.number,
+    titleOf: (r) => r.title,
+  },
   breakdowns: [
-    { title: "RFIs by status", build: (items) => countBy(items, (r) => rfiStatusLabel(r.status)), filterId: "status" },
     { title: "Open RFIs: ball in court", build: (items) => countBy(items.filter(isRfiOpen), (r) => r.ballInCourt ?? "Not recorded") },
     { title: "RFIs by discipline", build: (items) => countBy(items, (r) => r.discipline ?? "Not set"), filterId: "discipline" },
     { title: "RFIs by priority", build: (items) => countBy(items, (r) => r.priority ?? "Not set"), filterId: "priority" },
-    { title: "RFIs by category", build: (items) => countBy(items, (r) => r.category ?? "Not set") },
-    { title: "RFIs by project", build: (items) => countBy(items, (r) => r.projectName, 15) },
   ],
   columns: [
     { label: "Title", value: (r) => r.title, width: 3 },

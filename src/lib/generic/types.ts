@@ -70,6 +70,20 @@ export interface GenericConfig<T extends BaseRecord> {
     build: (items: T[]) => Array<{ month: string } & Record<string, number | string>>;
   };
   breakdowns: Breakdown<T>[];
+  // Headline visuals, all optional.
+  donut?: { title: string; build: (items: T[]) => Count[] };
+  treemap?: { title: string; build: (items: T[]) => Count[]; filterId?: string };
+  gauge?: { title: string; unit: string; value: (items: T[]) => number | null };
+  // Stacks the monthly chart by this (e.g. status) using the date filter's date.
+  statusOf?: (t: T) => string;
+  overdue?: {
+    title: string;
+    dueOf: (t: T) => string | undefined;
+    ownerLabel: string;
+    ownerOf: (t: T) => string | undefined;
+    numberOf: (t: T) => string;
+    titleOf: (t: T) => string;
+  };
   columns: Column<T>[];
   // Column 0 links to the record in Forma.
   linkOf: (t: T) => string | undefined;
