@@ -31,6 +31,9 @@ export interface FilterDim<T> {
   label: string;
   valueOf: (t: T) => string;
   format?: (v: string) => string;
+  // Value is a ", "-joined list (e.g. several people in court); each entry
+  // is its own option and matches on its own.
+  multi?: boolean;
 }
 
 export interface Breakdown<T> {
@@ -54,9 +57,13 @@ export interface GenericConfig<T extends BaseRecord> {
   noun: string; // plural, lower case: "reviews"
   filters: FilterDim<T>[];
   searchText: (t: T) => string;
+  // Date the From/To filter applies to (e.g. created or raised).
+  dateFilter?: { label: string; get: (t: T) => string | undefined };
   // Custom field name -> display text; enables the custom-field filter.
   customOf?: (t: T) => Record<string, string> | undefined;
   kpis: (items: T[], now: Date) => ReportKpi[];
+  // Still open / outstanding; colours the project globe.
+  isOpen: (t: T) => boolean;
   trend: {
     title: string;
     series: Array<{ key: string; label: string; colour: string; pdfColour: string }>;
@@ -76,6 +83,8 @@ export interface GenericFilters {
   dims: Record<string, string[]>;
   search: string;
   custom: Record<string, string[]>;
+  from?: string;
+  to?: string;
 }
 
 export const EMPTY_GENERIC_FILTERS: GenericFilters = { projectIds: [], dims: {}, search: "", custom: {} };

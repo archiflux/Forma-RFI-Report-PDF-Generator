@@ -1,6 +1,14 @@
 import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
 import type { BaseRecord, GenericConfig, GenericFilters } from "./types";
 import { describeCustom, matchesCustom } from "@/lib/custom/filter";
+import { inDateRange } from "@/lib/dashboard/date-range";
+import type { FilterDim } from "./types";
+
+// Option values a record contributes for a filter dimension.
+export function dimValues<T>(dim: FilterDim<T>, t: T): string[] {
+  const v = String(dim.valueOf(t) ?? "");
+  return dim.multi ? v.split(", ").map((x) => x.trim()).filter(Boolean) : [v];
+}
 
 export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>, f: GenericFilters): T[] {
   const q = f.search.trim().toLowerCase();
@@ -8,8 +16,9 @@ export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: Gener
     if (f.projectIds.length && !f.projectIds.includes(t.projectId)) return false;
     for (const dim of cfg.filters) {
       const sel = f.dims[dim.id];
-      if (sel?.length && !sel.includes(String(dim.valueOf(t) ?? ""))) return false;
+      if (sel?.length && !dimValues(dim, t).some((v) => sel.includes(v))) return false;
     }
+    if (cfg.dateFilter && !inDateRange(cfg.dateFilter.get(t), f.from, f.to)) return false;
     if (cfg.customOf && !matchesCustom(cfg.customOf(t), f.custom ?? {})) return false;
     return !q || cfg.searchText(t).toLowerCase().includes(q);
   });
@@ -52,6 +61,8 @@ export function buildGenericReport<T extends BaseRecord>(input: {
     filters: describeFilters([
       ["Projects", f.projectIds.map((id) => input.projectNames[id] ?? id)],
       ...cfg.filters.map((d): [string, string[]] => [d.label, (f.dims[d.id] ?? []).map((v) => (d.format ? d.format(v) : v))]),
+      [`${cfg.dateFilter?.label ?? "Date"} from`, f.from],
+      [`${cfg.dateFilter?.label ?? "Date"} to`, f.to],
       ["Search", f.search.trim() || undefined],
       ...describeCustom(f.custom ?? {}),
     ]),

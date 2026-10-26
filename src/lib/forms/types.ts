@@ -14,6 +14,8 @@ export interface FormRecord {
   createdBy?: string;
   createdAt: string;
   updatedAt?: string;
+  // Answers to the template's questions: question label -> answer text.
+  custom?: Record<string, string>;
 }
 
 export interface FormsProject {

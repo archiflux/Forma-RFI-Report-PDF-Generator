@@ -1,13 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { applyGenericFilters, buildGenericReport } from "@/lib/generic/aggregate";
+import { applyGenericFilters, buildGenericReport, dimValues } from "@/lib/generic/aggregate";
+import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { EMPTY_GENERIC_FILTERS, type BaseRecord, type GenericConfig, type GenericDataset, type GenericFilters } from "@/lib/generic/types";
 import { BarList } from "@/components/dashboard/bar-list";
 import { MultiSelect } from "@/components/dashboard/multi-select";
 import { Panel } from "@/components/dashboard/panel";
 import { PdfButton } from "@/components/dashboard/pdf-button";
 import { TrendChart } from "@/components/dashboard/trend-chart";
+import type { ProjectLocation } from "@/lib/aps/project-location";
+import { globePoints } from "@/lib/dashboard/globe";
+import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { GenericTable } from "./generic-table";
 import { CustomFieldFilter } from "@/components/dashboard/custom-field-filter";
 
@@ -20,7 +24,19 @@ function Tile({ label, value, alert }: { label: string; value: string; alert?: b
   );
 }
 
-export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: { cfg: GenericConfig<T>; dataset: GenericDataset<T>; now: Date; title?: string }) {
+export function GenericView<T extends BaseRecord>({
+  cfg,
+  dataset,
+  now,
+  title,
+  locations,
+}: {
+  cfg: GenericConfig<T>;
+  dataset: GenericDataset<T>;
+  now: Date;
+  title?: string;
+  locations?: Record<string, ProjectLocation | null>;
+}) {
   const [f, setF] = useState<GenericFilters>(EMPTY_GENERIC_FILTERS);
   const all = dataset.items;
   const items = useMemo(() => applyGenericFilters(all, cfg, f), [all, cfg, f]);
@@ -43,11 +59,14 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
           <MultiSelect
             key={d.id}
             label={d.label}
-            options={[...new Set(all.map(d.valueOf))].sort().map((v) => ({ value: v, label: d.format ? d.format(v) : v }))}
+            options={[...new Set(all.flatMap((t) => dimValues(d, t)))].sort().map((v) => ({ value: v, label: d.format ? d.format(v) : v }))}
             value={f.dims[d.id] ?? []}
             onChange={(v) => setDim(d.id, v)}
           />
         ))}
+        {cfg.dateFilter ? (
+          <DateRangeFilter label={cfg.dateFilter.label} from={f.from} to={f.to} onChange={(r) => setF((cur) => ({ ...cur, from: r.from, to: r.to }))} />
+        ) : null}
         {cfg.customOf ? (
           <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => setF((cur) => ({ ...cur, custom: v }))} />
         ) : null}
@@ -87,6 +106,19 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
         ))}
       </div>
 
+      {locations ? (
+        <Panel title="Projects on the map">
+          <ProjectGlobe
+            noun={cfg.noun}
+            {...globePoints(items, dataset.projects, locations, cfg.isOpen)}
+            selected={f.projectIds}
+            onSelect={(id) =>
+              setF((cur) => ({ ...cur, projectIds: cur.projectIds.includes(id) ? cur.projectIds.filter((x) => x !== id) : [...cur.projectIds, id] }))
+            }
+          />
+        </Panel>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title={cfg.trend.title}>
           <TrendChart data={trend} series={cfg.trend.series} ariaLabel={cfg.trend.title} />
@@ -104,7 +136,7 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
                       // Bars show formatted labels; map back to raw values.
                       selected: sel.map((v) => (dim.format ? dim.format(v) : v)),
                       onSelect: (label: string) => {
-                        const raw = [...new Set(all.map(dim.valueOf))].find((v) => (dim.format ? dim.format(v) : v) === label) ?? label;
+                        const raw = [...new Set(all.flatMap((t) => dimValues(dim, t)))].find((v) => (dim.format ? dim.format(v) : v) === label) ?? label;
                         setDim(fid, sel.includes(raw) ? sel.filter((x) => x !== raw) : [...sel, raw]);
                       },
                     }

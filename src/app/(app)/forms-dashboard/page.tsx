@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useFormsData } from "@/lib/forms/use-forms-data";
+import { useProjectLocations } from "@/lib/dashboard/use-project-locations";
 import { SelectionSidebar } from "@/components/dashboard/selection-sidebar";
 import { FormsView } from "@/components/forms/forms-view";
 import { SharePanel } from "@/components/dashboard/share-panel";
@@ -13,6 +14,7 @@ function FormsDashboard() {
   const sel = useProjectSelection();
   const { hubId, chosen } = sel;
   const { dataset, loading, total } = useFormsData(chosen);
+  const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
   const failed = dataset.projects.filter((p) => p.error);
   const skipped = dataset.projects.filter((p) => p.formsUnavailable);
@@ -55,7 +57,7 @@ function FormsDashboard() {
           </p>
         ) : (
           <>
-            <FormsView dataset={dataset} now={now} />
+            <FormsView dataset={dataset} now={now} locations={locations} />
             <SharePanel
               kind="forms"
               itemCount={dataset.forms.length}

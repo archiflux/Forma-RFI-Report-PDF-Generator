@@ -10,7 +10,8 @@ export function redactForms(ds: FormsDataset): FormsDataset {
   };
   return {
     projects: ds.projects.filter((p) => !p.error && !p.formsUnavailable).map(({ id, name, formCount }) => ({ id, name, formCount })),
-    forms: ds.forms.map((f) => (f.createdBy ? { ...f, createdBy: alias(f.createdBy) } : f)),
+    // Form answers can hold names and commercial detail, so they're dropped.
+    forms: ds.forms.map((f) => ({ ...f, custom: {}, ...(f.createdBy ? { createdBy: alias(f.createdBy) } : {}) })),
   };
 }
 
@@ -30,6 +31,7 @@ const FormSchema = z.object({
   createdBy: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string().optional(),
+  custom: z.record(z.string()).optional(),
 });
 
 const DatasetSchema = z.object({

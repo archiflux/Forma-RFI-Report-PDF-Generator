@@ -128,9 +128,13 @@ export const rfisConfig: GenericConfig<RfiRecord> = {
     { id: "status", label: "Status", valueOf: (r) => r.status, format: rfiStatusLabel },
     { id: "discipline", label: "Discipline", valueOf: (r) => r.discipline ?? "Not set" },
     { id: "priority", label: "Priority", valueOf: (r) => r.priority ?? "Not set" },
+    { id: "category", label: "Category", valueOf: (r) => r.category ?? "Not set" },
+    { id: "bic", label: "Ball in court", valueOf: (r) => r.ballInCourt ?? "Not recorded", multi: true },
   ],
+  dateFilter: { label: "Raised", get: (r) => r.createdAt },
   searchText: (r) => `${r.number} ${r.title} ${r.ballInCourt ?? ""} ${r.discipline ?? ""}`,
   customOf: (r) => r.custom,
+  isOpen: isRfiOpen,
   kpis: (items, now) => {
     const overdue = items.filter((r) => isRfiOverdue(r, now)).length;
     return [

@@ -37,8 +37,12 @@ export const reviewsConfig: GenericConfig<ReviewRecord> = {
   filters: [
     { id: "status", label: "Status", valueOf: (r) => r.status, format: reviewStatusLabel },
     { id: "workflow", label: "Workflow", valueOf: (r) => r.workflow },
+    { id: "waiting", label: "Waiting on", valueOf: (r) => r.nextActionBy ?? "Not recorded", multi: true },
+    { id: "startedBy", label: "Started by", valueOf: (r) => r.createdBy ?? "Unknown" },
   ],
+  dateFilter: { label: "Started", get: (r) => r.createdAt },
   searchText: (r) => `${r.sequenceId} ${r.name} ${r.workflow} ${r.createdBy ?? ""}`,
+  isOpen: isReviewOpen,
   kpis: (items, now) => {
     const overdue = items.filter((r) => isReviewOverdue(r, now)).length;
     return [
