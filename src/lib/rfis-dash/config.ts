@@ -1,5 +1,6 @@
 import { rfiUrl } from "@/lib/aps/links";
-import { listCustomAttributes, mergeCustomAttributes, scrapeAllRfis } from "@/lib/aps/rfis";
+import { getRfiById, listCustomAttributes, mergeCustomAttributes, rfisHaveCustomAttributes, scrapeAllRfis } from "@/lib/aps/rfis";
+import { createLimiter } from "@/lib/generic/limit";
 import { getProjectDirectory } from "@/lib/aps/users";
 import type { CustomAttributeDef, Rfi, RfiParty } from "@/lib/aps/types";
 import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
@@ -87,13 +88,49 @@ export function toRfiRecord(
   };
 }
 
-export const loadRfis: ProjectLoader<RfiRecord> = async (client, project) => {
+// One limiter for every project, so loading custom fields for many
+// projects keeps to eight requests in flight.
+const detailLimit = createLimiter(8);
+
+// The RFI search returns RFIs without custom fields on most tenants; the
+// per-RFI GET has them. Takes customAttributes (and their observed names)
+// from the detail and keeps everything else from search.
+export async function withCustomFields(
+  rfis: Rfi[],
+  fetchOne: (id: string) => Promise<Rfi>,
+  onProgress?: (done: number, total: number) => void,
+): Promise<Rfi[]> {
+  if (!rfis.length || rfisHaveCustomAttributes(rfis)) return rfis;
+  let done = 0;
+  onProgress?.(0, rfis.length);
+  return Promise.all(
+    rfis.map((r) =>
+      detailLimit(async () => {
+        try {
+          const d = await fetchOne(r.id);
+          return {
+            ...r,
+            customAttributes: d.customAttributes,
+            ...(d.customAttributesMeta ? { customAttributesMeta: d.customAttributesMeta } : {}),
+          };
+        } catch {
+          return r;
+        } finally {
+          onProgress?.(++done, rfis.length);
+        }
+      }),
+    ),
+  );
+}
+
+export const loadRfis: ProjectLoader<RfiRecord> = async (client, project, opts) => {
   const empty = new Map<string, string>();
-  const [rfis, dir, fetchedDefs] = await Promise.all([
+  const [found, dir, fetchedDefs] = await Promise.all([
     scrapeAllRfis(client, project.id),
     getProjectDirectory(client, project.id).catch(() => ({ people: empty, companies: empty, roles: empty })),
     listCustomAttributes(client, project.id).catch(() => []),
   ]);
+  const rfis = opts.full ? await withCustomFields(found, (id) => getRfiById(client, project.id, id), opts.onProgress) : found;
   const lookup = new Map([...dir.roles, ...dir.companies, ...dir.people]);
   const defs = mergeCustomAttributes(fetchedDefs, rfis);
   return rfis.map((r) => toRfiRecord(r, project.id, project.name, lookup, defs));
