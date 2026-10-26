@@ -6,9 +6,8 @@ import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import { fitView, heatColour, HEAT_RAMP, type GlobePoint } from "@/lib/dashboard/globe";
 import { ChartTooltip, type TooltipState } from "./chart-tooltip";
+import { useWidth } from "@/components/charts/use-width";
 
-const S = 420; // viewBox size
-const R = S / 2 - 10;
 
 type Land = FeatureCollection<Geometry>;
 let landCache: Promise<Land> | null = null;
@@ -37,6 +36,11 @@ export function ProjectGlobe({
   noun: string;
 }) {
   const [land, setLand] = useState<Land | null>(null);
+  // Fill the panel: width from the container, height in proportion.
+  const [boxRef, measured] = useWidth<HTMLDivElement>();
+  const W = Math.max(300, measured || 640);
+  const H = Math.round(Math.min(560, Math.max(340, W * 0.5)));
+  const R = Math.min(W, H) / 2 - 12;
   const fit = useMemo(() => fitView(points), [points]);
   const [view, setView] = useState(() => ({ ...fit, zoom: 1 }));
   const anim = useRef<number | null>(null);
@@ -110,8 +114,8 @@ export function ProjectGlobe({
   }, []);
 
   const projection = useMemo(
-    () => geoOrthographic().scale(R * view.zoom).translate([S / 2, S / 2]).rotate([-view.lon, -view.lat]).clipAngle(90),
-    [view],
+    () => geoOrthographic().scale(R * view.zoom).translate([W / 2, H / 2]).rotate([-view.lon, -view.lat]).clipAngle(90),
+    [view, W, H, R],
   );
   const path = useMemo(() => geoPath(projection), [projection]);
   const maxTotal = Math.max(1, ...points.map((p) => p.total));
@@ -136,7 +140,7 @@ export function ProjectGlobe({
   // under the finger or cursor roughly follows it.
   function degPerPx(zoom: number): number {
     const box = svgRef.current?.getBoundingClientRect();
-    const k = box ? S / box.width : 1;
+    const k = box && box.width ? W / box.width : 1;
     return (k * 180) / (Math.PI * R * zoom);
   }
 
@@ -211,13 +215,13 @@ export function ProjectGlobe({
   };
 
   return (
-    <div className="relative" onMouseLeave={() => setTip(null)}>
+    <div ref={boxRef} className="relative" onMouseLeave={() => setTip(null)}>
       <ChartTooltip tip={tip} />
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,520px)_16rem]">
+      <div className="relative">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${S} ${S}`}
-          className="h-auto w-full cursor-grab touch-pan-y select-none active:cursor-grabbing"
+          viewBox={`0 0 ${W} ${H}`}
+          className="block h-auto w-full cursor-grab touch-pan-y select-none rounded-lg active:cursor-grabbing"
           role="img"
           aria-label={`Globe of projects sized by ${noun} and coloured by open ${noun}`}
           onPointerDown={onPointerDown}
@@ -273,12 +277,12 @@ export function ProjectGlobe({
           })}
         </svg>
 
-        <div className="space-y-3 text-xs text-[color:var(--brand-ink-soft)]">
-          <div className="flex gap-2">
-            <button type="button" className="rounded-md border border-[color:var(--brand-border)] px-2 py-1" onClick={() => zoomBy(1.5)} aria-label="Zoom in">+</button>
-            <button type="button" className="rounded-md border border-[color:var(--brand-border)] px-2 py-1" onClick={() => zoomBy(1 / 1.5)} aria-label="Zoom out">−</button>
-            <button type="button" className="rounded-md border border-[color:var(--brand-border)] px-2 py-1" onClick={() => flyTo(fit)}>Reset</button>
+        <div className="absolute left-3 top-3 flex gap-2">
+            <button type="button" className="rounded-md border border-[color:var(--brand-border)] bg-white/90 px-2.5 py-1 text-xs shadow-sm" onClick={() => zoomBy(1.5)} aria-label="Zoom in">+</button>
+            <button type="button" className="rounded-md border border-[color:var(--brand-border)] bg-white/90 px-2.5 py-1 text-xs shadow-sm" onClick={() => zoomBy(1 / 1.5)} aria-label="Zoom out">−</button>
+            <button type="button" className="rounded-md border border-[color:var(--brand-border)] bg-white/90 px-2.5 py-1 text-xs shadow-sm" onClick={() => flyTo(fit)}>Reset</button>
           </div>
+        <div className="mt-3 space-y-3 text-xs text-[color:var(--brand-ink-soft)] md:absolute md:right-3 md:top-3 md:mt-0 md:w-64 md:rounded-lg md:border md:border-[color:var(--brand-border)] md:bg-white/90 md:p-3 md:shadow-sm">
           <div>
             <p className="font-semibold text-[color:var(--brand-primary)]">Open {noun}</p>
             <div className="mt-1 flex h-2 overflow-hidden rounded">

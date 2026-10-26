@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useWidth } from "./use-width";
 import type { Count } from "@/lib/dashboard/aggregate";
 import { squarify } from "@/lib/charts/treemap";
 import { HEAT_RAMP } from "@/lib/dashboard/globe";
@@ -13,15 +14,7 @@ const H = 280;
 // at the container's pixel width so text stays a normal size.
 export function Treemap({ data, onSelect, selected = [] }: { data: Count[]; onSelect?: (label: string) => void; selected?: string[] }) {
   const [tip, setTip] = useState<TooltipState | null>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const [W, setW] = useState(0);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setW(Math.round(e?.contentRect.width ?? 0)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const [box, W] = useWidth<HTMLDivElement>();
   const rects = squarify(data, (d) => d.count, W, H);
   const ranked = [...data].sort((a, b) => b.count - a.count).map((d) => d.label);
   const total = data.reduce((s, d) => s + d.count, 0);

@@ -211,12 +211,14 @@ export function GenericView<T extends BaseRecord>({
             </Panel>
           </div>
         ) : null}
-        {breakdowns.map(({ b, data }) => {
+        {breakdowns.map(({ b, data }, bi) => {
+          const wide = bi === breakdowns.length - 1 && breakdowns.length % 2 === 1;
           const fid = b.filterId;
           const sel = fid ? (f.dims[fid] ?? []) : [];
           const dim = cfg.filters.find((d) => d.id === fid);
           return (
-            <Panel key={b.title} title={fid ? `${b.title} (click to filter)` : b.title}>
+            <div key={b.title} className={wide ? "lg:col-span-2" : undefined}>
+              <Panel title={fid ? `${b.title} (click to filter)` : b.title}>
               <BarList
                 data={data}
                 {...(fid && dim
@@ -231,6 +233,7 @@ export function GenericView<T extends BaseRecord>({
                   : {})}
               />
             </Panel>
+            </div>
           );
         })}
       </div>
