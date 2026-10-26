@@ -6,6 +6,8 @@ import type { FormsDataset } from "@/lib/forms/types";
 import { applyFormFilters, EMPTY_FORM_FILTERS, formBreakdowns, formKpis, type FormFilters } from "@/lib/forms/aggregate";
 import { buildFormsReport } from "@/lib/forms/report";
 import { PdfButton } from "@/components/dashboard/pdf-button";
+import { CustomFieldFilter } from "@/components/dashboard/custom-field-filter";
+import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { BarList } from "@/components/dashboard/bar-list";
 import { MultiSelect } from "@/components/dashboard/multi-select";
 import { Panel } from "@/components/dashboard/panel";
@@ -35,6 +37,7 @@ export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }
   const [f, setF] = useState<FormFilters>(EMPTY_FORM_FILTERS);
   const all = dataset.forms;
   const forms = useMemo(() => applyFormFilters(all, f), [all, f]);
+  const customs = useMemo(() => all.map((x) => x.custom), [all]);
   const set = (patch: Partial<FormFilters>) => setF((cur) => ({ ...cur, ...patch }));
 
   const k = useMemo(() => formKpis(forms, now), [forms, now]);
@@ -46,6 +49,9 @@ export function FormsView({ dataset, now }: { dataset: FormsDataset; now: Date }
         <MultiSelect label="Project" options={dataset.projects.filter((p) => p.formCount).map((p) => ({ value: p.id, label: p.name }))} value={f.projectIds} onChange={(v) => set({ projectIds: v })} />
         <MultiSelect label="Template" options={opts(all.map((x) => x.templateName))} value={f.templates} onChange={(v) => set({ templates: v })} />
         <MultiSelect label="Status" options={opts(all.map((x) => x.status), formStatusLabel)} value={f.statuses} onChange={(v) => set({ statuses: v })} />
+        <MultiSelect label="Created by" options={opts(all.map((x) => x.createdBy ?? "Unknown"))} value={f.creators} onChange={(v) => set({ creators: v })} />
+        <DateRangeFilter label="Form date" from={f.from} to={f.to} onChange={(r) => set({ from: r.from, to: r.to })} />
+        <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => set({ custom: v })} />
         <input
           type="search"
           placeholder="Search number, name, template"

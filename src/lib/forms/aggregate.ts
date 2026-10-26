@@ -1,15 +1,21 @@
 import { countBy, monthlyCounts } from "@/lib/dashboard/aggregate";
 import { formStatusLabel, isFormOpen, isFormOverdue } from "./normalise";
 import type { FormRecord } from "./types";
+import { matchesCustom, type CustomFilters } from "@/lib/custom/filter";
+import { inDateRange } from "@/lib/dashboard/date-range";
 
 export interface FormFilters {
   projectIds: string[];
   templates: string[];
   statuses: string[];
+  creators: string[];
   search: string;
+  custom: CustomFilters;
+  from?: string;
+  to?: string;
 }
 
-export const EMPTY_FORM_FILTERS: FormFilters = { projectIds: [], templates: [], statuses: [], search: "" };
+export const EMPTY_FORM_FILTERS: FormFilters = { projectIds: [], templates: [], statuses: [], creators: [], search: "", custom: {} };
 
 export function applyFormFilters(forms: FormRecord[], f: FormFilters): FormRecord[] {
   const q = f.search.trim().toLowerCase();
@@ -18,6 +24,9 @@ export function applyFormFilters(forms: FormRecord[], f: FormFilters): FormRecor
       (!f.projectIds.length || f.projectIds.includes(x.projectId)) &&
       (!f.templates.length || f.templates.includes(x.templateName)) &&
       (!f.statuses.length || f.statuses.includes(x.status)) &&
+      (!f.creators?.length || f.creators.includes(x.createdBy ?? "Unknown")) &&
+      inDateRange(x.formDate ?? x.createdAt, f.from, f.to) &&
+      matchesCustom(x.custom, f.custom ?? {}) &&
       (!q || `${x.formNum} ${x.name} ${x.templateName}`.toLowerCase().includes(q)),
   );
 }

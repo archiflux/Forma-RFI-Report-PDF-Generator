@@ -18,6 +18,7 @@ import { KpiTiles } from "./kpi-tiles";
 import { MultiSelect } from "./multi-select";
 import { Panel } from "./panel";
 import { CustomFieldFilter } from "./custom-field-filter";
+import { DateRangeFilter } from "./date-range-filter";
 import { PdfButton } from "./pdf-button";
 import { buildIssuesReport } from "@/lib/dashboard/report";
 import { ProjectStatus, StatusLegend } from "./project-status";
@@ -70,12 +71,7 @@ export function DashboardView({ dataset, now }: { dataset: DashboardDataset; now
         <MultiSelect label="Status" options={opts(all.map((i) => i.status), statusLabel)} value={f.statuses} onChange={(v) => set({ statuses: v })} />
         <MultiSelect label="Type" options={opts(all.map((i) => i.typeName))} value={f.types} onChange={(v) => set({ types: v })} />
         <MultiSelect label="Assignee" options={opts(all.map((i) => i.assignee?.name ?? "Unassigned"))} value={f.assignees} onChange={(v) => set({ assignees: v })} />
-        <label className="flex min-h-9 items-center gap-1 rounded-lg border border-[color:var(--brand-border)] bg-white px-2 text-xs">
-          <span className="text-[color:var(--brand-muted)]">Created</span>
-          <input type="date" value={f.createdFrom ?? ""} onChange={(e) => set({ createdFrom: e.target.value || undefined })} className="text-xs" />
-          <span>to</span>
-          <input type="date" value={f.createdTo ?? ""} onChange={(e) => set({ createdTo: e.target.value || undefined })} className="text-xs" />
-        </label>
+        <DateRangeFilter label="Created" from={f.createdFrom} to={f.createdTo} onChange={(r) => set({ createdFrom: r.from, createdTo: r.to })} />
         <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => set({ custom: v })} />
         <input
           type="search"

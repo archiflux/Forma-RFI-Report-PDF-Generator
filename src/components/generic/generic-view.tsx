@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { applyGenericFilters, buildGenericReport } from "@/lib/generic/aggregate";
+import { applyGenericFilters, buildGenericReport, dimValues } from "@/lib/generic/aggregate";
+import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { EMPTY_GENERIC_FILTERS, type BaseRecord, type GenericConfig, type GenericDataset, type GenericFilters } from "@/lib/generic/types";
 import { BarList } from "@/components/dashboard/bar-list";
 import { MultiSelect } from "@/components/dashboard/multi-select";
@@ -43,11 +44,14 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
           <MultiSelect
             key={d.id}
             label={d.label}
-            options={[...new Set(all.map(d.valueOf))].sort().map((v) => ({ value: v, label: d.format ? d.format(v) : v }))}
+            options={[...new Set(all.flatMap((t) => dimValues(d, t)))].sort().map((v) => ({ value: v, label: d.format ? d.format(v) : v }))}
             value={f.dims[d.id] ?? []}
             onChange={(v) => setDim(d.id, v)}
           />
         ))}
+        {cfg.dateFilter ? (
+          <DateRangeFilter label={cfg.dateFilter.label} from={f.from} to={f.to} onChange={(r) => setF((cur) => ({ ...cur, from: r.from, to: r.to }))} />
+        ) : null}
         {cfg.customOf ? (
           <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => setF((cur) => ({ ...cur, custom: v }))} />
         ) : null}
@@ -104,7 +108,7 @@ export function GenericView<T extends BaseRecord>({ cfg, dataset, now, title }: 
                       // Bars show formatted labels; map back to raw values.
                       selected: sel.map((v) => (dim.format ? dim.format(v) : v)),
                       onSelect: (label: string) => {
-                        const raw = [...new Set(all.map(dim.valueOf))].find((v) => (dim.format ? dim.format(v) : v) === label) ?? label;
+                        const raw = [...new Set(all.flatMap((t) => dimValues(dim, t)))].find((v) => (dim.format ? dim.format(v) : v) === label) ?? label;
                         setDim(fid, sel.includes(raw) ? sel.filter((x) => x !== raw) : [...sel, raw]);
                       },
                     }

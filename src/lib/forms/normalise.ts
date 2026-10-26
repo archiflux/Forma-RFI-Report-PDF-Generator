@@ -1,4 +1,5 @@
 import type { FormRecord } from "./types";
+import { asText } from "@/lib/generic/text";
 
 export interface FormsContext {
   projectId: string;
@@ -18,6 +19,32 @@ interface RawForm {
   createdAt?: string;
   updatedAt?: string;
   formTemplate?: { id?: string; name?: string; templateType?: string } | string | null;
+  customValues?: unknown;
+}
+
+// customValues holds one entry per answered question. The value sits in a
+// type-specific key (textVal, choiceVal, numberVal...). Not confirmed
+// against a live payload: unrecognised entries are skipped, so at worst
+// no form custom fields appear.
+const VALUE_KEYS = ["textVal", "choiceVal", "arrayVal", "numberVal", "dateVal", "toggleVal", "value"] as const;
+
+export function formCustom(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!Array.isArray(raw)) return out;
+  for (const e of raw) {
+    if (!e || typeof e !== "object") continue;
+    const o = e as Record<string, unknown>;
+    const label = asText(o.itemLabel ?? o.label ?? o.fieldLabel ?? o.name ?? o.valueName);
+    if (!label) continue;
+    for (const k of VALUE_KEYS) {
+      const v = Array.isArray(o[k]) ? (o[k] as unknown[]).map(asText).filter(Boolean).join(" | ") : asText(o[k]);
+      if (v) {
+        out[label] = v;
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 function str(v: unknown): string | undefined {
@@ -49,6 +76,7 @@ export function normaliseForm(raw: unknown, ctx: FormsContext): FormRecord | nul
     ...(createdBy ? { createdBy: ctx.people.get(createdBy) ?? `Unknown user (${createdBy.slice(0, 6)})` } : {}),
     createdAt: r.createdAt ?? "",
     ...(str(r.updatedAt) ? { updatedAt: r.updatedAt } : {}),
+    custom: formCustom(r.customValues),
   };
 }
 

@@ -3,6 +3,7 @@ import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/li
 import { formBreakdowns, formKpis, type FormFilters } from "./aggregate";
 import { formStatusLabel, isFormOverdue } from "./normalise";
 import type { FormRecord } from "./types";
+import { describeCustom } from "@/lib/custom/filter";
 
 function day(iso?: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-GB") : "";
@@ -31,7 +32,11 @@ export function buildFormsReport(input: {
       ["Projects", f.projectIds.map((id) => input.projectNames[id] ?? id)],
       ["Template", f.templates],
       ["Status", f.statuses.map(formStatusLabel)],
+      ["Created by", f.creators ?? []],
+      ["Form date from", f.from],
+      ["Form date to", f.to],
       ["Search", f.search.trim() || undefined],
+      ...describeCustom(f.custom ?? {}),
     ]),
     kpis: [
       { label: "Forms", value: String(k.total) },

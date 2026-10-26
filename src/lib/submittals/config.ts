@@ -120,7 +120,10 @@ export const submittalsConfig: GenericConfig<SubmittalRecord> = {
     { id: "status", label: "Status", valueOf: (s) => s.status },
     { id: "state", label: "Stage", valueOf: (s) => s.state },
     { id: "type", label: "Type", valueOf: (s) => s.type },
+    { id: "bic", label: "Ball in court", valueOf: (s) => s.ballInCourt ?? "Not recorded", multi: true },
+    { id: "spec", label: "Spec", valueOf: (s) => s.spec ?? "Not set" },
   ],
+  dateFilter: { label: "Created", get: (s) => s.createdAt },
   searchText: (s) => `${s.number} ${s.title} ${s.spec ?? ""} ${s.ballInCourt ?? ""}`,
   kpis: (items, now) => {
     const overdue = items.filter((s) => isSubmittalOverdue(s, now)).length;
