@@ -18,7 +18,7 @@ export function Donut({ data, centreLabel }: { data: Count[]; centreLabel: strin
   const gap = data.length > 1 ? 2 : 0;
   const active = data.find((d) => d.label === hover);
   return (
-    <div className="flex flex-wrap items-center gap-6">
+    <div className="flex h-full flex-wrap content-center items-center gap-6">
       <svg viewBox="0 0 180 180" className="h-44 w-44 shrink-0" role="img" aria-label={`${centreLabel} by category`}>
         <g transform="rotate(-90 90 90)">
           {data.map((d, i) => {

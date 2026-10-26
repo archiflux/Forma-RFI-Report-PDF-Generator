@@ -13,6 +13,7 @@ import {
   BUCKET_LABEL,
   STATUS_BUCKETS,
   statusBucket,
+  isOverdue,
 } from "@/lib/dashboard/aggregate";
 import { EMPTY_FILTERS, type DashboardDataset, type DashboardFilters } from "@/lib/dashboard/types";
 import { BarList } from "./bar-list";
@@ -66,7 +67,11 @@ export function DashboardView({
   const set = (patch: Partial<DashboardFilters>) => setF((cur) => ({ ...cur, ...patch }));
 
   const k = useMemo(() => kpis(issues, now), [issues, now]);
-  const byType = useMemo(() => countBy(issues, (i) => i.typeName), [issues]);
+  const byType = useMemo(() => countBy(issues, (i) => i.typeName, 16), [issues]);
+  const overdueByAssignee = useMemo(
+    () => countBy(issues.filter((i) => isOverdue(i, now)), (i) => i.assignee?.name ?? "Unassigned"),
+    [issues, now],
+  );
   const byCause = useMemo(() => countBy(issues, (i) => i.rootCause), [issues]);
   const byAssignee = useMemo(() => countBy(issues.filter(isOutstanding), (i) => i.assignee?.name ?? "Unassigned"), [issues]);
   const byStatus = useMemo(() => countBy(issues, (i) => statusLabel(i.status), 6), [issues]);
@@ -157,8 +162,8 @@ export function DashboardView({
         </div>
       </div>
 
-      <Panel title="Issues by root cause">
-        <Treemap data={byCause} />
+      <Panel title="Issues by type (click to filter)">
+        <Treemap data={byType} selected={f.types} onSelect={(v) => set({ types: toggle(f.types, v) })} />
       </Panel>
 
       <Panel title="Status by project" action={<StatusLegend />}>
@@ -196,15 +201,21 @@ export function DashboardView({
         <Panel title="Age of outstanding issues">
           <BarList data={ages} />
         </Panel>
-        <Panel title="Issues by type (click to filter)">
-          <BarList data={byType} selected={f.types} onSelect={(v) => set({ types: toggle(f.types, v) })} />
+        <Panel title="Overdue open issues by assignee (click to filter)">
+          <BarList data={overdueByAssignee} selected={f.assignees} onSelect={(v) => set({ assignees: toggle(f.assignees, v) })} />
+        </Panel>
+        <Panel title="Issues by root cause">
+          <BarList data={byCause} />
         </Panel>
         <Panel title="Open workload by assignee (click to filter)">
           <BarList data={byAssignee} selected={f.assignees} onSelect={(v) => set({ assignees: toggle(f.assignees, v) })} />
         </Panel>
-        <Panel title="Issues by location">
-          <BarList data={byLocation} />
-        </Panel>
+        {/* Without custom fields this is the last panel; let it span the row. */}
+        <div className={customFields.length ? undefined : "lg:col-span-2"}>
+          <Panel title="Issues by location">
+            <BarList data={byLocation} />
+          </Panel>
+        </div>
         {customFields.length ? (
           <Panel
             title="Issues by custom field"

@@ -1,7 +1,7 @@
 import { rfiUrl } from "@/lib/aps/links";
 import { getRfiById, listCustomAttributes, mergeCustomAttributes, rfisHaveCustomAttributes, scrapeAllRfis } from "@/lib/aps/rfis";
 import { createLimiter } from "@/lib/generic/limit";
-import { averageDays } from "@/lib/charts/series";
+import { averageDays, averageDaysBy } from "@/lib/charts/series";
 import { getProjectDirectory } from "@/lib/aps/users";
 import type { CustomAttributeDef, Rfi, RfiParty } from "@/lib/aps/types";
 import { countBy, gapFill, monthlyCounts } from "@/lib/dashboard/aggregate";
@@ -217,6 +217,10 @@ export const rfisConfig: GenericConfig<RfiRecord> = {
     { title: "Open RFIs: ball in court", build: (items) => countBy(items.filter(isRfiOpen), (r) => r.ballInCourt ?? "Not recorded") },
     { title: "RFIs by discipline", build: (items) => countBy(items, (r) => r.discipline ?? "Not set"), filterId: "discipline" },
     { title: "RFIs by priority", build: (items) => countBy(items, (r) => r.priority ?? "Not set"), filterId: "priority" },
+    {
+      title: "Average days to respond, by discipline",
+      build: (items) => averageDaysBy(items, (r) => r.discipline ?? "Not set", (r) => r.createdAt, (r) => r.respondedAt),
+    },
   ],
   columns: [
     { label: "Title", value: (r) => r.title, width: 3 },

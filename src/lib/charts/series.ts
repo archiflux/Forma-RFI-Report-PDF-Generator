@@ -57,6 +57,26 @@ export function topOverdue<T>(
     .slice(0, limit);
 }
 
+// Average days between two dates per group, largest first, to one
+// decimal place. Groups with no complete pairs are left out.
+export function averageDaysBy<T>(
+  items: T[],
+  groupOf: (t: T) => string,
+  startOf: (t: T) => string | undefined,
+  endOf: (t: T) => string | undefined,
+  limit = 10,
+): Array<{ label: string; count: number }> {
+  const groups = new Map<string, T[]>();
+  for (const t of items) groups.set(groupOf(t), [...(groups.get(groupOf(t)) ?? []), t]);
+  return [...groups.entries()]
+    .flatMap(([label, g]) => {
+      const avg = averageDays(g, startOf, endOf);
+      return avg === null ? [] : [{ label, count: Math.round(avg * 10) / 10 }];
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 export function averageDays<T>(items: T[], startOf: (t: T) => string | undefined, endOf: (t: T) => string | undefined): number | null {
   let sum = 0;
   let n = 0;

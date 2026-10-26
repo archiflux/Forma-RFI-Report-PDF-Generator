@@ -56,3 +56,19 @@ describe("series helpers", () => {
     expect(averageDays([], () => undefined, () => undefined)).toBeNull();
   });
 });
+
+describe("averageDaysBy", () => {
+  it("averages per group, largest first, one decimal place", async () => {
+    const { averageDaysBy } = await import("@/lib/charts/series");
+    const items = [
+      { g: "MEP", a: "2026-01-01", b: "2026-01-11" },
+      { g: "MEP", a: "2026-01-01", b: "2026-01-02" },
+      { g: "Arch", a: "2026-01-01", b: "2026-01-04" },
+      { g: "Civils", a: "2026-01-01" },
+    ];
+    expect(averageDaysBy(items, (x) => x.g, (x) => x.a, (x) => (x as { b?: string }).b)).toEqual([
+      { label: "MEP", count: 5.5 },
+      { label: "Arch", count: 3 },
+    ]);
+  });
+});
