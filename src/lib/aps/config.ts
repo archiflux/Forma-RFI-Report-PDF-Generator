@@ -1,10 +1,12 @@
+import { withBase } from "@/lib/base-path";
+
 export const APS_BASE_URL = "https://developer.api.autodesk.com";
 
 // Same-origin proxy that forwards to APS_BASE_URL. The ApsClient hits this
 // from the browser to sidestep CORS on the RFI v3 endpoints. The proxy
 // enforces the same read-only verb allow-list server-side (see
 // src/lib/aps/proxy.ts and src/app/api/aps/[...path]/route.ts).
-export const APS_BROWSER_BASE = "/api/aps";
+export const APS_BROWSER_BASE = withBase("/api/aps");
 
 export const APS_OAUTH = {
   authorizeUrl: `${APS_BASE_URL}/authentication/v2/authorize`,
@@ -51,7 +53,7 @@ export function loadPublicConfig(): ApsPublicConfig {
   const clientId = process.env.NEXT_PUBLIC_APS_CLIENT_ID ?? "";
   const redirectUri =
     process.env.NEXT_PUBLIC_APS_REDIRECT_URI ??
-    (typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "");
+    (typeof window !== "undefined" ? `${window.location.origin}${withBase("/auth/callback")}` : "");
   const scopes =
     process.env.NEXT_PUBLIC_APS_SCOPES ?? APS_SCOPES_READ_ONLY.join(" ");
   return { clientId, redirectUri, scopes };

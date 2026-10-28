@@ -7,7 +7,9 @@
 // Cached for the duration of the page session: the same Blob is reused
 // across every PDF export. ~100 KB, negligible memory.
 
-const LOGO_PATH = "/logo-colour.png";
+import { withBase } from "@/lib/base-path";
+
+const LOGO_PATH = withBase("/logo-colour.png");
 
 let cached: Promise<string | undefined> | undefined;
 

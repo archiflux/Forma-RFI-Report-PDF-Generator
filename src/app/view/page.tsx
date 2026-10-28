@@ -9,6 +9,7 @@ import { DEMO_LOCATIONS, demoDataset } from "@/lib/dashboard/demo";
 import { parseSnapshot } from "@/lib/dashboard/snapshot";
 import { parseFormsDataset } from "@/lib/forms/snapshot";
 import { loadShared } from "@/lib/share/client";
+import { withBase } from "@/lib/base-path";
 import type { DashboardDataset } from "@/lib/dashboard/types";
 import type { FormsDataset } from "@/lib/forms/types";
 import { GenericView } from "@/components/generic/generic-view";
@@ -65,9 +66,11 @@ function Viewer() {
     <div className="min-h-screen">
       <header className="border-b border-[color:var(--brand-border)] bg-white">
         <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-10">
-          <Image src="/icon-colour.png" alt="Bailey Partnership" width={32} height={32} className="h-8 w-8 rounded-md object-contain" />
+          <Image src={withBase("/icon-colour.png")} alt="Bailey Partnership" width={32} height={32} className="h-8 w-8 rounded-md object-contain" />
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">Bailey Partnership</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
+              Bailey Partnership <span className="font-wordmark normal-case tracking-wide">Siteboard</span>
+            </p>
             <h1 className="text-base font-semibold text-[color:var(--brand-primary)]">{loaded?.title ?? "Shared dashboard"}</h1>
           </div>
           {loaded ? (

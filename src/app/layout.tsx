@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Figtree } from "next/font/google";
+import { Chakra_Petch, Figtree } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { withBase } from "@/lib/base-path";
 
 // Figtree matches the typography used on the Bailey Partnership report cover.
 // `variable` exposes it as a CSS custom property so globals.css can compose it
@@ -13,13 +14,21 @@ const figtree = Figtree({
   display: "swap",
 });
 
+// Chakra Petch is used only for the "Siteboard" wordmark (font-wordmark).
+const chakraPetch = Chakra_Petch({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-chakra-petch",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Forma Dashboards",
+  title: "Bailey Partnership Siteboard",
   description:
-    "Read-only dashboards for Issues, RFIs, Forms and Reviews across Autodesk Forma projects.",
+    "Keep your projects in sight. Read-only dashboards for Issues, RFIs, Forms and Reviews across Autodesk Forma projects.",
   icons: {
-    icon: "/icon-colour.png",
-    apple: "/icon-colour.png",
+    icon: withBase("/icon-colour.png"),
+    apple: withBase("/icon-colour.png"),
   },
 };
 
@@ -29,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={figtree.variable}>
+    <html lang="en" className={`${figtree.variable} ${chakraPetch.variable}`}>
       <body className="min-h-screen antialiased">
         <Providers>{children}</Providers>
         <Analytics />

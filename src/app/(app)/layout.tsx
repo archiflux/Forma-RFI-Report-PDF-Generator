@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { useCanProbe } from "@/lib/auth/use-can-probe";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/store";
+import { withBase } from "@/lib/base-path";
 
 export default function AuthedLayout({
   children,
@@ -93,7 +94,7 @@ function Brand({ href }: { href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3" title="Back to dashboard templates">
       <Image
-        src="/icon-colour.png"
+        src={withBase("/icon-colour.png")}
         alt="Bailey Partnership"
         width={36}
         height={36}
@@ -104,8 +105,8 @@ function Brand({ href }: { href: string }) {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
           Bailey Partnership
         </p>
-        <h1 className="text-base font-semibold text-[color:var(--brand-primary)] sm:text-lg">
-          Forma Dashboards
+        <h1 className="font-wordmark text-lg font-semibold tracking-wide text-[color:var(--brand-primary)] sm:text-xl">
+          Siteboard
         </h1>
       </div>
     </Link>
