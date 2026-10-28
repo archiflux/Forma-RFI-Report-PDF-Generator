@@ -20,6 +20,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        wordmark: ["var(--font-chakra-petch)", "var(--font-sans)", "sans-serif"],
       },
       boxShadow: {
         card: "0 1px 2px rgba(14, 40, 65, 0.04), 0 12px 32px -12px rgba(14, 40, 65, 0.12)",

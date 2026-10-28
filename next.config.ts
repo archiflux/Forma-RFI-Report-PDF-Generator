@@ -45,6 +45,8 @@ const headers: NextConfig["headers"] = async () => [
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // Exposed to the browser so withBase() can prefix fetch/asset URLs.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   ...(isExport
     ? {
         output: "export" as const,

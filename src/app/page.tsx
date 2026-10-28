@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { beginSignIn } from "@/lib/aps/auth";
 import { useAuth } from "@/lib/auth/store";
+import { withBase } from "@/lib/base-path";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -36,16 +37,19 @@ export default function LandingPage() {
           className="absolute right-0 top-0 h-full w-1.5 bg-[color:var(--brand-accent)]"
         />
         <Image
-          src="/logo-colour.png"
+          src={withBase("/logo-colour.png")}
           alt="Bailey Partnership"
           width={220}
           height={64}
           priority
           className="h-14 w-auto sm:h-16"
         />
-        <h1 className="mt-6 text-3xl font-semibold text-[color:var(--brand-primary)] sm:text-4xl">
-          Forma Dashboards
+        <h1 className="mt-6 font-wordmark text-4xl font-semibold tracking-wide text-[color:var(--brand-primary)] sm:text-5xl">
+          <span className="sr-only">Bailey Partnership </span>Siteboard
         </h1>
+        <p className="mt-2 text-lg font-medium text-[color:var(--brand-secondary)] sm:text-xl">
+          Keep your projects in sight
+        </p>
         <p className="mt-4 max-w-prose text-[color:var(--brand-ink-soft)]">
           Sign in with your Autodesk account to see Issues, RFIs, Forms and
           Reviews across your Autodesk Forma projects, export branded PDF
