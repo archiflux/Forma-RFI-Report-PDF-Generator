@@ -151,13 +151,13 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
         </div>
       ) : null}
 
-      {hover && !selected ? (
+      {hover ? (
         <div
           className="pointer-events-none absolute z-20 max-w-[18rem] -translate-x-1/2 -translate-y-[calc(100%+14px)] rounded-xl border border-white/15 bg-[#0b1b2e]/85 px-3 py-2 text-xs shadow-2xl backdrop-blur-md"
           style={{ left: hover.x, top: hover.y }}
         >
-          <p className="font-semibold text-white">{hover.thing.title}</p>
-          <p className="mt-0.5 text-white/65">{hover.thing.subtitle}</p>
+          <p className="font-semibold text-white">{hover.note?.title ?? hover.thing.title}</p>
+          <p className="mt-0.5 text-white/65">{hover.note?.subtitle ?? hover.thing.subtitle}</p>
           <p className="mt-1 flex items-center gap-1.5 text-white/80">
             <span className="h-2 w-2 rounded-sm" style={{ background: hover.group.colour }} />
             {hover.group.label}
@@ -177,8 +177,8 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
             <div className="flex items-start gap-3 border-b border-white/10 p-4">
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Properties</p>
-                <p className="mt-1 font-semibold text-white">{selected.thing.title}</p>
-                <p className="mt-0.5 text-xs text-white/65">{selected.thing.subtitle}</p>
+                <p className="mt-1 font-semibold text-white">{selected.note?.title ?? selected.thing.title}</p>
+                <p className="mt-0.5 text-xs text-white/65">{selected.note?.subtitle ?? selected.thing.subtitle}</p>
                 <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/85">
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: selected.group.colour }} />
                   {selected.group.label}
@@ -195,14 +195,17 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
               </button>
             </div>
             <dl className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-xs">
-              {selected.thing.props.map((pr) => (
+              {selected.note ? (
+                <p className="py-1.5 text-white/60">This dot is a location. Organise by Project and switch to Towers or Blocks to see its individual {universe.noun}.</p>
+              ) : null}
+              {(selected.note ? [] : selected.thing.props).map((pr) => (
                 <div key={pr.label} className="grid grid-cols-[8.5rem_1fr] gap-2 border-b border-white/5 py-1.5 last:border-0">
                   <dt className="text-white/55">{pr.label}</dt>
                   <dd className="whitespace-pre-line break-words text-white/90">{pr.value}</dd>
                 </div>
               ))}
             </dl>
-            {selected.thing.href ? (
+            {selected.thing.href && !selected.note ? (
               <div className="border-t border-white/10 p-3">
                 <a
                   href={selected.thing.href}
