@@ -13,7 +13,7 @@ import {
 } from "./universe";
 
 function thing(i: number, groups: Record<string, string>, extra: Partial<Thing3D> = {}): Thing3D {
-  return { key: `p:${i}`, title: `T${i}`, subtitle: "", projectId: "p", projectName: "P", groups, ...extra };
+  return { key: `p:${i}`, title: `T${i}`, subtitle: "", projectId: "p", projectName: "P", groups, props: [], ...extra };
 }
 
 function universe(things: Thing3D[]): Universe3D {
@@ -81,6 +81,23 @@ describe("layouts", () => {
     const keys = new Set<string>();
     for (let i = 0; i < things.length; i++) keys.add(`${l.pos[i * 3]?.toFixed(2)},${l.pos[i * 3 + 1]?.toFixed(2)},${l.pos[i * 3 + 2]?.toFixed(2)}`);
     expect(keys.size).toBe(things.length);
+  });
+
+  it("stacks the timeline as strata: within a month, the first group sits below the second", () => {
+    const l = layout("timeline", u, g);
+    const xOf = (i: number) => (l.pos[i * 3] as number).toFixed(1);
+    for (let i = 0; i < things.length; i++) {
+      for (let j = 0; j < things.length; j++) {
+        if (things[i]?.month !== things[j]?.month || g.groupOf[i] !== 0 || g.groupOf[j] !== 1 || xOf(i) !== xOf(j)) continue;
+        expect(l.pos[i * 3 + 1] as number).toBeLessThanOrEqual(l.pos[j * 3 + 1] as number);
+      }
+    }
+  });
+
+  it("draws globe and galaxy as dots and the rest as cubes", () => {
+    expect(layout("globe", u, g).dots).toBe(true);
+    expect(layout("galaxy", u, g).dots).toBe(true);
+    expect(layout("towers", u, g).dots).toBe(false);
   });
 
   it("puts records on the globe's surface facing outwards", () => {
