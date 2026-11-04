@@ -41,6 +41,7 @@ export interface UniverseHandle {
   clearSelection(): void;
   resetView(): void;
   setAutoRotate(on: boolean): void;
+  setMotion(m: "fly" | "fade"): void;
   dispose(): void;
 }
 
@@ -268,7 +269,7 @@ function labelEl(text: string, sub: string, colour?: string): HTMLDivElement {
 export function createUniverse(
   container: HTMLElement,
   u: Universe3D,
-  opts: { reducedMotion: boolean; onHover: (p: PickInfo | null) => void; onSelect: (p: PickInfo | null) => void },
+  opts: { motion: "fly" | "fade"; onHover: (p: PickInfo | null) => void; onSelect: (p: PickInfo | null) => void },
 ): UniverseHandle {
   const N = u.things.length;
   const width = () => Math.max(1, container.clientWidth);
@@ -490,9 +491,8 @@ export function createUniverse(
   let roundTarget = 0;
   for (let i = 0; i < N; i++) writeInstance(i, CUBE_SIZE);
 
-  // ---- galaxy: a live force-directed graph (like Obsidian's graph view).
-  // Each group is a hub; every record is linked to its hub, hubs are linked
-  // to a central node, records push each other apart and hubs repel.
+  // ---- galaxy: a graph like Obsidian's graph view. Each group is a hub
+  // linked to a central node; every record is linked to its hub.
   const galaxy = new THREE.Group();
   galaxy.visible = false;
   scene.add(galaxy);
@@ -509,44 +509,31 @@ export function createUniverse(
   galaxy.add(hubs);
   const hubLabels = new THREE.Group();
   galaxy.add(hubLabels);
-  interface Sim {
-    alpha: number;
-    vel: Float32Array;
-    hub: Float32Array;
-    hubVel: Float32Array;
-    rest: Float32Array;
-    mass: Float32Array;
-    G: number;
-    time: number;
-  }
   // Each record's own spot in its group's cloud: a random direction (a
-  // slightly flattened sphere, like a galaxy's disc), a random distance
-  // that fills the cloud rather than a shell, and an orbit speed that is
-  // faster near the hub. Fixed per record so the shape is stable.
+  // slightly flattened sphere, like a galaxy's disc) and a random distance
+  // that fills the cloud rather than a shell. Fixed per record so the shape
+  // is stable between visits.
   const gDir = new Float32Array(N * 3);
   const gDist = new Float32Array(N);
-  const gSpin = new Float32Array(N);
   u.things.forEach((t, i) => {
     const a = hash01(t.key, 61) * Math.PI * 2;
     const b = Math.acos(2 * hash01(t.key, 62) - 1);
     gDir[i * 3] = Math.sin(b) * Math.cos(a);
     gDir[i * 3 + 1] = Math.cos(b) * 0.55;
     gDir[i * 3 + 2] = Math.sin(b) * Math.sin(a);
-    const d = 0.18 + 0.9 * Math.cbrt(hash01(t.key, 63));
-    gDist[i] = d;
-    gSpin[i] = (0.12 + hash01(t.key, 64) * 0.06) / (0.4 + d);
+    gDist[i] = 0.18 + 0.9 * Math.cbrt(hash01(t.key, 63));
   });
-  let sim: Sim | null = null;
-  let simClock = 0;
-  const HT = 1 << 15;
-  const head = new Int32Array(HT);
-  const next = new Int32Array(Math.max(1, N));
-  const CELL = 2.2;
-  const cellKey = (x: number, y: number, z: number) => ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) & (HT - 1);
 
-  const startGalaxy = () => {
+  // Lays the graph out once (no live physics, so no lag): hubs are settled
+  // with a short force simulation (heavier groups pulled nearer the centre,
+  // hubs pushing each other apart), then every record is placed in its
+  // hub's cloud. Returns the records' positions and the framing radius.
+  const buildGalaxy = (): { pos: Float32Array; radius: number } => {
     const G = grouping.groups.length;
     const hub = new Float32Array((G + 1) * 3);
+    const vel = new Float32Array((G + 1) * 3);
+    const rest = Float32Array.from(grouping.groups, (g) => 2.5 + Math.cbrt(g.count) * 1.6);
+    const mass = Float32Array.from(grouping.groups, (g) => Math.sqrt(g.count));
     const spreadR = 4 + Math.sqrt(N) * 0.5;
     grouping.groups.forEach((g, gi) => {
       const a = hash01(g.label, 51) * Math.PI * 2;
@@ -555,177 +542,77 @@ export function createUniverse(
       hub[gi * 3 + 1] = Math.cos(b) * spreadR * 0.6;
       hub[gi * 3 + 2] = Math.sin(b) * Math.sin(a) * spreadR;
     });
-    const vel = sim?.vel ?? new Float32Array(N * 3);
-    // A random kick so records burst loose before settling.
-    for (let i = 0; i < N * 3; i++) vel[i] = (vel[i] as number) + (Math.random() - 0.5) * 0.8;
-    sim = {
-      alpha: 1,
-      vel,
-      hub,
-      hubVel: new Float32Array((G + 1) * 3),
-      rest: Float32Array.from(grouping.groups, (g) => 2.5 + Math.cbrt(g.count) * 1.6),
-      mass: Float32Array.from(grouping.groups, (g) => Math.sqrt(g.count)),
-      G,
-      time: 0,
-    };
-    // Settle the few hubs straight away; the records then visibly fall
-    // into orbit around them.
-    for (let it = 0; it < 400; it++) stepHubs(sim, 1, 1 / 60);
-    sim.hubVel.fill(0);
-    const cols = grouping.groups.map((g) => new THREE.Color(g.colour));
-    for (let i = 0; i < N; i++) {
-      const c = cols[grouping.groupOf[i] as number] as THREE.Color;
-      for (let k = 0; k < 2; k++) {
-        linkCol[i * 6 + k * 3] = c.r;
-        linkCol[i * 6 + k * 3 + 1] = c.g;
-        linkCol[i * 6 + k * 3 + 2] = c.b;
+    const f = [0, 0, 0];
+    for (let it = 0; it < 500; it++) {
+      for (let h = 0; h < G; h++) {
+        const pull = 0.02 * (1 + (mass[h] as number) / 12);
+        f[0] = -(hub[h * 3] as number) * pull;
+        f[1] = -(hub[h * 3 + 1] as number) * pull * 1.6;
+        f[2] = -(hub[h * 3 + 2] as number) * pull;
+        for (let o = 0; o < G; o++) {
+          if (o === h) continue;
+          const dx = (hub[h * 3] as number) - (hub[o * 3] as number);
+          const dy = (hub[h * 3 + 1] as number) - (hub[o * 3 + 1] as number);
+          const dz = (hub[h * 3 + 2] as number) - (hub[o * 3 + 2] as number);
+          const d2 = Math.max(4, dx * dx + dy * dy + dz * dz);
+          const want = (rest[h] as number) + (rest[o] as number);
+          const k = Math.min(0.5, (want * want * 0.06) / d2);
+          f[0] += dx * k;
+          f[1] += dy * k;
+          f[2] += dz * k;
+        }
+        for (let c = 0; c < 3; c++) {
+          const v = Math.max(-0.8, Math.min(0.8, ((vel[h * 3 + c] as number) + (f[c] as number)) * 0.85));
+          vel[h * 3 + c] = v;
+          hub[h * 3 + c] = (hub[h * 3 + c] as number) + v;
+        }
       }
     }
-    grouping.groups.forEach((g, gi) => {
-      const c = cols[gi] as THREE.Color;
-      const o = (N + gi) * 6;
-      linkCol.set([c.r, c.g, c.b, 0.6, 0.7, 0.85], o);
-      hubs.setColorAt(gi, c.clone().multiplyScalar(1.6));
-    });
-    hubs.setColorAt(G, new THREE.Color(1.6, 1.6, 1.6));
-    hubs.count = G + 1;
-    if (hubs.instanceColor) hubs.instanceColor.needsUpdate = true;
-    linkGeo.setDrawRange(0, (N + G) * 2);
-    (linkGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+    const pos = new Float32Array(N * 3);
+    const cols = grouping.groups.map((g) => new THREE.Color(g.colour));
+    for (let i = 0; i < N; i++) {
+      const gi = grouping.groupOf[i] as number;
+      const r = (rest[gi] as number) * (gDist[i] as number);
+      for (let c = 0; c < 3; c++) pos[i * 3 + c] = (hub[gi * 3 + c] as number) + (gDir[i * 3 + c] as number) * r;
+      linkPos.set([pos[i * 3] as number, pos[i * 3 + 1] as number, pos[i * 3 + 2] as number, hub[gi * 3] as number, hub[gi * 3 + 1] as number, hub[gi * 3 + 2] as number], i * 6);
+      const col = cols[gi] as THREE.Color;
+      linkCol.set([col.r, col.g, col.b, col.r, col.g, col.b], i * 6);
+    }
     for (const o of [...hubLabels.children]) {
       if (o instanceof CSS2DObject) o.element.remove();
       hubLabels.remove(o);
     }
-    grouping.groups.forEach((g) => {
-      const o = new CSS2DObject(labelEl(g.label, g.count.toLocaleString("en-GB"), g.colour));
-      o.center.set(0.5, 1.4);
-      hubLabels.add(o);
-    });
-    const centre = new CSS2DObject(labelEl(N.toLocaleString("en-GB"), u.noun, ""));
-    centre.center.set(0.5, 1.2);
-    hubLabels.add(centre);
-    galaxy.visible = true;
-  };
-
-  // Hubs: pulled to the centre, pushed apart from each other.
-  const stepHubs = (s0: Sim, a: number, dt: number) => {
-    const { hub, hubVel, rest, mass, G } = s0;
-    for (let h = 0; h < G; h++) {
-      // Heavier groups are pulled harder to the centre, so the biggest sit
-      // in the middle and small ones drift to the edges, as in Obsidian.
-      const pull = 0.02 * (1 + (mass[h] as number) / 12);
-      let fx = -(hub[h * 3] as number) * pull;
-      let fy = -(hub[h * 3 + 1] as number) * pull * 1.6;
-      let fz = -(hub[h * 3 + 2] as number) * pull;
-      for (let o = 0; o < G; o++) {
-        if (o === h) continue;
-        const dx = (hub[h * 3] as number) - (hub[o * 3] as number);
-        const dy = (hub[h * 3 + 1] as number) - (hub[o * 3 + 1] as number);
-        const dz = (hub[h * 3 + 2] as number) - (hub[o * 3 + 2] as number);
-        const d2 = Math.max(4, dx * dx + dy * dy + dz * dz);
-        const want = (rest[h] as number) + (rest[o] as number);
-        const f = Math.min(0.5, (want * want * 0.06) / d2);
-        fx += dx * f;
-        fy += dy * f;
-        fz += dz * f;
-      }
-      for (let k = 0; k < 3; k++) {
-        const v = Math.max(-0.8, Math.min(0.8, ((hubVel[h * 3 + k] as number) + [fx, fy, fz][k]! * a * dt * 60) * 0.85));
-        hubVel[h * 3 + k] = v;
-        hub[h * 3 + k] = (hub[h * 3 + k] as number) + v;
-      }
-    }
-  };
-
-  const stepGalaxy = (dt: number) => {
-    if (!sim) return;
-    const { vel, hub, rest, G } = sim;
-    const a = sim.alpha;
-    sim.time += opts.reducedMotion ? 0 : dt;
-    const time = sim.time;
-    stepHubs(sim, a, dt);
-    // Spatial hash so each record only repels its near neighbours.
-    head.fill(-1);
-    for (let i = 0; i < N; i++) {
-      const c = cellKey(Math.floor((cur[i * 3] as number) / CELL), Math.floor((cur[i * 3 + 1] as number) / CELL), Math.floor((cur[i * 3 + 2] as number) / CELL));
-      next[i] = head[c] as number;
-      head[c] = i;
-    }
-    // The pull to each spot always acts (so clouds keep turning); alpha
-    // only adds the extra energy of the opening burst.
-    const step = (0.5 + 0.5 * a) * dt * 60;
-    for (let i = 0; i < N; i++) {
-      const px = cur[i * 3] as number;
-      const py = cur[i * 3 + 1] as number;
-      const pz = cur[i * 3 + 2] as number;
-      const gi = grouping.groupOf[i] as number;
-      // Spring towards this record's own orbiting spot in its group's cloud.
-      const r = (rest[gi] as number) * (gDist[i] as number);
-      const th = time * (gSpin[i] as number);
-      const c = Math.cos(th);
-      const sn = Math.sin(th);
-      const dx0 = gDir[i * 3] as number;
-      const dz0 = gDir[i * 3 + 2] as number;
-      const tx = (hub[gi * 3] as number) + (dx0 * c - dz0 * sn) * r;
-      const ty = (hub[gi * 3 + 1] as number) + (gDir[i * 3 + 1] as number) * r;
-      const tz = (hub[gi * 3 + 2] as number) + (dx0 * sn + dz0 * c) * r;
-      let fx = (tx - px) * 0.035;
-      let fy = (ty - py) * 0.035;
-      let fz = (tz - pz) * 0.035;
-      const cx = Math.floor(px / CELL);
-      const cy = Math.floor(py / CELL);
-      const cz = Math.floor(pz / CELL);
-      for (let ox = -1; ox <= 1; ox++)
-        for (let oy = -1; oy <= 1; oy++)
-          for (let oz = -1; oz <= 1; oz++) {
-            for (let j = head[cellKey(cx + ox, cy + oy, cz + oz)] as number; j >= 0; j = next[j] as number) {
-              if (j === i) continue;
-              const dx = px - (cur[j * 3] as number);
-              const dy = py - (cur[j * 3 + 1] as number);
-              const dz = pz - (cur[j * 3 + 2] as number);
-              const d2 = dx * dx + dy * dy + dz * dz;
-              if (d2 > CELL * CELL || d2 < 1e-6) continue;
-              const f = 0.06 / d2;
-              fx += dx * f;
-              fy += dy * f;
-              fz += dz * f;
-            }
-          }
-      let vx = ((vel[i * 3] as number) + fx * step) * 0.8;
-      let vy = ((vel[i * 3 + 1] as number) + fy * step) * 0.8;
-      let vz = ((vel[i * 3 + 2] as number) + fz * step) * 0.8;
-      const sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
-      if (sp > 1.2) {
-        vx *= 1.2 / sp;
-        vy *= 1.2 / sp;
-        vz *= 1.2 / sp;
-      }
-      vel[i * 3] = vx;
-      vel[i * 3 + 1] = vy;
-      vel[i * 3 + 2] = vz;
-      cur[i * 3] = px + vx;
-      cur[i * 3 + 1] = py + vy;
-      cur[i * 3 + 2] = pz + vz;
-      linkPos.set([cur[i * 3] as number, cur[i * 3 + 1] as number, cur[i * 3 + 2] as number, hub[gi * 3] as number, hub[gi * 3 + 1] as number, hub[gi * 3 + 2] as number], i * 6);
-    }
-    // Cool down, but never fully freeze, so the graph keeps breathing.
-    sim.alpha = Math.max(0, sim.alpha * Math.pow(0.99, dt * 60));
-    for (let h = 0; h < G; h++) {
-      const o = (N + h) * 6;
-      linkPos.set([hub[h * 3] as number, hub[h * 3 + 1] as number, hub[h * 3 + 2] as number, 0, 0, 0], o);
-      vp.set(hub[h * 3] as number, hub[h * 3 + 1] as number, hub[h * 3 + 2] as number);
-      const g = grouping.groups[h] as Group;
+    let ext = 6;
+    grouping.groups.forEach((g, gi) => {
+      const c = cols[gi] as THREE.Color;
+      linkPos.set([hub[gi * 3] as number, hub[gi * 3 + 1] as number, hub[gi * 3 + 2] as number, 0, 0, 0], (N + gi) * 6);
+      linkCol.set([c.r, c.g, c.b, 0.6, 0.7, 0.85], (N + gi) * 6);
+      vp.set(hub[gi * 3] as number, hub[gi * 3 + 1] as number, hub[gi * 3 + 2] as number);
       vs.setScalar(1.2 + Math.sqrt(g.count) * 0.12);
       m4.compose(vp, q.identity(), vs);
-      hubs.setMatrixAt(h, m4);
-      hubLabels.children[h]?.position.copy(vp);
-    }
+      hubs.setMatrixAt(gi, m4);
+      hubs.setColorAt(gi, c.clone().multiplyScalar(1.4));
+      const o = new CSS2DObject(labelEl(g.label, g.count.toLocaleString("en-GB"), g.colour));
+      o.center.set(0.5, 1.4);
+      o.position.copy(vp);
+      hubLabels.add(o);
+      ext = Math.max(ext, vp.length() + (rest[gi] as number) * 1.3);
+    });
     vs.setScalar(1.8);
     m4.compose(vp.set(0, 0, 0), q.identity(), vs);
     hubs.setMatrixAt(G, m4);
-    hubLabels.children[G]?.position.set(0, 0, 0);
+    hubs.setColorAt(G, new THREE.Color(1.4, 1.4, 1.4));
+    hubs.count = G + 1;
     hubs.instanceMatrix.needsUpdate = true;
+    if (hubs.instanceColor) hubs.instanceColor.needsUpdate = true;
+    const centre = new CSS2DObject(labelEl(N.toLocaleString("en-GB"), u.noun, ""));
+    centre.center.set(0.5, 1.2);
+    hubLabels.add(centre);
+    linkGeo.setDrawRange(0, (N + G) * 2);
     (linkGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    (linkGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+    galaxy.visible = true;
+    return { pos, radius: ext };
   };
 
   // ---- post-processing, controls
@@ -741,7 +628,7 @@ export function createUniverse(
   controls.enableDamping = true;
   controls.dampingFactor = 0.07;
   controls.zoomToCursor = true;
-  let wantSpin = !opts.reducedMotion;
+  let wantSpin = true;
   controls.autoRotateSpeed = 0.5;
   camera.position.set(0, shell * 0.8, shell * 2);
 
@@ -759,7 +646,7 @@ export function createUniverse(
     controls.minDistance = framing.radius * 0.15;
     controls.maxDistance = framing.radius * 6;
     controls.maxPolarAngle = framing.floor ? Math.PI * 0.495 : Math.PI;
-    if (instant || opts.reducedMotion) {
+    if (instant || motion === "fade") {
       camera.position.copy(toP);
       controls.target.copy(framing.centre);
       camAnim.active = false;
@@ -791,7 +678,14 @@ export function createUniverse(
 
   // ---- arrange
   let grouping: Grouping = groupThings(u.things, u.dims[0]?.id ?? "");
-  let anim = { active: false, t0: 0, dur: opts.reducedMotion ? 1 : 1500, span: 0 };
+  let anim = { active: false, t0: 0, dur: 1800, span: 0 };
+  // "fly": cubes travel to their new slots. "fade": each shrinks away and
+  // reappears in place (for anyone who prefers less movement).
+  let motion: "fly" | "fade" = opts.motion;
+  let galaxyOn = false;
+  let globeOn = false;
+  // Globe dot scale for the current zoom (1 = whole planet in view).
+  let zoomWas = 1;
   let floorTarget = 0;
   let globeTarget = 0;
   let galaxyTarget = 0;
@@ -805,9 +699,10 @@ export function createUniverse(
     sFrom.set(sCur);
     for (let i = 0; i < N; i++) sTo[i] = lay.sizes ? (lay.sizes[i] as number) : lay.dots ? DOT_SIZE : CUBE_SIZE;
     notes = lay.notes;
-    if (shape === "galaxy") startGalaxy();
-    else {
-      sim = null;
+    galaxyOn = shape === "galaxy";
+    globeOn = shape === "globe";
+    zoomWas = 1;
+    if (!galaxyOn) {
       hubs.count = 0;
       for (const o of [...hubLabels.children]) {
         if (o instanceof CSS2DObject) o.element.remove();
@@ -820,8 +715,11 @@ export function createUniverse(
     qFrom.set(qCur);
     cFrom.set(cCur);
     to.set(lay.pos);
+    const gal = galaxyOn ? buildGalaxy() : null;
+    if (gal) to.set(gal.pos);
     const groupColours = grouping.groups.map((g) => new THREE.Color(g.colour));
-    const maxDelay = opts.reducedMotion ? 0 : Math.min(1, 0.5 + N / 20000);
+    const fly = motion === "fly";
+    const maxDelay = fly ? Math.min(1, 0.5 + N / 20000) : 0;
     let minX = Infinity;
     let maxX = -Infinity;
     for (let i = 0; i < N; i++) {
@@ -855,9 +753,10 @@ export function createUniverse(
       lift[i] = Math.min(lay.radius * 0.25, dist * 0.3) * (0.6 + hash01(key, 42) * 0.4);
     }
     aGroup.needsUpdate = true;
-    anim = { active: true, t0: performance.now(), dur: opts.reducedMotion ? 1 : 1800, span: maxDelay * 1000 };
+    anim = { active: true, t0: performance.now(), dur: fly ? 1800 : 700, span: maxDelay * 1000 };
     floorTarget = lay.floor ? 1 : 0;
-    galaxyTarget = shape === "galaxy" ? 1 : 0;
+    // Galaxy links fade in once the records have landed.
+    galaxyTarget = 0;
     globeTarget = shape === "globe" ? 1 : 0;
     if (shape === "globe") {
       globe.visible = true;
@@ -871,14 +770,8 @@ export function createUniverse(
       radius: lay.radius,
       floor: lay.floor,
     };
-    if (sim) {
-      // Frame the graph as it will settle: the furthest hub plus its cloud.
-      let ext = 6;
-      for (let h = 0; h < sim.G; h++) {
-        const d = Math.hypot(sim.hub[h * 3] as number, sim.hub[h * 3 + 1] as number, sim.hub[h * 3 + 2] as number);
-        ext = Math.max(ext, d + (sim.rest[h] as number) * 1.3);
-      }
-      framing.radius = ext;
+    if (gal) {
+      framing.radius = gal.radius;
       framing.centre.set(0, 0, 0);
     }
     frame(false);
@@ -894,14 +787,15 @@ export function createUniverse(
       el.style.opacity = "0";
       const o = new CSS2DObject(el);
       o.position.set(l.x, l.y, l.z);
-      o.center.set(0.5, 1);
+      // Globe labels sit at the surface; lift them clear of the dot.
+      o.center.set(0.5, shape === "globe" ? 1.6 : 1);
       labelGroup.add(o);
     }
     labelTimer = setTimeout(
       () => {
         for (const o of labelGroup.children) if (o instanceof CSS2DObject) o.element.style.opacity = "1";
       },
-      opts.reducedMotion ? 0 : anim.dur * 0.8 + anim.span,
+      anim.dur * 0.8 + anim.span,
     );
     return grouping;
   };
@@ -911,8 +805,7 @@ export function createUniverse(
   const ndc = new THREE.Vector2();
   let lastPick = 0;
   const pickAt = (ev: PointerEvent): PickInfo | null => {
-    if (anim.active && !sim) return null;
-    if (sim) cubes.computeBoundingSphere();
+    if (anim.active) return null;
     const r = renderer.domElement.getBoundingClientRect();
     ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
@@ -933,7 +826,7 @@ export function createUniverse(
     if (now - lastPick < 70) return;
     lastPick = now;
     const hit = pickAt(ev);
-    if (sim) cubeMat.uniforms.uHoverGroup!.value = hit ? (grouping.groupOf[u.things.indexOf(hit.thing)] as number) : legendGroup;
+    if (galaxyOn) cubeMat.uniforms.uHoverGroup!.value = hit ? (grouping.groupOf[u.things.indexOf(hit.thing)] as number) : legendGroup;
     opts.onHover(hit);
   };
   const onDown = (ev: PointerEvent) => {
@@ -997,7 +890,7 @@ export function createUniverse(
     raf = requestAnimationFrame(tick);
     const now = performance.now();
     adapt(now);
-    dustMat.uniforms.uTime!.value = opts.reducedMotion ? 0 : (now - start) / 1000;
+    dustMat.uniforms.uTime!.value = (now - start) / 1000;
 
     if (anim.active) {
       let done = true;
@@ -1006,17 +899,32 @@ export function createUniverse(
         const t = raw <= 0 ? 0 : raw >= 1 ? 1 : raw;
         if (t < 1) done = false;
         const e = ease(t);
-        const arc = Math.sin(Math.PI * e);
-        if (!sim) {
-          // Straight, eased flight from the old slot to the new one, lifted
-          // in a low arc so cubes pass over the stacks instead of through.
-          const fx = from[i * 3] as number;
-          const fy = from[i * 3 + 1] as number;
-          const fz = from[i * 3 + 2] as number;
-          cur[i * 3] = fx + ((to[i * 3] as number) - fx) * e;
-          cur[i * 3 + 1] = fy + ((to[i * 3 + 1] as number) - fy) * e + arc * (lift[i] as number);
-          cur[i * 3 + 2] = fz + ((to[i * 3 + 2] as number) - fz) * e;
+        if (motion === "fade") {
+          // Shrink away at the old slot, reappear at the new one.
+          const out = t < 0.5;
+          const k = out ? 1 - t * 2 : t * 2 - 1;
+          const src = out ? from : to;
+          cur[i * 3] = src[i * 3] as number;
+          cur[i * 3 + 1] = src[i * 3 + 1] as number;
+          cur[i * 3 + 2] = src[i * 3 + 2] as number;
+          for (let c = 0; c < 4; c++) qCur[i * 4 + c] = ((out ? qFrom : qTo)[i * 4 + c] as number);
+          for (let c = 0; c < 3; c++) cCur[i * 3 + c] = ((out ? cFrom : cTo)[i * 3 + c] as number);
+          colour.setRGB(cCur[i * 3] as number, cCur[i * 3 + 1] as number, cCur[i * 3 + 2] as number);
+          cubes.setColorAt(i, colour);
+          sCur[i] = (out ? (sFrom[i] as number) : (sTo[i] as number)) * ease(k);
+          if (t >= 1) sCur[i] = sTo[i] as number;
+          writeInstance(i, sCur[i] as number);
+          continue;
         }
+        // Straight, eased flight from the old slot to the new one, lifted in
+        // a low arc so cubes pass over the stacks instead of through them.
+        const arc = Math.sin(Math.PI * e);
+        const fx = from[i * 3] as number;
+        const fy = from[i * 3 + 1] as number;
+        const fz = from[i * 3 + 2] as number;
+        cur[i * 3] = fx + ((to[i * 3] as number) - fx) * e;
+        cur[i * 3 + 1] = fy + ((to[i * 3 + 1] as number) - fy) * e + arc * (lift[i] as number);
+        cur[i * 3 + 2] = fz + ((to[i * 3 + 2] as number) - fz) * e;
         q.set(qFrom[i * 4] as number, qFrom[i * 4 + 1] as number, qFrom[i * 4 + 2] as number, qFrom[i * 4 + 3] as number);
         q2.set(qTo[i * 4] as number, qTo[i * 4 + 1] as number, qTo[i * 4 + 2] as number, qTo[i * 4 + 3] as number);
         q.slerp(q2, e);
@@ -1037,7 +945,7 @@ export function createUniverse(
         cubes.setColorAt(i, colour);
         const sf = sFrom[i] as number;
         sCur[i] = sf + ((sTo[i] as number) - sf) * e;
-        writeInstance(i, (sCur[i] as number) * (1 - arc * 0.15));
+        writeInstance(i, (sCur[i] as number) * (1 - arc * 0.15) * (globeOn && t >= 1 ? zoomWas : 1));
       }
       cubes.instanceMatrix.needsUpdate = true;
       if (cubes.instanceColor) cubes.instanceColor.needsUpdate = true;
@@ -1053,24 +961,22 @@ export function createUniverse(
     const ru = cubeMat.uniforms.uRound as { value: number };
     ru.value += (roundTarget - ru.value) * kk;
     (cubeMat.uniforms.uTime as { value: number }).value = (now - start) / 1000;
-    if (sim) {
-      // Fixed 60 Hz steps so the graph settles in real time on any device.
-      simClock += dt;
-      let steps = 0;
-      const maxSteps = N > 6000 ? 2 : 4;
-      while (simClock >= 1 / 60 && steps < maxSteps) {
-        stepGalaxy(1 / 60);
-        simClock -= 1 / 60;
-        steps++;
-      }
-      if (steps === maxSteps) simClock = 0;
-      if (!anim.active) {
-        for (let i = 0; i < N; i++) writeInstance(i, sCur[i] as number);
+    if (galaxyOn && !anim.active) galaxyTarget = 1;
+    // Globe dots keep a constant on-screen size: zooming in shrinks them in
+    // the scene so close neighbours separate instead of filling the view.
+    if (globeOn && !anim.active) {
+      // Reference: the camera distance that frames the whole planet.
+      const d = camera.position.distanceTo(controls.target);
+      const z = Math.min(1, Math.max(0.02, d / (R * 3.2)));
+      if (Math.abs(z - zoomWas) / zoomWas > 0.02) {
+        zoomWas = z;
+        for (let i = 0; i < N; i++) writeInstance(i, (sCur[i] as number) * z);
         cubes.instanceMatrix.needsUpdate = true;
+        cubes.computeBoundingSphere();
       }
     }
     linkMat.opacity += (galaxyTarget * 0.22 - linkMat.opacity) * kk;
-    if (!sim && linkMat.opacity < 0.01) galaxy.visible = false;
+    if (!galaxyOn && linkMat.opacity < 0.01) galaxy.visible = false;
 
     if (camAnim.active) {
       const t = Math.min(1, (now - camAnim.t0) / camAnim.dur);
@@ -1105,6 +1011,9 @@ export function createUniverse(
     },
     resetView() {
       frame(false);
+    },
+    setMotion(m) {
+      motion = m;
     },
     setAutoRotate(on) {
       wantSpin = on;
