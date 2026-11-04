@@ -15,7 +15,7 @@ export interface TrendSeries {
 
 type Row = { month: string };
 
-export const ISSUE_SERIES: TrendSeries[] = [
+const ISSUE_SERIES: TrendSeries[] = [
   { key: "created", label: "Created", colour: "var(--series-1)" },
   { key: "closed", label: "Closed", colour: "var(--series-2)" },
 ];

@@ -1,6 +1,7 @@
 "use client";
 
-import { barsScene, blocksScene, gaugeScene, globeScene, openClosedScene, overdueScene, ringScene, seriesScene, stackedScene } from "@/lib/three-d/spec";
+import { Open3DButton } from "@/components/three-d/open-3d-button";
+import { genericUniverse } from "@/lib/three-d/things";
 import { useMemo, useState } from "react";
 import { applyGenericFilters, buildGenericReport, dimValues, openClosedByProject } from "@/lib/generic/aggregate";
 import { Treemap } from "@/components/charts/treemap";
@@ -62,7 +63,6 @@ export function GenericView<T extends BaseRecord>({
     [items, cfg],
   );
   const overdue = useMemo(() => (cfg.overdue ? topOverdue(items, cfg.isOpen, cfg.overdue.dueOf, now) : []), [items, cfg, now]);
-  const Noun = `${cfg.noun.charAt(0).toUpperCase()}${cfg.noun.slice(1)}`;
   const toggleProject = (id: string) =>
     setF((cur) => ({ ...cur, projectIds: cur.projectIds.includes(id) ? cur.projectIds.filter((x) => x !== id) : [...cur.projectIds, id] }));
   const toggleDimLabel = (fid: string, label: string) => {
@@ -113,7 +113,8 @@ export function GenericView<T extends BaseRecord>({
             Reset filters ({items.length} of {all.length})
           </button>
         ) : null}
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Open3DButton build={() => genericUniverse(cfg, items, now, locations, title)} />
           <PdfButton
             build={(includeRegister, maxRegisterRows) =>
               buildGenericReport({
@@ -138,7 +139,7 @@ export function GenericView<T extends BaseRecord>({
       </div>
 
       {locations ? (
-        <Panel title="Projects on the map" view3d={() => globeScene(`${Noun} by project location`, cfg.noun, globePoints(items, dataset.projects, locations, cfg.isOpen).points)}>
+        <Panel title="Projects on the map">
           <ProjectGlobe
             noun={cfg.noun}
             {...globePoints(items, dataset.projects, locations, cfg.isOpen)}
@@ -151,13 +152,13 @@ export function GenericView<T extends BaseRecord>({
       {cfg.gauge || cfg.donut ? (
         <div className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
           {cfg.gauge ? (
-            <Panel title={cfg.gauge.title} view3d={() => (cfg.gauge ? gaugeScene(cfg.gauge.title, cfg.gauge.unit, gaugeValue) : null)}>
+            <Panel title={cfg.gauge.title}>
               <Gauge value={gaugeValue} unit={cfg.gauge.unit} caption={cfg.gauge.title} />
             </Panel>
           ) : null}
           {cfg.donut ? (
             <div className={cfg.gauge ? "lg:col-span-2" : "lg:col-span-3"}>
-              <Panel title={cfg.donut.title} view3d={() => ringScene(cfg.donut?.title ?? "", cfg.noun, donut)}>
+              <Panel title={cfg.donut.title}>
                 <Donut data={donut} centreLabel={cfg.noun} />
               </Panel>
             </div>
@@ -166,7 +167,7 @@ export function GenericView<T extends BaseRecord>({
       ) : null}
 
       {cfg.treemap ? (
-        <Panel title={cfg.treemap.filterId ? `${cfg.treemap.title} (click to filter)` : cfg.treemap.title} view3d={() => blocksScene(cfg.treemap?.title ?? "", cfg.noun, tree)}>
+        <Panel title={cfg.treemap.filterId ? `${cfg.treemap.title} (click to filter)` : cfg.treemap.title}>
           <Treemap
             data={tree}
             {...(cfg.treemap.filterId
@@ -176,22 +177,22 @@ export function GenericView<T extends BaseRecord>({
         </Panel>
       ) : null}
 
-      <Panel title="Open and closed by project (click a project to filter)" view3d={() => openClosedScene(`Open and closed ${cfg.noun} by project`, cfg.noun, byProject)}>
+      <Panel title="Open and closed by project (click a project to filter)">
         <OpenClosedBars rows={byProject} selected={f.projectIds} onSelect={toggleProject} />
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         {statusMonths ? (
-          <Panel title={`${Noun} per month, by status today`} view3d={() => stackedScene(`${Noun} per month, by status today`, cfg.noun, statusMonths.rows, statusMonths.categories)}>
+          <Panel title={`${cfg.noun.charAt(0).toUpperCase()}${cfg.noun.slice(1)} per month, by status today`}>
             <StackedArea rows={statusMonths.rows} categories={statusMonths.categories} />
           </Panel>
         ) : null}
-        <Panel title={cfg.trend.title} view3d={() => seriesScene(cfg.trend.title, cfg.noun, trend, cfg.trend.series ?? [{ key: "count", label: Noun, colour: "var(--series-1)" }])}>
+        <Panel title={cfg.trend.title}>
           <TrendChart data={trend} series={cfg.trend.series} ariaLabel={cfg.trend.title} />
         </Panel>
         {cfg.overdue ? (
           <div className="lg:col-span-2">
-            <Panel title={cfg.overdue.title} view3d={() => overdueScene(cfg.overdue?.title ?? "", overdue.map(({ item, daysOverdue }) => ({ number: cfg.overdue?.numberOf(item) ?? "", title: cfg.overdue?.titleOf(item) ?? "", daysOverdue })))}>
+            <Panel title={cfg.overdue.title}>
               <OverdueTable
                 ownerLabel={cfg.overdue.ownerLabel}
                 rows={overdue.map(({ item, due, daysOverdue }) => {
@@ -220,7 +221,7 @@ export function GenericView<T extends BaseRecord>({
           const dim = cfg.filters.find((d) => d.id === fid);
           return (
             <div key={b.title} className={wide ? "lg:col-span-2" : undefined}>
-              <Panel title={fid ? `${b.title} (click to filter)` : b.title} view3d={() => barsScene(b.title, cfg.noun, data)}>
+              <Panel title={fid ? `${b.title} (click to filter)` : b.title}>
               <BarList
                 data={data}
                 {...(fid && dim
