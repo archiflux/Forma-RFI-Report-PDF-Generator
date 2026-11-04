@@ -11,16 +11,16 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { geoEquirectangular, geoPath, type GeoPermissibleObjects } from "d3-geo";
-import { feature } from "topojson-client";
+import { geoEquirectangular, geoGraticule, geoPath, type GeoPermissibleObjects } from "d3-geo";
+import { feature, mesh } from "topojson-client";
 import {
   globeRadius,
   groupThings,
   hash01,
-  latLonToXYZ,
   layout,
   type Group,
   type Grouping,
+  type Layout,
   type Shape,
   type Thing3D,
   type Universe3D,
@@ -29,6 +29,8 @@ import {
 export interface PickInfo {
   thing: Thing3D;
   group: Group;
+  // Location summary on the globe, shown instead of the record itself.
+  note?: { title: string; subtitle: string };
   x: number;
   y: number;
 }
@@ -54,14 +56,21 @@ const CUBE_VERT = /* glsl */ `
   uniform float uSelId;
   uniform float uHoverGroup;
   uniform float uRound;
+  uniform float uTime;
   varying vec3 vColor;
   varying vec3 vN;
   varying vec3 vWorld;
   varying float vHi;
+  varying float vSel;
   varying float vDim;
   void main() {
+    float id = float(gl_InstanceID);
+    vSel = abs(id - uSelId) < 0.5 ? 1.0 : 0.0;
+    vHi = abs(id - uHoverId) < 0.5 ? 1.0 : 0.0;
     vec3 sp = normalize(position) * 0.5;
-    vec3 p = mix(position, sp, uRound);
+    // Selected record swells and pulses; hovered one swells a little.
+    float grow = 1.0 + vSel * (0.22 + 0.08 * sin(uTime * 4.0)) + vHi * (1.0 - vSel) * 0.12;
+    vec3 p = mix(position, sp, uRound) * grow;
     vec3 nn = normalize(mix(normal, normalize(position), uRound));
     mat4 m = modelMatrix * instanceMatrix;
     vec4 w = m * vec4(p, 1.0);
@@ -70,8 +79,6 @@ const CUBE_VERT = /* glsl */ `
     vColor = instanceColor;
     bool groupOn = uHoverGroup >= 0.0;
     vDim = groupOn && abs(aGroup - uHoverGroup) > 0.5 ? 1.0 : 0.0;
-    float id = float(gl_InstanceID);
-    vHi = (abs(id - uHoverId) < 0.5 || abs(id - uSelId) < 0.5) ? 1.0 : 0.0;
     gl_Position = projectionMatrix * viewMatrix * w;
   }
 `;
@@ -82,7 +89,9 @@ const CUBE_FRAG = /* glsl */ `
   varying vec3 vN;
   varying vec3 vWorld;
   varying float vHi;
+  varying float vSel;
   varying float vDim;
+  uniform float uTime;
   void main() {
     vec3 n = normalize(vN);
     vec3 v = normalize(cameraPosition - vWorld);
@@ -92,8 +101,11 @@ const CUBE_FRAG = /* glsl */ `
     vec3 col = vColor * diff * 0.9 + vColor * fres * 0.35;
     // Dots glow from the centre outwards.
     col = mix(col, vColor * (1.1 + fres * 0.9) + 0.04, uRound * 0.7);
-    col += (vColor * 0.8 + 0.35) * vHi;
     col *= mix(1.0, 0.15, vDim);
+    // White-based highlights so every colour (pale grey and yellow included)
+    // visibly changes: hover brightens, selection pulses towards white.
+    col = mix(col, vec3(1.0), vHi * (1.0 - vSel) * 0.35);
+    col = mix(col, vec3(1.0), vSel * (0.45 + 0.25 * sin(uTime * 4.0)));
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -170,21 +182,6 @@ const DOT_FRAG = /* glsl */ `
   }
 `;
 
-const LAND_VERT = /* glsl */ `
-  uniform float uPixel;
-  uniform float uSize;
-  varying float vAlpha;
-  void main() {
-    vec4 w = modelMatrix * vec4(position, 1.0);
-    vec3 n = normalize(w.xyz);
-    float facing = dot(n, normalize(cameraPosition));
-    vAlpha = smoothstep(-0.2, 0.6, facing) * 0.9 + 0.1;
-    vec4 mv = viewMatrix * w;
-    gl_Position = projectionMatrix * mv;
-    gl_PointSize = uPixel * uSize / -mv.z;
-  }
-`;
-
 const NORMAL_VERT = /* glsl */ `
   varying vec3 vN;
   varying vec3 vWorld;
@@ -196,14 +193,32 @@ const NORMAL_VERT = /* glsl */ `
   }
 `;
 
-const CORE_FRAG = /* glsl */ `
-  uniform float uFade;
+const CORE_VERT = /* glsl */ `
   varying vec3 vN;
   varying vec3 vWorld;
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    vec4 w = modelMatrix * vec4(position, 1.0);
+    vWorld = w.xyz;
+    vN = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * w;
+  }
+`;
+
+// Earth texture with a soft day-side light and a blue rim. The 0.25 offset
+// lines the equirectangular map up with latLonToXYZ (Greenwich facing +Z).
+const CORE_FRAG = /* glsl */ `
+  uniform float uFade;
+  uniform sampler2D uMap;
+  varying vec3 vN;
+  varying vec3 vWorld;
+  varying vec2 vUv;
   void main() {
     vec3 v = normalize(cameraPosition - vWorld);
     float f = max(dot(normalize(vN), v), 0.0);
-    vec3 col = vec3(0.043, 0.153, 0.278) * (0.25 + 0.75 * f) + vec3(0.05, 0.18, 0.35) * pow(1.0 - f, 3.0);
+    vec3 tex = texture(uMap, vec2(fract(vUv.x + 0.25), vUv.y)).rgb;
+    vec3 col = tex * (0.35 + 0.75 * f) + vec3(0.05, 0.18, 0.35) * pow(1.0 - f, 3.0);
     gl_FragColor = vec4(col * uFade, uFade);
   }
 `;
@@ -336,7 +351,9 @@ export function createUniverse(
   const R = globeRadius(N);
   const globe = new THREE.Group();
   const globeFade = { value: 0 };
-  const coreMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uFade: globeFade }, vertexShader: NORMAL_VERT, fragmentShader: CORE_FRAG });
+  const blank = new THREE.DataTexture(new Uint8Array([8, 34, 63, 255]), 1, 1);
+  blank.needsUpdate = true;
+  const coreMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uFade: globeFade, uMap: { value: blank } }, vertexShader: CORE_VERT, fragmentShader: CORE_FRAG });
   globe.add(new THREE.Mesh(new THREE.SphereGeometry(R * 0.995, 72, 48), coreMat));
   globe.add(
     new THREE.Mesh(
@@ -354,60 +371,56 @@ export function createUniverse(
   );
   globe.visible = false;
   scene.add(globe);
+  // Earth map painted onto the sphere: ocean, land, country borders and a
+  // 15-degree graticule, drawn once to an equirectangular canvas.
   let landLoaded = false;
   const loadLand = () => {
     if (landLoaded) return;
     landLoaded = true;
-    import("world-atlas/land-110m.json")
+    import("world-atlas/countries-50m.json")
       .then((mod) => {
-        const topo = (mod.default ?? mod) as unknown as Parameters<typeof feature>[0] & { objects: { land: Parameters<typeof feature>[1] } };
-        const land = feature(topo, topo.objects.land) as unknown as GeoPermissibleObjects;
-        // Rasterise once to an equirectangular mask; a pixel test per dot is
-        // far faster than spherical point-in-polygon.
-        const MW = 1024;
-        const MH = 512;
+        type Topo = Parameters<typeof feature>[0] & { objects: { countries: Parameters<typeof feature>[1]; land: Parameters<typeof feature>[1] } };
+        const topo = (mod.default ?? mod) as unknown as Topo;
+        const countries = feature(topo, topo.objects.countries) as unknown as GeoPermissibleObjects;
+        const borders = mesh(topo, topo.objects.countries as Parameters<typeof mesh>[1], (a, b) => a !== b) as unknown as GeoPermissibleObjects;
+        // Sharper map on desktops; phones keep a lighter texture.
+        const W = coarse ? 2048 : 4096;
+        const H = W / 2;
         const cv = document.createElement("canvas");
-        cv.width = MW;
-        cv.height = MH;
-        const ctx = cv.getContext("2d", { willReadFrequently: true });
+        cv.width = W;
+        cv.height = H;
+        const ctx = cv.getContext("2d");
         if (!ctx) return;
-        ctx.fillStyle = "#fff";
+        const path = geoPath(geoEquirectangular().scale(W / (2 * Math.PI)).translate([W / 2, H / 2]), ctx);
+        ctx.fillStyle = "#08223f";
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = "rgba(95, 168, 255, 0.12)";
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        geoPath(geoEquirectangular().scale(MW / (2 * Math.PI)).translate([MW / 2, MH / 2]), ctx)(land);
+        path(geoGraticule().step([15, 15])());
+        ctx.stroke();
+        ctx.fillStyle = "#1f5e9c";
+        ctx.beginPath();
+        path(countries);
         ctx.fill();
-        const mask = ctx.getImageData(0, 0, MW, MH).data;
-        const pts: number[] = [];
-        const M = 16000;
-        const golden = Math.PI * (3 - Math.sqrt(5));
-        for (let i = 0; i < M; i++) {
-          const lat = (Math.asin(1 - (i / (M - 1)) * 2) * 180) / Math.PI;
-          const lon = (((((i * golden * 180) / Math.PI) % 360) + 540) % 360) - 180;
-          const px = Math.min(MW - 1, Math.floor(((lon + 180) / 360) * MW));
-          const py = Math.min(MH - 1, Math.floor(((90 - lat) / 180) * MH));
-          if ((mask[(py * MW + px) * 4 + 3] ?? 0) > 0) pts.push(...latLonToXYZ(lat, lon, R * 1.002));
-        }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-        globe.add(
-          new THREE.Points(
-            g,
-            new THREE.ShaderMaterial({
-              transparent: true,
-              depthWrite: false,
-              blending: THREE.AdditiveBlending,
-              uniforms: { uPixel: { value: pixel }, uSize: { value: R * 7 }, uColor: { value: new THREE.Color("#5fa8ff") }, uFade: globeFade },
-              vertexShader: LAND_VERT,
-              fragmentShader: DOT_FRAG,
-            }),
-          ),
-        );
+        ctx.strokeStyle = "rgba(160, 205, 255, 0.55)";
+        ctx.lineWidth = W / 1700;
+        ctx.beginPath();
+        path(borders);
+        ctx.stroke();
+        const tex = new THREE.CanvasTexture(cv);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        tex.wrapS = THREE.RepeatWrapping;
+        coreMat.uniforms.uMap!.value = tex;
       })
       .catch(() => undefined);
   };
 
+
   // ---- the cubes
   const cubeMat = new THREE.ShaderMaterial({
-    uniforms: { uHoverId: { value: -1 }, uSelId: { value: -1 }, uHoverGroup: { value: -1 }, uRound: { value: 0 } },
+    uniforms: { uHoverId: { value: -1 }, uSelId: { value: -1 }, uHoverGroup: { value: -1 }, uRound: { value: 0 }, uTime: { value: 0 } },
     vertexShader: CUBE_VERT,
     fragmentShader: CUBE_FRAG,
   });
@@ -466,13 +479,16 @@ export function createUniverse(
     m4.compose(vp, q, vs);
     cubes.setMatrixAt(i, m4);
   };
-  // Cube size (slightly under the 1-unit slot, leaving a hairline gap) and
-  // dot size; `size` eases between them as the shape changes.
-  const CUBE_SIZE = 0.9;
-  let size = CUBE_SIZE;
-  let sizeTarget = CUBE_SIZE;
+  // Per-record size: cubes sit slightly under their 1-unit slot (a hairline
+  // gap); dots are smaller, and on the globe one dot per location grows
+  // with its count while the rest shrink away inside it.
+  const CUBE_SIZE = 0.92;
+  const DOT_SIZE = 0.6;
+  const sCur = new Float32Array(N).fill(CUBE_SIZE);
+  const sFrom = new Float32Array(N);
+  const sTo = new Float32Array(N);
   let roundTarget = 0;
-  for (let i = 0; i < N; i++) writeInstance(i, size);
+  for (let i = 0; i < N; i++) writeInstance(i, CUBE_SIZE);
 
   // ---- galaxy: a live force-directed graph (like Obsidian's graph view).
   // Each group is a hub; every record is linked to its hub, hubs are linked
@@ -499,8 +515,27 @@ export function createUniverse(
     hub: Float32Array;
     hubVel: Float32Array;
     rest: Float32Array;
+    mass: Float32Array;
     G: number;
+    time: number;
   }
+  // Each record's own spot in its group's cloud: a random direction (a
+  // slightly flattened sphere, like a galaxy's disc), a random distance
+  // that fills the cloud rather than a shell, and an orbit speed that is
+  // faster near the hub. Fixed per record so the shape is stable.
+  const gDir = new Float32Array(N * 3);
+  const gDist = new Float32Array(N);
+  const gSpin = new Float32Array(N);
+  u.things.forEach((t, i) => {
+    const a = hash01(t.key, 61) * Math.PI * 2;
+    const b = Math.acos(2 * hash01(t.key, 62) - 1);
+    gDir[i * 3] = Math.sin(b) * Math.cos(a);
+    gDir[i * 3 + 1] = Math.cos(b) * 0.55;
+    gDir[i * 3 + 2] = Math.sin(b) * Math.sin(a);
+    const d = 0.18 + 0.9 * Math.cbrt(hash01(t.key, 63));
+    gDist[i] = d;
+    gSpin[i] = (0.12 + hash01(t.key, 64) * 0.06) / (0.4 + d);
+  });
   let sim: Sim | null = null;
   let simClock = 0;
   const HT = 1 << 15;
@@ -528,8 +563,10 @@ export function createUniverse(
       vel,
       hub,
       hubVel: new Float32Array((G + 1) * 3),
-      rest: Float32Array.from(grouping.groups, (g) => 3 + Math.sqrt(g.count) * 0.55),
+      rest: Float32Array.from(grouping.groups, (g) => 2.5 + Math.cbrt(g.count) * 1.6),
+      mass: Float32Array.from(grouping.groups, (g) => Math.sqrt(g.count)),
       G,
+      time: 0,
     };
     // Settle the few hubs straight away; the records then visibly fall
     // into orbit around them.
@@ -572,11 +609,14 @@ export function createUniverse(
 
   // Hubs: pulled to the centre, pushed apart from each other.
   const stepHubs = (s0: Sim, a: number, dt: number) => {
-    const { hub, hubVel, rest, G } = s0;
+    const { hub, hubVel, rest, mass, G } = s0;
     for (let h = 0; h < G; h++) {
-      let fx = -(hub[h * 3] as number) * 0.035;
-      let fy = -(hub[h * 3 + 1] as number) * 0.035;
-      let fz = -(hub[h * 3 + 2] as number) * 0.035;
+      // Heavier groups are pulled harder to the centre, so the biggest sit
+      // in the middle and small ones drift to the edges, as in Obsidian.
+      const pull = 0.02 * (1 + (mass[h] as number) / 12);
+      let fx = -(hub[h * 3] as number) * pull;
+      let fy = -(hub[h * 3 + 1] as number) * pull * 1.6;
+      let fz = -(hub[h * 3 + 2] as number) * pull;
       for (let o = 0; o < G; o++) {
         if (o === h) continue;
         const dx = (hub[h * 3] as number) - (hub[o * 3] as number);
@@ -601,6 +641,8 @@ export function createUniverse(
     if (!sim) return;
     const { vel, hub, rest, G } = sim;
     const a = sim.alpha;
+    sim.time += opts.reducedMotion ? 0 : dt;
+    const time = sim.time;
     stepHubs(sim, a, dt);
     // Spatial hash so each record only repels its near neighbours.
     head.fill(-1);
@@ -609,20 +651,27 @@ export function createUniverse(
       next[i] = head[c] as number;
       head[c] = i;
     }
-    const step = a * dt * 60;
+    // The pull to each spot always acts (so clouds keep turning); alpha
+    // only adds the extra energy of the opening burst.
+    const step = (0.5 + 0.5 * a) * dt * 60;
     for (let i = 0; i < N; i++) {
       const px = cur[i * 3] as number;
       const py = cur[i * 3 + 1] as number;
       const pz = cur[i * 3 + 2] as number;
       const gi = grouping.groupOf[i] as number;
-      const hx = (hub[gi * 3] as number) - px;
-      const hy = (hub[gi * 3 + 1] as number) - py;
-      const hz = (hub[gi * 3 + 2] as number) - pz;
-      const hd = Math.sqrt(hx * hx + hy * hy + hz * hz) + 1e-6;
-      const spring = ((hd - (rest[gi] as number)) / hd) * 0.03;
-      let fx = hx * spring;
-      let fy = hy * spring;
-      let fz = hz * spring;
+      // Spring towards this record's own orbiting spot in its group's cloud.
+      const r = (rest[gi] as number) * (gDist[i] as number);
+      const th = time * (gSpin[i] as number);
+      const c = Math.cos(th);
+      const sn = Math.sin(th);
+      const dx0 = gDir[i * 3] as number;
+      const dz0 = gDir[i * 3 + 2] as number;
+      const tx = (hub[gi * 3] as number) + (dx0 * c - dz0 * sn) * r;
+      const ty = (hub[gi * 3 + 1] as number) + (gDir[i * 3 + 1] as number) * r;
+      const tz = (hub[gi * 3 + 2] as number) + (dx0 * sn + dz0 * c) * r;
+      let fx = (tx - px) * 0.035;
+      let fy = (ty - py) * 0.035;
+      let fz = (tz - pz) * 0.035;
       const cx = Math.floor(px / CELL);
       const cy = Math.floor(py / CELL);
       const cz = Math.floor(pz / CELL);
@@ -636,7 +685,7 @@ export function createUniverse(
               const dz = pz - (cur[j * 3 + 2] as number);
               const d2 = dx * dx + dy * dy + dz * dz;
               if (d2 > CELL * CELL || d2 < 1e-6) continue;
-              const f = 0.15 / d2;
+              const f = 0.06 / d2;
               fx += dx * f;
               fy += dy * f;
               fz += dz * f;
@@ -660,7 +709,7 @@ export function createUniverse(
       linkPos.set([cur[i * 3] as number, cur[i * 3 + 1] as number, cur[i * 3 + 2] as number, hub[gi * 3] as number, hub[gi * 3 + 1] as number, hub[gi * 3 + 2] as number], i * 6);
     }
     // Cool down, but never fully freeze, so the graph keeps breathing.
-    sim.alpha = Math.max(opts.reducedMotion ? 0 : 0.03, sim.alpha * Math.pow(0.985, dt * 60));
+    sim.alpha = Math.max(0, sim.alpha * Math.pow(0.99, dt * 60));
     for (let h = 0; h < G; h++) {
       const o = (N + h) * 6;
       linkPos.set([hub[h * 3] as number, hub[h * 3 + 1] as number, hub[h * 3 + 2] as number, 0, 0, 0], o);
@@ -684,7 +733,7 @@ export function createUniverse(
   composer.setPixelRatio(pixel);
   composer.setSize(width(), height());
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width(), height()), 0.6, 0.45, 0.72);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width(), height()), 0.32, 0.35, 0.86);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
@@ -746,13 +795,16 @@ export function createUniverse(
   let floorTarget = 0;
   let globeTarget = 0;
   let galaxyTarget = 0;
+  let notes: Layout["notes"] = null;
   let legendGroup = -1;
 
   const arrange = (dimId: string, shape: Shape): Grouping => {
     grouping = groupThings(u.things, dimId);
     const lay = layout(shape, u, grouping);
     roundTarget = lay.dots ? 1 : 0;
-    sizeTarget = lay.dots ? 0.55 : CUBE_SIZE;
+    sFrom.set(sCur);
+    for (let i = 0; i < N; i++) sTo[i] = lay.sizes ? (lay.sizes[i] as number) : lay.dots ? DOT_SIZE : CUBE_SIZE;
+    notes = lay.notes;
     if (shape === "galaxy") startGalaxy();
     else {
       sim = null;
@@ -769,7 +821,13 @@ export function createUniverse(
     cFrom.set(cCur);
     to.set(lay.pos);
     const groupColours = grouping.groups.map((g) => new THREE.Color(g.colour));
-    const maxDelay = opts.reducedMotion ? 0 : Math.min(0.9, 0.35 + N / 20000);
+    const maxDelay = opts.reducedMotion ? 0 : Math.min(1, 0.5 + N / 20000);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i < N; i++) {
+      minX = Math.min(minX, to[i * 3] as number);
+      maxX = Math.max(maxX, to[i * 3] as number);
+    }
     for (let i = 0; i < N; i++) {
       const gi = grouping.groupOf[i] as number;
       aGroup.setX(i, gi);
@@ -789,8 +847,12 @@ export function createUniverse(
       // Lower cubes leave first so stacks build from the ground up.
       const key = (u.things[i] as Thing3D).key;
       const heightRank = Math.min(1, Math.max(0, (to[i * 3 + 1] as number) / Math.max(1, lay.radius)));
-      delay[i] = (hash01(key, 41) * 0.55 + heightRank * 0.45) * maxDelay * 1000;
-      lift[i] = (0.15 + hash01(key, 42) * 0.35) * lay.radius;
+      // A wave sweeping left to right across the new shape, lower slots
+      // first, with a little jitter so it feels organic.
+      const sweep = Math.min(1, Math.max(0, ((to[i * 3] as number) - minX) / Math.max(1e-6, maxX - minX)));
+      delay[i] = (sweep * 0.6 + heightRank * 0.25 + hash01(key, 41) * 0.15) * maxDelay * 1000;
+      const dist = Math.hypot((to[i * 3] as number) - (from[i * 3] as number), (to[i * 3 + 1] as number) - (from[i * 3 + 1] as number), (to[i * 3 + 2] as number) - (from[i * 3 + 2] as number));
+      lift[i] = Math.min(lay.radius * 0.25, dist * 0.3) * (0.6 + hash01(key, 42) * 0.4);
     }
     aGroup.needsUpdate = true;
     anim = { active: true, t0: performance.now(), dur: opts.reducedMotion ? 1 : 1800, span: maxDelay * 1000 };
@@ -861,7 +923,8 @@ export function createUniverse(
     if (id < 0) return null;
     const thing = u.things[id] as Thing3D;
     const group = grouping.groups[grouping.groupOf[id] as number] as Group;
-    return { thing, group, x: ev.clientX - r.left, y: ev.clientY - r.top };
+    const note = notes?.[id];
+    return { thing, group, ...(note ? { note } : {}), x: ev.clientX - r.left, y: ev.clientY - r.top };
   };
   let downAt: { x: number; y: number } | null = null;
   const onMove = (ev: PointerEvent) => {
@@ -943,30 +1006,23 @@ export function createUniverse(
         const t = raw <= 0 ? 0 : raw >= 1 ? 1 : raw;
         if (t < 1) done = false;
         const e = ease(t);
-        const arc = sim ? 0 : Math.sin(Math.PI * e);
+        const arc = Math.sin(Math.PI * e);
         if (!sim) {
-        const fx = from[i * 3] as number;
-        const fy = from[i * 3 + 1] as number;
-        const fz = from[i * 3 + 2] as number;
-        let x = fx + ((to[i * 3] as number) - fx) * e;
-        const y = fy + ((to[i * 3 + 1] as number) - fy) * e + arc * (lift[i] as number);
-        let z = fz + ((to[i * 3 + 2] as number) - fz) * e;
-        // A gentle swirl about the vertical axis while in flight.
-        const sw = arc * 0.5;
-        const cs = Math.cos(sw);
-        const sn = Math.sin(sw);
-        const rx = x * cs - z * sn;
-        z = x * sn + z * cs;
-        x = rx;
-        cur[i * 3] = x;
-        cur[i * 3 + 1] = y;
-        cur[i * 3 + 2] = z;
+          // Straight, eased flight from the old slot to the new one, lifted
+          // in a low arc so cubes pass over the stacks instead of through.
+          const fx = from[i * 3] as number;
+          const fy = from[i * 3 + 1] as number;
+          const fz = from[i * 3 + 2] as number;
+          cur[i * 3] = fx + ((to[i * 3] as number) - fx) * e;
+          cur[i * 3 + 1] = fy + ((to[i * 3 + 1] as number) - fy) * e + arc * (lift[i] as number);
+          cur[i * 3 + 2] = fz + ((to[i * 3 + 2] as number) - fz) * e;
         }
         q.set(qFrom[i * 4] as number, qFrom[i * 4 + 1] as number, qFrom[i * 4 + 2] as number, qFrom[i * 4 + 3] as number);
         q2.set(qTo[i * 4] as number, qTo[i * 4 + 1] as number, qTo[i * 4 + 2] as number, qTo[i * 4 + 3] as number);
         q.slerp(q2, e);
         if (arc > 0.001) {
-          qs.setFromAxisAngle(axes[i] as THREE.Vector3, arc * Math.PI);
+          // A slight wobble in flight; level again on landing.
+          qs.setFromAxisAngle(axes[i] as THREE.Vector3, arc * 0.6);
           q.multiply(qs);
         }
         qCur[i * 4] = q.x;
@@ -979,7 +1035,9 @@ export function createUniverse(
         }
         colour.setRGB(cCur[i * 3] as number, cCur[i * 3 + 1] as number, cCur[i * 3 + 2] as number);
         cubes.setColorAt(i, colour);
-        writeInstance(i, size * (1 - arc * 0.35));
+        const sf = sFrom[i] as number;
+        sCur[i] = sf + ((sTo[i] as number) - sf) * e;
+        writeInstance(i, (sCur[i] as number) * (1 - arc * 0.15));
       }
       cubes.instanceMatrix.needsUpdate = true;
       if (cubes.instanceColor) cubes.instanceColor.needsUpdate = true;
@@ -990,29 +1048,26 @@ export function createUniverse(
     }
 
     const dt = Math.min(0.05, (now - lastTick) / 1000);
-    // Ease shape (cube to dot) and size towards the current view's.
+    // Ease the cube-to-dot morph towards the current view's.
     const kk = 1 - Math.exp(-dt * 3);
     const ru = cubeMat.uniforms.uRound as { value: number };
     ru.value += (roundTarget - ru.value) * kk;
-    const sizeWas = size;
-    size += (sizeTarget - size) * kk;
+    (cubeMat.uniforms.uTime as { value: number }).value = (now - start) / 1000;
     if (sim) {
       // Fixed 60 Hz steps so the graph settles in real time on any device.
       simClock += dt;
       let steps = 0;
-      while (simClock >= 1 / 60 && steps < (N > 6000 ? 2 : 4)) {
+      const maxSteps = N > 6000 ? 2 : 4;
+      while (simClock >= 1 / 60 && steps < maxSteps) {
         stepGalaxy(1 / 60);
         simClock -= 1 / 60;
         steps++;
       }
-      if (steps === (N > 6000 ? 2 : 4)) simClock = 0;
+      if (steps === maxSteps) simClock = 0;
       if (!anim.active) {
-        for (let i = 0; i < N; i++) writeInstance(i, size);
+        for (let i = 0; i < N; i++) writeInstance(i, sCur[i] as number);
         cubes.instanceMatrix.needsUpdate = true;
       }
-    } else if (!anim.active && Math.abs(size - sizeWas) > 1e-4) {
-      for (let i = 0; i < N; i++) writeInstance(i, size);
-      cubes.instanceMatrix.needsUpdate = true;
     }
     linkMat.opacity += (galaxyTarget * 0.22 - linkMat.opacity) * kk;
     if (!sim && linkMat.opacity < 0.01) galaxy.visible = false;

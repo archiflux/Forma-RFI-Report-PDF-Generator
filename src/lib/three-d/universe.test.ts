@@ -94,6 +94,34 @@ describe("layouts", () => {
     }
   });
 
+  it("shows one dot per globe location, sized by its count", () => {
+    const l = layout("globe", u, g);
+    const sizes = l.sizes as Float32Array;
+    const visible = [...sizes].filter((x) => x > 0);
+    expect(visible).toHaveLength(1);
+    expect(l.notes?.[0]?.subtitle).toMatch(/^120 issues/);
+  });
+
+  it("keeps dated records out of No date, folding very old months into an Earlier column", () => {
+    const old = Array.from({ length: 140 }, (_, i) => {
+      const y = 2014 + Math.floor(i / 12);
+      return thing(i, { status: "Open" }, { month: `${y}-${String((i % 12) + 1).padStart(2, "0")}` });
+    });
+    const undated = thing(999, { status: "Open" });
+    const all = [...old, undated];
+    const lay = layout("timeline", universe(all), groupThings(all, "status"));
+    expect(lay.labels[0]?.text).toMatch(/^Before /);
+    expect(lay.labels.at(-1)?.text).toBe("No date");
+    const undatedX = lay.pos[(all.length - 1) * 3];
+    for (let i = 0; i < old.length; i++) expect(lay.pos[i * 3]).not.toBe(undatedX);
+  });
+
+  it("uses round tower footprints (10 x 10 for big groups)", () => {
+    expect(footprint(2416)).toBe(10);
+    expect(footprint(120)).toBe(5);
+    expect(footprint(20)).toBe(2);
+  });
+
   it("draws globe and galaxy as dots and the rest as cubes", () => {
     expect(layout("globe", u, g).dots).toBe(true);
     expect(layout("galaxy", u, g).dots).toBe(true);
