@@ -1,5 +1,6 @@
 "use client";
 
+import { barsScene, blocksScene, gaugeScene, globeScene, gridScene, overdueScene, ringScene, seriesScene, stackedScene } from "@/lib/three-d/spec";
 import { useMemo, useState } from "react";
 import {
   ageing,
@@ -37,7 +38,7 @@ import { DateRangeFilter } from "./date-range-filter";
 import { PdfButton } from "./pdf-button";
 import { buildIssuesReport } from "@/lib/dashboard/report";
 import { ProjectStatus, StatusLegend } from "./project-status";
-import { TrendChart } from "./trend-chart";
+import { ISSUE_SERIES, TrendChart } from "./trend-chart";
 
 function opts(values: string[], fmt: (v: string) => string = (v) => v) {
   return [...new Set(values)].sort().map((v) => ({ value: v, label: fmt(v) }));
@@ -141,7 +142,7 @@ export function DashboardView({
       <KpiTiles k={k} />
 
       {locations ? (
-        <Panel title="Projects on the map">
+        <Panel title="Projects on the map" view3d={() => globeScene("Issues by project location", "issues", globePoints(issues, dataset.projects, locations ?? {}, isOutstanding).points)}>
           <ProjectGlobe
             noun="issues"
             {...globePoints(issues, dataset.projects, locations, isOutstanding)}
@@ -152,37 +153,59 @@ export function DashboardView({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Panel title="Average days to close">
+        <Panel title="Average days to close" view3d={() => gaugeScene("Average days to close", "days, created to closed", k.avgDaysToClose)}>
           <Gauge value={k.avgDaysToClose} unit="days, created to closed" caption="Average days to close" />
         </Panel>
         <div className="lg:col-span-2">
-          <Panel title="Issues by status">
+          <Panel title="Issues by status" view3d={() => ringScene("Issues by status", "issues", byStatus)}>
             <Donut data={byStatus} centreLabel="issues" />
           </Panel>
         </div>
       </div>
 
-      <Panel title="Issues by type (click to filter)">
+      <Panel title="Issues by type (click to filter)" view3d={() => blocksScene("Issues by type", "issues", byType)}>
         <Treemap data={byType} selected={f.types} onSelect={(v) => set({ types: toggle(f.types, v) })} />
       </Panel>
 
-      <Panel title="Status by project" action={<StatusLegend />}>
+      <Panel
+        title="Status by project"
+        action={<StatusLegend />}
+        view3d={() =>
+          gridScene(
+            "Status by project",
+            "issues",
+            projects.map((r) => ({ label: r.projectName, values: STATUS_BUCKETS.map((b) => r.counts[b]) })),
+            STATUS_BUCKETS.map((b) => ({ label: BUCKET_LABEL[b], colour: BUCKET_COLOUR[b] })),
+          )
+        }
+      >
         <ProjectStatus rows={projects} />
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-        <Panel title="Issues raised per month, by status today">
+        <Panel
+          title="Issues raised per month, by status today"
+          view3d={() =>
+            stackedScene(
+              "Issues raised per month, by status today",
+              "issues",
+              byBucketMonth.rows,
+              bucketOrder,
+              Object.fromEntries(STATUS_BUCKETS.map((b) => [BUCKET_LABEL[b], BUCKET_COLOUR[b]])),
+            )
+          }
+        >
           <StackedArea
             rows={byBucketMonth.rows}
             categories={bucketOrder}
             colours={Object.fromEntries(STATUS_BUCKETS.map((b) => [BUCKET_LABEL[b], BUCKET_COLOUR[b]]))}
           />
         </Panel>
-        <Panel title="Created vs closed per month">
+        <Panel title="Created vs closed per month" view3d={() => seriesScene("Created vs closed per month", "issues", trend, ISSUE_SERIES)}>
           <TrendChart data={trend} />
         </Panel>
         <div className="lg:col-span-2">
-          <Panel title="Top 10 most overdue open issues">
+          <Panel title="Top 10 most overdue open issues" view3d={() => overdueScene("Top 10 most overdue open issues", overdue.map(({ item, daysOverdue }) => ({ number: item.displayId, title: item.title, daysOverdue })))}>
             <OverdueTable
               ownerLabel="Assigned to"
               rows={overdue.map(({ item, due, daysOverdue }) => ({
@@ -198,27 +221,28 @@ export function DashboardView({
             />
           </Panel>
         </div>
-        <Panel title="Age of outstanding issues">
+        <Panel title="Age of outstanding issues" view3d={() => barsScene("Age of outstanding issues", "issues", ages)}>
           <BarList data={ages} />
         </Panel>
-        <Panel title="Overdue open issues by assignee (click to filter)">
+        <Panel title="Overdue open issues by assignee (click to filter)" view3d={() => barsScene("Overdue open issues by assignee", "overdue issues", overdueByAssignee, "var(--status-critical)")}>
           <BarList data={overdueByAssignee} selected={f.assignees} onSelect={(v) => set({ assignees: toggle(f.assignees, v) })} />
         </Panel>
-        <Panel title="Issues by root cause">
+        <Panel title="Issues by root cause" view3d={() => barsScene("Issues by root cause", "issues", byCause)}>
           <BarList data={byCause} />
         </Panel>
-        <Panel title="Open workload by assignee (click to filter)">
+        <Panel title="Open workload by assignee (click to filter)" view3d={() => barsScene("Open workload by assignee", "open issues", byAssignee)}>
           <BarList data={byAssignee} selected={f.assignees} onSelect={(v) => set({ assignees: toggle(f.assignees, v) })} />
         </Panel>
         {/* Without custom fields this is the last panel; let it span the row. */}
         <div className={customFields.length ? undefined : "lg:col-span-2"}>
-          <Panel title="Issues by location">
+          <Panel title="Issues by location" view3d={() => barsScene("Issues by location", "issues", byLocation)}>
             <BarList data={byLocation} />
           </Panel>
         </div>
         {customFields.length ? (
           <Panel
             title="Issues by custom field"
+            view3d={() => barsScene(`Issues by ${activeField}`, "issues", byCustom)}
             action={
               <select
                 value={activeField}
