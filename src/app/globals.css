@@ -68,3 +68,32 @@ h4 {
   --series-6: #008300;
   --series-other: #a3a9b2;
 }
+
+/* Labels floating in the full-screen 3D views (CSS2DRenderer). */
+.sb3d-label {
+  font-family: var(--font-sans);
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  white-space: pre-line;
+  pointer-events: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+  line-height: 1.2;
+}
+.sb3d-value {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sb3d-name {
+  font-size: 11px;
+  color: rgba(214, 228, 245, 0.8);
+  max-width: 12rem;
+}
+.sb3d-big {
+  font-family: var(--font-chakra-petch), var(--font-sans);
+  font-size: clamp(36px, 7vw, 64px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 0 24px rgba(61, 139, 255, 0.7);
+}
