@@ -16,6 +16,8 @@ export interface Thing3D {
   projectName: string;
   month?: string; // YYYY-MM
   groups: Record<string, string>;
+  // Everything known about the record, for the properties panel.
+  props: Array<{ label: string; value: string }>;
 }
 
 export interface Dim3D {
@@ -60,7 +62,7 @@ export const GROUP_COLOURS = [
 export const OTHER_COLOUR = "#8a929c";
 const MAX_GROUPS = GROUP_COLOURS.length;
 
-export const PITCH = 1.25; // cube size 1 plus a gap
+export const PITCH = 1; // slot size; the engine draws cubes slightly smaller
 
 export interface Group {
   label: string;
@@ -134,6 +136,8 @@ export interface Layout {
   radius: number;
   floor: boolean;
   spin: boolean;
+  // Draw records as glowing dots rather than cubes (globe, galaxy).
+  dots: boolean;
   camDir: [number, number, number];
 }
 
@@ -165,19 +169,22 @@ function setPos(out: Float32Array, i: number, x: number, y: number, z: number) {
 
 const pct = (n: number, total: number) => `${Math.round((n / Math.max(1, total)) * 100)}%`;
 
+// Towers on a neat grid, largest groups in the back row so they never hide
+// smaller ones. Every tower has the same footprint, so heights compare.
 export function layoutTowers(things: Thing3D[], g: Grouping): Layout {
   const n = things.length;
   const pos = new Float32Array(n * 3);
   const G = Math.max(1, g.groups.length);
   const s = footprint(Math.max(...g.groups.map((x) => x.count), 1));
   const towerW = s * PITCH;
-  const gap = Math.max(2.5, towerW * 0.7);
-  const step = towerW + gap;
-  const span = (G - 1) * step;
-  const bend = G > 4 ? 0.22 : 0;
+  const step = towerW + Math.max(1.5, towerW * 0.6);
+  const cols = G <= 6 ? G : Math.ceil(Math.sqrt(G * 2));
+  const rows = Math.ceil(G / cols);
   const xz = g.groups.map((_, gi) => {
-    const u = G === 1 ? 0 : gi / (G - 1) - 0.5;
-    return [u * span, -(u * u) * span * bend] as const;
+    const r = Math.floor(gi / cols);
+    const c = gi % cols;
+    const inRow = r === rows - 1 ? G - r * cols : cols;
+    return [(c - (inRow - 1) / 2) * step, (r - (rows - 1) / 2) * step] as const;
   });
   const seen = new Int32Array(G);
   let maxH = 0;
@@ -194,10 +201,10 @@ export function layoutTowers(things: Thing3D[], g: Grouping): Layout {
   const labels = g.groups.map((gr, gi) => {
     const [x, z] = xz[gi] as readonly [number, number];
     const h = Math.ceil(gr.count / (s * s)) * PITCH;
-    return { text: gr.label, sub: `${gr.count.toLocaleString("en-GB")} · ${pct(gr.count, n)}`, x, y: h + 1.2, z, colour: gr.colour };
+    return { text: gr.label, sub: `${gr.count.toLocaleString("en-GB")} · ${pct(gr.count, n)}`, x, y: h + 0.8, z, colour: gr.colour };
   });
-  const radius = Math.max(8, span * 0.55, maxH * 0.9);
-  return { pos, up: null, labels, centre: [0, maxH * 0.4, -span * bend * 0.1], radius, floor: true, spin: false, camDir: [0, 0.42, 1] };
+  const radius = Math.max(8, cols * step * 0.55, rows * step * 0.5, maxH * 0.8);
+  return { pos, up: null, labels, centre: [0, maxH * 0.35, 0], radius, floor: true, spin: false, dots: false, camDir: [0, 0.55, 1] };
 }
 
 export function layoutRing(things: Thing3D[], g: Grouping): Layout {
@@ -232,7 +239,7 @@ export function layoutRing(things: Thing3D[], g: Grouping): Layout {
     return { text: gr.label, sub: `${gr.count.toLocaleString("en-GB")} · ${pct(gr.count, n)}`, x: Math.cos(th) * r, y: 0.5, z: -Math.sin(th) * r, colour: gr.colour };
   });
   labels.push({ text: n.toLocaleString("en-GB"), sub: "total", x: 0, y: L * PITCH + outer * 0.35, z: 0, colour: "" });
-  return { pos, up: null, labels, centre: [0, 0, 0], radius: outer * 1.45, floor: true, spin: false, camDir: [0, 1.1, 1] };
+  return { pos, up: null, labels, centre: [0, 0, 0], radius: outer * 1.45, floor: true, spin: false, dots: false, camDir: [0, 1.1, 1] };
 }
 
 export function layoutBlocks(things: Thing3D[], g: Grouping): Layout {
@@ -278,7 +285,7 @@ export function layoutBlocks(things: Thing3D[], g: Grouping): Layout {
       colour: gr.colour,
     };
   });
-  return { pos, up: null, labels, centre: [0, maxH * 0.3, 0], radius: Math.max(8, Math.hypot(W, D) * 0.55), floor: true, spin: false, camDir: [0.3, 1, 1] };
+  return { pos, up: null, labels, centre: [0, maxH * 0.3, 0], radius: Math.max(8, Math.hypot(W, D) * 0.55), floor: true, spin: false, dots: false, camDir: [0.3, 1, 1] };
 }
 
 function monthsBetween(a: string, b: string): string[] {
@@ -306,8 +313,11 @@ export function monthLabel(m: string): string {
   return Number.isNaN(d.getTime()) ? m : d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
 }
 
-// One stack per month (the last MAX_MONTHS), coloured by the chosen group,
-// with undated or older records in a final stack.
+// A stacked area chart built from cubes: one column per month (the last
+// MAX_MONTHS), columns touching, each a thin slab two cubes deep. Records
+// stack in group order, so each group forms a horizontal stratum whose
+// thickness rises and falls month by month. Undated records sit apart at
+// the end.
 export function layoutTimeline(things: Thing3D[], g: Grouping): Layout {
   const n = things.length;
   const pos = new Float32Array(n * 3);
@@ -325,31 +335,34 @@ export function layoutTimeline(things: Thing3D[], g: Grouping): Layout {
     const b = bucketOf(i);
     counts[b] = (counts[b] as number) + 1;
   }
-  const s = footprint(Math.max(1, ...counts));
-  const step = s * PITCH + Math.max(0.8, s * 0.35);
-  const span = (B - 1) * step;
+  const D = 2;
+  const maxCount = Math.max(1, ...counts);
+  const k = Math.max(1, Math.ceil(Math.sqrt(maxCount / (0.8 * Math.max(1, months.length) * D))));
+  const colW = k * PITCH;
+  const undatedGap = counts[months.length] ? colW * 1.5 : 0;
+  const span = Math.max(0, months.length - 1) * colW + (counts[months.length] ? colW + undatedGap : 0);
+  const xOf = (b: number) => -span / 2 + b * colW + (b === months.length ? undatedGap : 0);
   const seen = new Int32Array(B);
   let maxH = 0;
   for (const i of g.order) {
     const b = bucketOf(i);
-    const k = seen[b] as number;
-    seen[b] = k + 1;
-    const layer = Math.floor(k / (s * s));
-    const cell = k % (s * s);
-    const x = -span / 2 + b * step + ((cell % s) - (s - 1) / 2) * PITCH;
-    setPos(pos, i, x, (layer + 0.5) * PITCH, (Math.floor(cell / s) - (s - 1) / 2) * PITCH);
+    const q = seen[b] as number;
+    seen[b] = q + 1;
+    const layer = Math.floor(q / (k * D));
+    const cell = q % (k * D);
+    setPos(pos, i, xOf(b) + ((cell % k) - (k - 1) / 2) * PITCH, (layer + 0.5) * PITCH, (Math.floor(cell / k) - (D - 1) / 2) * PITCH);
     maxH = Math.max(maxH, (layer + 1) * PITCH);
   }
-  const every = Math.max(1, Math.ceil(B / 12));
+  const every = Math.max(1, Math.ceil(months.length / 12));
   const labels: Label3D[] = [];
   months.forEach((m, b) => {
     if (b % every && b !== months.length - 1) return;
-    labels.push({ text: monthLabel(m), sub: (counts[b] ?? 0).toLocaleString("en-GB"), x: -span / 2 + b * step, y: 0, z: s * PITCH * 0.5 + 2.5 });
+    labels.push({ text: monthLabel(m), sub: (counts[b] ?? 0).toLocaleString("en-GB"), x: xOf(b), y: 0, z: D * PITCH * 0.5 + 1.5 });
   });
   if (counts[months.length]) {
-    labels.push({ text: "No date", sub: (counts[months.length] ?? 0).toLocaleString("en-GB"), x: -span / 2 + months.length * step, y: 0, z: s * PITCH * 0.5 + 2.5 });
+    labels.push({ text: "No date", sub: (counts[months.length] ?? 0).toLocaleString("en-GB"), x: xOf(months.length), y: 0, z: D * PITCH * 0.5 + 1.5 });
   }
-  return { pos, up: null, labels, centre: [0, maxH * 0.35, 0], radius: Math.max(8, span * 0.4, maxH), floor: true, spin: false, camDir: [0.15, 0.5, 1] };
+  return { pos, up: null, labels, centre: [0, maxH * 0.45, 0], radius: Math.max(8, span * 0.5, maxH * 0.9), floor: true, spin: false, dots: false, camDir: [0, 0.3, 1] };
 }
 
 export function latLonToXYZ(lat: number, lon: number, r: number): [number, number, number] {
@@ -494,10 +507,10 @@ export function layoutGlobe(things: Thing3D[], g: Grouping, locations: Universe3
     });
     if (angle < 0.5) {
       const view = Math.max(R * 0.3, R * angle * 1.3 + tallest);
-      return { pos, up, labels, centre: [c[0] * R, c[1] * R, c[2] * R], radius: view, floor: false, spin: false, camDir: [c[0], c[1] + 0.35, c[2]] };
+      return { pos, up, labels, centre: [c[0] * R, c[1] * R, c[2] * R], radius: view, floor: false, spin: false, dots: true, camDir: [c[0], c[1] + 0.35, c[2]] };
     }
   }
-  return { pos, up, labels, centre: [0, 0, 0], radius: R * (loose.length ? 2 : 1.35), floor: false, spin: true, camDir: dir };
+  return { pos, up, labels, centre: [0, 0, 0], radius: R * (loose.length ? 2 : 1.35), floor: false, spin: true, dots: true, camDir: dir };
 }
 
 export function layoutGalaxy(things: Thing3D[], g: Grouping): Layout {
@@ -514,7 +527,7 @@ export function layoutGalaxy(things: Thing3D[], g: Grouping): Layout {
     const th = (arm / arms) * Math.PI * 2 + (r / Rg) * 3.2 + (h2 - 0.5) * 0.7;
     setPos(pos, i, Math.cos(th) * r, (h3 - 0.5) * 3 * (1.2 - r / Rg) * PITCH, Math.sin(th) * r);
   });
-  return { pos, up: null, labels: [], centre: [0, 0, 0], radius: Rg * 1.2, floor: false, spin: true, camDir: [0, 0.85, 1] };
+  return { pos, up: null, labels: [], centre: [0, 0, 0], radius: 12 + Math.sqrt(n) * 1.1, floor: false, spin: true, dots: true, camDir: [0, 0.85, 1] };
 }
 
 export function layout(shape: Shape, u: Universe3D, g: Grouping): Layout {

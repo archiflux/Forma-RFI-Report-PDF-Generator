@@ -48,6 +48,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   const [selected, setSelected] = useState<PickInfo | null>(null);
   const [legendOn, setLegendOn] = useState<number | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [keyOpen, setKeyOpen] = useState(true);
   const [spin, setSpin] = useState(true);
   const empty = universe.things.length === 0;
 
@@ -59,6 +60,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
       return;
     }
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (window.innerWidth < 640) setKeyOpen(false);
     setSpin(!reducedMotion);
     try {
       engine.current = createUniverse(el, universe, { reducedMotion, onHover: setHover, onSelect: setSelected });
@@ -163,55 +165,96 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
         </div>
       ) : null}
 
-      {selected ? (
-        <div className="absolute bottom-24 left-1/2 z-20 w-[min(22rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#0b1b2e]/90 p-4 text-sm shadow-2xl backdrop-blur-md sm:bottom-auto sm:left-auto sm:right-6 sm:top-28 sm:translate-x-0">
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-white">{selected.thing.title}</p>
-              <p className="mt-0.5 text-xs text-white/65">{selected.thing.subtitle}</p>
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-white/80">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: selected.group.colour }} />
-                {selected.group.label}
-              </p>
-            </div>
-            <button type="button" onClick={() => setSelected(null)} className="rounded-full px-2 text-white/60 hover:text-white" aria-label="Close details">
-              ×
-            </button>
-          </div>
-          {selected.thing.href ? (
-            <a
-              href={selected.thing.href}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex min-h-9 items-center rounded-full bg-[#d1c800] px-4 text-xs font-semibold text-[#0e2841] hover:brightness-110"
-            >
-              Open in Forma
-            </a>
-          ) : null}
-        </div>
-      ) : null}
-
-      <footer className="pointer-events-none relative z-10 mt-auto flex flex-wrap items-end gap-3 bg-gradient-to-t from-[#030a14]/90 to-transparent px-4 pb-4 pt-10 sm:px-6">
-        <ul className="pointer-events-auto flex max-w-full flex-wrap gap-1.5 text-xs">
-          {groups.map((g, i) => (
-            <li key={g.label}>
+      <aside
+        className={`absolute z-20 flex flex-col rounded-2xl border border-white/15 bg-[#0b1b2e]/90 text-sm shadow-2xl backdrop-blur-md transition duration-300
+          inset-x-3 bottom-3 max-h-[55vh] sm:inset-x-auto sm:bottom-24 sm:right-4 sm:top-36 sm:max-h-none sm:w-[22rem]
+          ${selected ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
+        aria-label="Properties"
+        aria-hidden={!selected}
+      >
+        {selected ? (
+          <>
+            <div className="flex items-start gap-3 border-b border-white/10 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Properties</p>
+                <p className="mt-1 font-semibold text-white">{selected.thing.title}</p>
+                <p className="mt-0.5 text-xs text-white/65">{selected.thing.subtitle}</p>
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/85">
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: selected.group.colour }} />
+                  {selected.group.label}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => toggleLegend(i)}
-                aria-pressed={legendOn === i}
-                className={`flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 backdrop-blur-md transition ${
-                  legendOn === i ? "border-white/60 bg-white/20" : "border-white/10 bg-white/5 hover:bg-white/10"
-                } ${legendOn !== null && legendOn !== i ? "opacity-50" : ""}`}
-              >
-                <span className="h-2.5 w-2.5 rounded-sm shadow-[0_0_8px_currentColor]" style={{ background: g.colour, color: g.colour }} />
-                <span className="max-w-[10rem] truncate">{g.label}</span>
-                <span className="tabular-nums text-white/60">{g.count.toLocaleString("en-GB")}</span>
+                onClick={() => {
+                  setSelected(null);
+                  engine.current?.clearSelection();
+                }}
+                className="rounded-full px-2 text-lg leading-none text-white/60 hover:text-white" aria-label="Close properties">
+                ×
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+            <dl className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-xs">
+              {selected.thing.props.map((pr) => (
+                <div key={pr.label} className="grid grid-cols-[8.5rem_1fr] gap-2 border-b border-white/5 py-1.5 last:border-0">
+                  <dt className="text-white/55">{pr.label}</dt>
+                  <dd className="whitespace-pre-line break-words text-white/90">{pr.value}</dd>
+                </div>
+              ))}
+            </dl>
+            {selected.thing.href ? (
+              <div className="border-t border-white/10 p-3">
+                <a
+                  href={selected.thing.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-9 items-center rounded-full bg-[#d1c800] px-4 text-xs font-semibold text-[#0e2841] hover:brightness-110"
+                >
+                  Open in Forma
+                </a>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </aside>
+
+      <section
+        className="pointer-events-auto absolute left-4 top-36 z-10 w-[15rem] max-w-[calc(100%-2rem)] rounded-2xl border border-white/10 bg-[#0b1b2e]/75 text-xs shadow-xl backdrop-blur-md sm:left-6 sm:top-28"
+        aria-label="Colour key"
+      >
+        <button type="button" onClick={() => setKeyOpen((v) => !v)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left" aria-expanded={keyOpen}>
+          <span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Key</span>
+            <span className="ml-2 text-white/85">{universe.dims.find((d) => d.id === dim)?.label}</span>
+          </span>
+          <span className="text-white/50">{keyOpen ? "–" : "+"}</span>
+        </button>
+        {keyOpen ? (
+          <ul className="max-h-[40vh] overflow-y-auto px-1.5 pb-1.5">
+            {groups.map((g, i) => (
+              <li key={g.label}>
+                <button
+                  type="button"
+                  onClick={() => toggleLegend(i)}
+                  aria-pressed={legendOn === i}
+                  className={`flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left transition ${legendOn === i ? "bg-white/15" : "hover:bg-white/10"} ${
+                    legendOn !== null && legendOn !== i ? "opacity-45" : ""
+                  }`}
+                >
+                  <span className="h-3 w-3 shrink-0 rounded-sm shadow-[0_0_8px_currentColor]" style={{ background: g.colour, color: g.colour }} />
+                  <span className="min-w-0 flex-1 truncate text-white/90">{g.label}</span>
+                  <span className="tabular-nums text-white/60">{g.count.toLocaleString("en-GB")}</span>
+                  <span className="w-9 text-right tabular-nums text-white/40">{Math.round((g.count / Math.max(1, total)) * 100)}%</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      <footer className="pointer-events-none relative z-10 mt-auto flex flex-wrap items-end gap-3 bg-gradient-to-t from-[#030a14]/90 to-transparent px-4 pb-4 pt-10 sm:px-6">
         <p className="text-xs text-white/50 sm:ml-auto">
-          {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}Drag to orbit · Scroll or pinch to zoom · Tap a cube for details
+          {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}Drag to orbit · Scroll or pinch to zoom · Click a record for its properties
         </p>
         <div className="pointer-events-auto flex gap-2">
           <button

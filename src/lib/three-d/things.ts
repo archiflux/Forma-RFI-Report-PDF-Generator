@@ -33,6 +33,27 @@ function withCustom(groups: Record<string, string>, custom: Record<string, strin
   for (const d of dims) groups[d.id] = custom?.[d.label] || "Not set";
 }
 
+type Prop = { label: string; value: string };
+
+function fmtDate(d: string | undefined): string {
+  if (!d) return "";
+  const t = new Date(d);
+  return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Drops empty values so the panel only lists what is actually known.
+function props(list: Array<[string, string | number | boolean | undefined | null]>, custom?: Record<string, string>): Prop[] {
+  const out: Prop[] = [];
+  const seen = new Set<string>();
+  for (const [label, v] of list) {
+    if (v === undefined || v === null || v === "" || seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, value: typeof v === "boolean" ? (v ? "Yes" : "No") : String(v) });
+  }
+  for (const [k, v] of Object.entries(custom ?? {})) if (v) out.push({ label: k, value: v });
+  return out;
+}
+
 const MONTH_DIM: Dim3D = { id: "month", label: "Month created" };
 
 export function issuesUniverse(issues: IssueRecord[], now: Date, locations: Locations, title = "Issues"): Universe3D {
@@ -72,6 +93,29 @@ export function issuesUniverse(issues: IssueRecord[], now: Date, locations: Loca
       projectName: i.projectName,
       ...(monthOf(i.createdAt) ? { month: monthOf(i.createdAt) as string } : {}),
       groups,
+      props: props(
+        [
+          ["Number", i.displayId ? `#${i.displayId}` : ""],
+          ["Project", i.projectName],
+          ["Status", groups.status],
+          ["Due", groups.due],
+          ["Type", i.typeName],
+          ["Subtype", i.subtypeName],
+          ["Root cause", i.rootCause],
+          ["Location", i.location],
+          ["Assigned to", i.assignee?.name ?? "Unassigned"],
+          ["Created by", i.createdBy],
+          ["Created", fmtDate(i.createdAt)],
+          ["Due date", fmtDate(i.dueDate)],
+          ["Closed", fmtDate(i.closedAt)],
+          ["Last updated", fmtDate(i.updatedAt)],
+          ["Comments", i.commentCount],
+          ["Attachments", i.attachmentCount],
+          ["Pinned to a model or sheet", i.hasViewpoint],
+          ["Description", i.description],
+        ],
+        i.custom,
+      ),
     };
   });
   return { title, noun: "issues", dims, things, locations: locs(locations) };
@@ -109,6 +153,22 @@ export function formsUniverse(forms: FormRecord[], now: Date, locations: Locatio
       projectName: f.projectName,
       ...(m ? { month: m } : {}),
       groups,
+      props: props(
+        [
+          ["Number", f.formNum ? `#${f.formNum}` : ""],
+          ["Project", f.projectName],
+          ["Status", groups.status],
+          ["Due", groups.due],
+          ["Template", f.templateName],
+          ["Template type", f.templateType],
+          ["Form date", fmtDate(f.formDate)],
+          ["Due date", fmtDate(f.dueDate)],
+          ["Created by", f.createdBy],
+          ["Created", fmtDate(f.createdAt)],
+          ["Last updated", fmtDate(f.updatedAt)],
+        ],
+        f.custom,
+      ),
     };
   });
   return { title, noun: "forms", dims, things, locations: locs(locations) };
@@ -154,6 +214,14 @@ export function genericUniverse<T extends BaseRecord>(cfg: GenericConfig<T>, ite
       projectName: t.projectName,
       ...(m ? { month: m } : {}),
       groups,
+      props: props(
+        [
+          ["Project", t.projectName],
+          ...(cfg.overdue ? ([["Due", groups.due]] as Array<[string, string]>) : []),
+          ...cfg.columns.map((c) => [c.label, c.value(t, now)] as [string, string]),
+        ],
+        cfg.customOf?.(t),
+      ),
     };
   });
   return { title: title ?? cfg.title, noun: cfg.noun, dims: uniqueDims, things, locations: locs(locations) };
