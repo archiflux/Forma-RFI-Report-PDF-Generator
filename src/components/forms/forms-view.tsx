@@ -1,6 +1,7 @@
 "use client";
 
-import { barsScene, blocksScene, globeScene, openClosedScene, overdueScene, ringScene, seriesScene, stackedScene } from "@/lib/three-d/spec";
+import { Open3DButton } from "@/components/three-d/open-3d-button";
+import { formsUniverse } from "@/lib/three-d/things";
 import { useMemo, useState } from "react";
 import { formStatusLabel } from "@/lib/forms/normalise";
 import type { FormsDataset } from "@/lib/forms/types";
@@ -97,7 +98,8 @@ export function FormsView({
           onChange={(e) => set({ search: e.target.value })}
           className="min-h-9 w-56 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 text-xs"
         />
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Open3DButton build={() => formsUniverse(forms, now, locations)} />
           <PdfButton
             build={(includeRegister, maxRegisterRows) =>
               buildFormsReport({
@@ -127,7 +129,7 @@ export function FormsView({
       </div>
 
       {locations ? (
-        <Panel title="Projects on the map" view3d={() => globeScene("Forms by project location", "forms", globePoints(forms, dataset.projects, locations, isFormOpen).points)}>
+        <Panel title="Projects on the map">
           <ProjectGlobe
             noun="forms"
             {...globePoints(forms, dataset.projects, locations, isFormOpen)}
@@ -137,25 +139,25 @@ export function FormsView({
         </Panel>
       ) : null}
 
-      <Panel title="Forms by template (click to filter)" view3d={() => blocksScene("Forms by template", "forms", tree)}>
+      <Panel title="Forms by template (click to filter)">
         <Treemap data={tree} selected={f.templates} onSelect={(v) => set({ templates: toggle(f.templates, v) })} />
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-        <Panel title="Forms by status" view3d={() => ringScene("Forms by status", "forms", donut)}>
+        <Panel title="Forms by status">
           <Donut data={donut} centreLabel="forms" />
         </Panel>
-        <Panel title="Open and closed by project (click a project to filter)" view3d={() => openClosedScene("Open and closed forms by project", "forms", projectRows)}>
+        <Panel title="Open and closed by project (click a project to filter)">
           <OpenClosedBars rows={projectRows} selected={f.projectIds} onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })} />
         </Panel>
-        <Panel title="Forms over time by status (form date)" view3d={() => stackedScene("Forms over time by status", "forms", statusMonths.rows, statusMonths.categories)}>
+        <Panel title="Forms over time by status (form date)">
           <StackedArea rows={statusMonths.rows} categories={statusMonths.categories} />
         </Panel>
-        <Panel title="Forms per month (by form date)" view3d={() => seriesScene("Forms per month", "forms", trend, [{ key: "count", label: "Forms", colour: "var(--series-1)" }])}>
+        <Panel title="Forms per month (by form date)">
           <TrendChart data={trend} series={[{ key: "count", label: "Forms", colour: "var(--series-1)" }]} ariaLabel="Forms per month" />
         </Panel>
         <div className="lg:col-span-2">
-          <Panel title="Top 10 most overdue open forms" view3d={() => overdueScene("Top 10 most overdue open forms", overdue.map(({ item, daysOverdue }) => ({ number: item.formNum, title: item.name, daysOverdue })))}>
+          <Panel title="Top 10 most overdue open forms">
             <OverdueTable
               ownerLabel="Created by"
               rows={overdue.map(({ item, due, daysOverdue }) => ({
@@ -171,10 +173,10 @@ export function FormsView({
             />
           </Panel>
         </div>
-        <Panel title="Overdue forms by template" view3d={() => barsScene("Overdue forms by template", "overdue forms", overdueByTemplate, "var(--status-critical)")}>
+        <Panel title="Overdue forms by template">
           <BarList data={overdueByTemplate} />
         </Panel>
-        <Panel title="Forms by creator" view3d={() => barsScene("Forms by creator", "forms", byCreator)}>
+        <Panel title="Forms by creator">
           <BarList data={byCreator} />
         </Panel>
       </div>
