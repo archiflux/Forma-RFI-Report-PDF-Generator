@@ -436,11 +436,12 @@ export function spreadOnSphere(dirs: Array<[number, number, number]>, radii: num
   return v;
 }
 
-// Dot diameter for a location holding `count` records, relative to the
-// globe: grows with the cube root, so a site with 1,000 issues is about
-// four times wider than one with a single issue.
+// Dot diameter for a location holding `count` records, as seen with the
+// whole planet in view (the engine keeps that on-screen size as you zoom):
+// grows with the cube root, so a site with 1,000 issues is about four
+// times wider than one with a single issue.
 export function dotSize(count: number, R: number): number {
-  return R * (0.006 + 0.0035 * Math.cbrt(Math.max(1, count)));
+  return R * (0.012 + 0.007 * Math.cbrt(Math.max(1, count)));
 }
 
 // One glowing dot per project location, sized by how many records it
@@ -509,7 +510,8 @@ export function layoutGlobe(things: Thing3D[], g: Grouping, locations: Universe3
     }
     sizes[rep] = d;
     if (labels.length < 8) {
-      const top = R + d + 0.6;
+      // Pinned just above the surface so it stays by its dot at any zoom.
+      const top = R * 1.002;
       labels.push({ text: name, sub: list.length.toLocaleString("en-GB"), x: nrm[0] * top, y: nrm[1] * top, z: nrm[2] * top });
     }
   });

@@ -15,15 +15,18 @@ function webglAvailable(): boolean {
 
 const PREF_KEY = "siteboard-3d";
 
-function readPref(): { dim?: string; shape?: Shape } {
+type Motion = "fly" | "fade";
+type Pref = { dim?: string; motion?: Motion };
+
+function readPref(): Pref {
   try {
-    return JSON.parse(window.localStorage.getItem(PREF_KEY) ?? "{}") as { dim?: string; shape?: Shape };
+    return JSON.parse(window.localStorage.getItem(PREF_KEY) ?? "{}") as Pref;
   } catch {
     return {};
   }
 }
 
-function writePref(p: { dim: string; shape: Shape }) {
+function writePref(p: Pref) {
   try {
     window.localStorage.setItem(PREF_KEY, JSON.stringify(p));
   } catch {
@@ -42,7 +45,11 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   const shapes = SHAPES.filter((s) => s.id !== "globe" || hasLocations(universe));
   const pref = useRef(readPref());
   const [dim, setDim] = useState(() => (universe.dims.some((d) => d.id === pref.current.dim) ? (pref.current.dim as string) : (universe.dims[0]?.id ?? "")));
-  const [shape, setShape] = useState<Shape>(() => (shapes.some((s) => s.id === pref.current.shape) ? (pref.current.shape as Shape) : "towers"));
+  // Always opens on Towers; the grouping and motion choice are remembered.
+  const [shape, setShape] = useState<Shape>("towers");
+  // Flying is the default whatever the device's reduce-motion setting
+  // (Windows turns that on with "Animation effects" off); Fade is one tap away.
+  const [motion, setMotion] = useState<Motion>(() => (pref.current.motion === "fade" ? "fade" : "fly"));
   const [groups, setGroups] = useState<Group[]>([]);
   const [hover, setHover] = useState<PickInfo | null>(null);
   const [selected, setSelected] = useState<PickInfo | null>(null);
@@ -59,11 +66,9 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
       setFailed("This device or browser doesn't support WebGL 2, so the 3D dashboard can't be shown.");
       return;
     }
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     if (window.innerWidth < 640) setKeyOpen(false);
-    setSpin(!reducedMotion);
     try {
-      engine.current = createUniverse(el, universe, { reducedMotion, onHover: setHover, onSelect: setSelected });
+      engine.current = createUniverse(el, universe, { motion: pref.current.motion === "fade" ? "fade" : "fly", onHover: setHover, onSelect: setSelected });
     } catch (e) {
       setFailed(e instanceof Error ? e.message : "The 3D dashboard couldn't start.");
     }
@@ -80,8 +85,11 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
     setLegendOn(null);
     setSelected(null);
     engine.current.highlightGroup(null);
-    writePref({ dim, shape });
   }, [dim, shape, failed]);
+
+  useEffect(() => {
+    writePref({ dim, motion });
+  }, [dim, motion]);
 
   const toggleLegend = (i: number) => {
     const next = legendOn === i ? null : i;
@@ -260,6 +268,18 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
           {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}Drag to orbit · Scroll or pinch to zoom · Click a record for its properties
         </p>
         <div className="pointer-events-auto flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const next: Motion = motion === "fly" ? "fade" : "fly";
+              setMotion(next);
+              engine.current?.setMotion(next);
+            }}
+            title="How records move between views"
+            className="min-h-9 rounded-full border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
+          >
+            Transitions: {motion === "fly" ? "Fly" : "Fade"}
+          </button>
           <button
             type="button"
             onClick={() => {
