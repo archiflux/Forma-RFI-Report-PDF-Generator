@@ -1,14 +1,28 @@
+import { sanitiseLayout, type DashKind, type DashLayout } from "@/lib/layout/layout";
+
 // Saved project sets, per Autodesk user. Stored in localStorage under a key
 // that includes the user's Autodesk id so two people sharing a browser don't
 // see each other's sets. Sets hold project ids and names only — no issue
-// data — so persisting them across sessions is safe.
+// data — so persisting them across sessions is safe. Each set also keeps
+// each dashboard's layout (hidden panels, register columns and sort).
 
 export interface ProjectSet {
   id: string;
   name: string;
   hubId: string;
   projects: Array<{ id: string; name: string }>;
+  layouts?: Partial<Record<DashKind, DashLayout>>;
   updatedAt: string;
+}
+
+function cleanLayouts(v: unknown): ProjectSet["layouts"] {
+  if (!v || typeof v !== "object") return undefined;
+  const out: Partial<Record<DashKind, DashLayout>> = {};
+  for (const [k, l] of Object.entries(v as Record<string, unknown>)) {
+    const clean = sanitiseLayout(l);
+    if (clean) out[k as DashKind] = clean;
+  }
+  return out;
 }
 
 const PREFIX = "forma-dash:project-sets:";
@@ -41,7 +55,14 @@ export function loadSets(userId: string, store: Storage | null = storage()): Pro
   try {
     const raw = store.getItem(storageKey(userId));
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter(isSet) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter(isSet).map((x) => {
+          const layouts = cleanLayouts(x.layouts);
+          const { layouts: _drop, ...rest } = x;
+          void _drop;
+          return layouts ? { ...rest, layouts } : rest;
+        })
+      : [];
   } catch {
     return [];
   }
@@ -73,8 +94,10 @@ export function saveSet(
   const existing = sets.find(
     (s) => s.hubId === input.hubId && s.name.toLowerCase() === input.name.trim().toLowerCase(),
   );
+  const layouts = { ...existing?.layouts, ...input.layouts };
   const next: ProjectSet = {
     ...input,
+    ...(Object.keys(layouts).length ? { layouts } : {}),
     name: input.name.trim(),
     id: existing?.id ?? newId(),
     updatedAt: new Date().toISOString(),
@@ -86,6 +109,22 @@ export function saveSet(
 
 export function deleteSet(userId: string, id: string, store: Storage | null = storage()): ProjectSet[] {
   const out = loadSets(userId, store).filter((s) => s.id !== id);
+  persist(userId, out, store);
+  return out;
+}
+
+// Records a dashboard's layout on a saved set (called as the user changes it
+// while that set is loaded).
+export function updateSetLayout(
+  userId: string,
+  id: string,
+  kind: DashKind,
+  layout: DashLayout,
+  store: Storage | null = storage(),
+): ProjectSet[] {
+  const out = loadSets(userId, store).map((s) =>
+    s.id === id ? { ...s, layouts: { ...s.layouts, [kind]: layout }, updatedAt: new Date().toISOString() } : s,
+  );
   persist(userId, out, store);
   return out;
 }

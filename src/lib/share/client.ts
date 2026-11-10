@@ -2,6 +2,7 @@
 
 import { withBase } from "@/lib/base-path";
 import type { SharedSnapshot, SnapshotKind, SnapshotMeta } from "./types";
+import type { DashLayout } from "@/lib/layout/layout";
 
 async function gzip(text: string): Promise<Blob> {
   const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"));
@@ -19,7 +20,7 @@ async function errorOf(res: Response): Promise<Error> {
 
 export async function publishSnapshot(
   token: string,
-  payload: { kind: SnapshotKind; title: string; redacted: boolean; expiresInDays: number; itemCount: number; data: unknown },
+  payload: { kind: SnapshotKind; title: string; redacted: boolean; expiresInDays: number; itemCount: number; data: unknown; layout?: DashLayout },
 ): Promise<SnapshotMeta> {
   const res = await fetch(withBase("/api/share"), {
     method: "POST",

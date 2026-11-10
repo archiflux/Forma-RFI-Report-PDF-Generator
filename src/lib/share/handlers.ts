@@ -3,6 +3,7 @@
 // (checked against APS /userprofile) from an allowed email domain; viewing
 // a link needs nothing but the unguessable id, and stops at expiry.
 
+import { sanitiseLayout } from "@/lib/layout/layout";
 import { randomBytes } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { APS_BASE_URL } from "@/lib/aps/config";
@@ -70,7 +71,7 @@ export async function publish(req: Request, store: SnapshotStore, env: ShareEnv,
   if (who instanceof Response) return who;
   const gz = new Uint8Array(await req.arrayBuffer());
   if (gz.byteLength > MAX_SNAPSHOT_BYTES) return json(413, { error: "Snapshot too large. Select fewer projects or filter it down." });
-  let body: { kind?: string; title?: string; redacted?: boolean; expiresInDays?: number; itemCount?: number; data?: unknown };
+  let body: { kind?: string; title?: string; redacted?: boolean; expiresInDays?: number; itemCount?: number; data?: unknown; layout?: unknown };
   try {
     body = JSON.parse(gunzipSync(gz, { maxOutputLength: MAX_UNZIPPED }).toString("utf8"));
   } catch {
@@ -90,7 +91,8 @@ export async function publish(req: Request, store: SnapshotStore, env: ShareEnv,
     redacted: body.redacted !== false,
     itemCount: Number(body.itemCount) || 0,
   };
-  const snap: SharedSnapshot = { version: 2, ...meta, data: body.data };
+  const layout = sanitiseLayout(body.layout);
+  const snap: SharedSnapshot = { version: 2, ...meta, data: body.data, ...(layout ? { layout } : {}) };
   await store.putSnapshot(meta.id, gzipSync(JSON.stringify(snap)));
   await store.putMeta(who.userId, meta);
   return json(201, meta);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ export function GenericPage<T extends BaseRecord>({
   intro: string;
   enrich?: { label: string; note: string };
 }) {
-  const sel = useProjectSelection();
+  const { layout, setLayout, sel } = useDashLayout(cfg.kind, useProjectSelection());
   const { hubId, chosen } = sel;
   const [full, setFull] = useState(false);
   const [progress, setProgress] = useState<Record<string, { done: number; total: number }>>({});
@@ -95,9 +96,10 @@ export function GenericPage<T extends BaseRecord>({
           </p>
         ) : (
           <>
-            <GenericView cfg={cfg} dataset={dataset} now={now} locations={locations} />
+            <GenericView cfg={cfg} dataset={dataset} now={now} locations={locations} layout={layout} onLayoutChange={setLayout} />
             <SharePanel
               kind={cfg.kind}
+              layout={layout}
               itemCount={dataset.items.length}
               defaultTitle={cfg.title}
               redactionNote={cfg.redactionNote}

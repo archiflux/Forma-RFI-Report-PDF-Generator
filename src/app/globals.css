@@ -133,3 +133,9 @@ h4 {
   color: rgba(214, 228, 245, 0.75);
   font-variant-numeric: tabular-nums;
 }
+
+/* A grid cell whose panel is hidden on a shared link renders nothing;
+   don't leave an empty gap for it. */
+.grid > div:empty {
+  display: none;
+}

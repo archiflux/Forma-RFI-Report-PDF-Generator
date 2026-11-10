@@ -10,16 +10,19 @@ export interface ReportKpi {
   alert?: boolean;
 }
 
+// `id` matches the on-screen panel, so hiding a panel drops its section.
 export type ReportSection =
-  | { kind: "bars"; title: string; data: Count[] }
+  | { kind: "bars"; id?: string; title: string; data: Count[] }
   | {
       kind: "trend";
+      id?: string;
       title: string;
       series: Array<{ key: string; label: string; colour: string }>;
       data: Array<{ month: string } & Record<string, number | string>>;
     }
   | {
       kind: "table";
+      id?: string;
       title: string;
       columns: string[];
       // Relative column widths (flex weights); equal when omitted.

@@ -1,7 +1,10 @@
 import { formUrl } from "@/lib/aps/links";
-import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
+import { describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
+import { EMPTY_LAYOUT, type DashLayout } from "@/lib/layout/layout";
+import { registerSection } from "@/lib/layout/register";
+import { formColumns, FORM_DEFAULT_SORT } from "./register";
 import { formBreakdowns, formKpis, type FormFilters } from "./aggregate";
-import { formStatusLabel, isFormOpen, isFormOverdue } from "./normalise";
+import { formStatusLabel, isFormOpen } from "./normalise";
 import type { FormRecord } from "./types";
 import { describeCustom } from "@/lib/custom/filter";
 import { topOverdue } from "@/lib/charts/series";
@@ -19,13 +22,14 @@ export function buildFormsReport(input: {
   // Register row cap; the PDF uses the default, CSV passes Infinity.
   maxRegisterRows?: number;
   title?: string;
+  // Register columns and sort chosen on screen.
+  layout?: DashLayout;
 }): DashboardReport {
   const { forms, filters: f, now } = input;
   const k = formKpis(forms, now);
   const b = formBreakdowns(forms, now);
   const late = topOverdue(forms, isFormOpen, (x) => x.dueDate, now);
   const projectCount = new Set(forms.map((x) => x.projectId)).size;
-  const register = capRows([...forms].sort((a, c) => (c.formDate ?? "").localeCompare(a.formDate ?? "")), input.maxRegisterRows);
   return {
     title: input.title ?? "Forms dashboard",
     subtitle: `${forms.length} forms across ${projectCount} project${projectCount === 1 ? "" : "s"}`,
@@ -48,14 +52,15 @@ export function buildFormsReport(input: {
       { label: "Templates in use", value: String(k.templates) },
     ],
     sections: [
-      { kind: "trend", title: "Forms per month", series: [{ key: "count", label: "Forms", colour: PDF_SERIES[0] }], data: b.trend.map((p) => ({ ...p })) },
-      { kind: "bars", title: "Forms by template", data: b.byTemplate },
-      { kind: "bars", title: "Forms by status", data: b.byStatus },
-      { kind: "bars", title: "Overdue forms by template", data: b.overdueByTemplate },
-      { kind: "bars", title: "Forms by project", data: b.byProject },
-      { kind: "bars", title: "Forms by creator", data: b.byCreator },
+      { kind: "trend", id: "trend", title: "Forms per month", series: [{ key: "count", label: "Forms", colour: PDF_SERIES[0] }], data: b.trend.map((p) => ({ ...p })) },
+      { kind: "bars", id: "template", title: "Forms by template", data: b.byTemplate },
+      { kind: "bars", id: "status", title: "Forms by status", data: b.byStatus },
+      { kind: "bars", id: "overdue-template", title: "Overdue forms by template", data: b.overdueByTemplate },
+      { kind: "bars", id: "projects", title: "Forms by project", data: b.byProject },
+      { kind: "bars", id: "creator", title: "Forms by creator", data: b.byCreator },
       {
         kind: "table" as const,
+        id: "overdue",
         title: "Top 10 most overdue open forms",
         columns: ["Name", "Project", "#", "Created by", "Due", "Days overdue"],
         widths: [3, 2, 0.6, 1.6, 1, 0.9],
@@ -64,25 +69,14 @@ export function buildFormsReport(input: {
       },
       ...(input.includeRegister
         ? [
-            {
-              kind: "table" as const,
+            registerSection({
               title: `Form register (${forms.length})`,
-              columns: ["Name", "Project", "#", "Template", "Status", "Created by", "Form date", "Due"],
-              widths: [3, 2, 0.5, 1.6, 1, 1.4, 1, 1.3],
-              rows: register.rows.map((x) => [
-                x.name || "(untitled)",
-                x.projectName,
-                x.formNum,
-                x.templateName,
-                formStatusLabel(x.status),
-                x.createdBy ?? "",
-                day(x.formDate),
-                `${day(x.dueDate)}${isFormOverdue(x, now) ? " (overdue)" : ""}`,
-              ]),
-              links: register.rows.map((x) => formUrl(x.projectId, x.templateId, x.id)),
-              totalRows: register.totalRows,
-              isRegister: true,
-            },
+              all: formColumns(forms, now),
+              items: forms,
+              layout: input.layout ?? EMPTY_LAYOUT,
+              defaultSort: FORM_DEFAULT_SORT,
+              ...(input.maxRegisterRows !== undefined ? { maxRows: input.maxRegisterRows } : {}),
+            }),
           ]
         : []),
     ],

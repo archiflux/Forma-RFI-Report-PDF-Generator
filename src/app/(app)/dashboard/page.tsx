@@ -1,5 +1,6 @@
 "use client";
 
+import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import Link from "next/link";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
@@ -12,7 +13,7 @@ import { makeSnapshot } from "@/lib/dashboard/snapshot";
 import { ProjectNotices } from "@/components/dashboard/project-notices";
 
 function Dashboard() {
-  const sel = useProjectSelection();
+  const { layout, setLayout, sel } = useDashLayout("issues", useProjectSelection());
   const { hubId, chosen } = sel;
   const { dataset, loading, total } = useDashboardData(hubId, chosen);
   const locations = useProjectLocations(chosen);
@@ -49,9 +50,10 @@ function Dashboard() {
           </p>
         ) : (
           <>
-            <DashboardView dataset={dataset} now={now} locations={locations} />
+            <DashboardView dataset={dataset} now={now} locations={locations} layout={layout} onLayoutChange={setLayout} />
             <SharePanel
               kind="issues"
+              layout={layout}
               itemCount={dataset.issues.length}
               defaultTitle="Issues dashboard"
               redactionNote="replace people's names with Person 1, Person 2 and leave out descriptions and custom fields."

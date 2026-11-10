@@ -1,3 +1,5 @@
+import type { DashLayout } from "@/lib/layout/layout";
+
 // Shared (hosted) snapshot. The body is gzipped JSON of a SharedSnapshot;
 // the meta record is what the owner sees in "My shared links".
 
@@ -17,6 +19,8 @@ export interface SharedSnapshot extends SnapshotMeta {
   version: 2;
   // Dataset for the dashboard named by `kind`; validated by the viewer.
   data: unknown;
+  // Hidden panels and register columns/sort chosen by the person sharing.
+  layout?: DashLayout;
 }
 
 export const EXPIRY_DAYS = [7, 30, 90] as const;

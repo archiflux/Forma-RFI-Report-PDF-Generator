@@ -1,4 +1,7 @@
-import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
+import { describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
+import { EMPTY_LAYOUT, type DashLayout } from "@/lib/layout/layout";
+import { registerSection } from "@/lib/layout/register";
+import { genericColumns, genericDefaultSort } from "./register";
 import type { BaseRecord, GenericConfig, GenericFilters } from "./types";
 import { describeCustom, matchesCustom } from "@/lib/custom/filter";
 import { inDateRange } from "@/lib/dashboard/date-range";
@@ -41,13 +44,6 @@ export function applyGenericFilters<T extends BaseRecord>(items: T[], cfg: Gener
   });
 }
 
-export function sortRows<T extends BaseRecord>(items: T[], cfg: GenericConfig<T>, column: number, dir: 1 | -1, now: Date): T[] {
-  const col = cfg.columns[column] ?? cfg.columns[0];
-  if (!col) return items;
-  const key = col.sortValue ?? ((t: T) => col.value(t, now));
-  return [...items].sort((a, b) => String(key(a) ?? "").localeCompare(String(key(b) ?? "")) * dir);
-}
-
 // Alias helper for redaction: the same name always maps to the same alias.
 export function aliaser(): (name: string) => string {
   const m = new Map<string, string>();
@@ -67,10 +63,11 @@ export function buildGenericReport<T extends BaseRecord>(input: {
   // Register row cap; the PDF uses the default, CSV passes Infinity.
   maxRegisterRows?: number;
   title?: string;
+  // Register columns and sort chosen on screen.
+  layout?: DashLayout;
 }): DashboardReport {
   const { cfg, items, filters: f, now } = input;
   const projectCount = new Set(items.map((t) => t.projectId)).size;
-  const register = capRows(sortRows(items, cfg, cfg.defaultSort.column, cfg.defaultSort.dir, now), input.maxRegisterRows);
   return {
     title: input.title ?? cfg.title,
     subtitle: `${items.length} ${cfg.noun} across ${projectCount} project${projectCount === 1 ? "" : "s"}`,
@@ -87,15 +84,17 @@ export function buildGenericReport<T extends BaseRecord>(input: {
     sections: [
       {
         kind: "trend",
+        id: "trend",
         title: cfg.trend.title,
         series: cfg.trend.series.map((s, i) => ({ key: s.key, label: s.label, colour: s.pdfColour || (PDF_SERIES[i] ?? "#2a78d6") })),
         data: cfg.trend.build(items),
       },
-      ...(cfg.donut ? [{ kind: "bars" as const, title: cfg.donut.title, data: cfg.donut.build(items) }] : []),
-      ...(cfg.treemap ? [{ kind: "bars" as const, title: cfg.treemap.title, data: cfg.treemap.build(items) }] : []),
-      ...cfg.breakdowns.map((b) => ({ kind: "bars" as const, title: b.title, data: b.build(items, now) })),
+      ...(cfg.donut ? [{ kind: "bars" as const, id: "donut", title: cfg.donut.title, data: cfg.donut.build(items) }] : []),
+      ...(cfg.treemap ? [{ kind: "bars" as const, id: "treemap", title: cfg.treemap.title, data: cfg.treemap.build(items) }] : []),
+      ...cfg.breakdowns.map((b) => ({ kind: "bars" as const, id: `b:${b.title}`, title: b.title, data: b.build(items, now) })),
       {
         kind: "table" as const,
+        id: "projects",
         title: "Open and closed by project",
         columns: ["Project", "Open", "Overdue", "Closed", "Total"],
         widths: [4, 1, 1, 1, 1],
@@ -108,6 +107,7 @@ export function buildGenericReport<T extends BaseRecord>(input: {
             return [
               {
                 kind: "table" as const,
+                id: "overdue",
                 title: o.title,
                 columns: ["Title", "Project", "#", o.ownerLabel, "Due", "Days overdue"],
                 widths: [3, 2, 0.6, 1.6, 1, 0.9],
@@ -119,16 +119,14 @@ export function buildGenericReport<T extends BaseRecord>(input: {
         : []),
       ...(input.includeRegister
         ? [
-            {
-              kind: "table" as const,
+            registerSection({
               title: `Register (${items.length})`,
-              columns: cfg.columns.map((c) => c.label),
-              widths: cfg.columns.map((c) => c.width ?? 1),
-              rows: register.rows.map((t) => cfg.columns.map((c) => c.value(t, now))),
-              links: register.rows.map((t) => cfg.linkOf(t)),
-              totalRows: register.totalRows,
-              isRegister: true,
-            },
+              all: genericColumns(cfg, items, now),
+              items,
+              layout: input.layout ?? EMPTY_LAYOUT,
+              defaultSort: genericDefaultSort(cfg),
+              ...(input.maxRegisterRows !== undefined ? { maxRows: input.maxRegisterRows } : {}),
+            }),
           ]
         : []),
     ],
