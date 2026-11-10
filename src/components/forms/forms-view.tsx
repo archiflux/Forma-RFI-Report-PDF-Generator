@@ -17,7 +17,11 @@ import { TrendChart } from "@/components/dashboard/trend-chart";
 import type { ProjectLocation } from "@/lib/aps/project-location";
 import { globePoints } from "@/lib/dashboard/globe";
 import { ProjectGlobe } from "@/components/dashboard/project-globe";
-import { FormsTable } from "./forms-table";
+import { RegisterTable } from "@/components/dashboard/register-table";
+import { Hideable } from "@/components/dashboard/panel";
+import { PanelLayoutContext, useViewLayout } from "@/components/dashboard/layout-context";
+import { formColumns, FORM_DEFAULT_SORT } from "@/lib/forms/register";
+import { applyLayoutToReport, type DashLayout } from "@/lib/layout/layout";
 import { isFormOpen } from "@/lib/forms/normalise";
 import { Treemap } from "@/components/charts/treemap";
 import { Donut } from "@/components/charts/donut";
@@ -51,11 +55,16 @@ export function FormsView({
   dataset,
   now,
   locations,
+  layout: layoutIn,
+  onLayoutChange,
 }: {
   dataset: FormsDataset;
   now: Date;
   locations?: Record<string, ProjectLocation | null>;
+  layout?: DashLayout;
+  onLayoutChange?: (l: DashLayout) => void;
 }) {
+  const { layout, setLayout, panels } = useViewLayout(layoutIn, onLayoutChange);
   const [f, setF] = useState<FormFilters>(EMPTY_FORM_FILTERS);
   const all = dataset.forms;
   const forms = useMemo(() => applyFormFilters(all, f), [all, f]);
@@ -82,108 +91,126 @@ export function FormsView({
   const k = useMemo(() => formKpis(forms, now), [forms, now]);
   const { byCreator, overdueByTemplate, trend } = useMemo(() => formBreakdowns(forms, now), [forms, now]);
 
+  const columns = useMemo(() => formColumns(all, now), [all, now]);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <MultiSelect label="Project" options={dataset.projects.filter((p) => p.formCount).map((p) => ({ value: p.id, label: p.name }))} value={f.projectIds} onChange={(v) => set({ projectIds: v })} />
-        <MultiSelect label="Template" options={opts(all.map((x) => x.templateName))} value={f.templates} onChange={(v) => set({ templates: v })} />
-        <MultiSelect label="Status" options={opts(all.map((x) => x.status), formStatusLabel)} value={f.statuses} onChange={(v) => set({ statuses: v })} />
-        <MultiSelect label="Created by" options={opts(all.map((x) => x.createdBy ?? "Unknown"))} value={f.creators} onChange={(v) => set({ creators: v })} />
-        <DateRangeFilter label="Form date" from={f.from} to={f.to} onChange={(r) => set({ from: r.from, to: r.to })} />
-        <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => set({ custom: v })} />
-        <input
-          type="search"
-          placeholder="Search number, name, template"
-          value={f.search}
-          onChange={(e) => set({ search: e.target.value })}
-          className="min-h-9 w-56 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 text-xs"
-        />
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Open3DButton build={() => formsUniverse(forms, now, locations)} />
-          <PdfButton
-            build={(includeRegister, maxRegisterRows) =>
-              buildFormsReport({
-                forms,
-                filters: f,
-                projectNames: Object.fromEntries(dataset.projects.map((p) => [p.id, p.name])),
-                now,
-                includeRegister,
-                maxRegisterRows,
-              })
-            }
+    <PanelLayoutContext.Provider value={panels}>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <MultiSelect label="Project" options={dataset.projects.filter((p) => p.formCount).map((p) => ({ value: p.id, label: p.name }))} value={f.projectIds} onChange={(v) => set({ projectIds: v })} />
+          <MultiSelect label="Template" options={opts(all.map((x) => x.templateName))} value={f.templates} onChange={(v) => set({ templates: v })} />
+          <MultiSelect label="Status" options={opts(all.map((x) => x.status), formStatusLabel)} value={f.statuses} onChange={(v) => set({ statuses: v })} />
+          <MultiSelect label="Created by" options={opts(all.map((x) => x.createdBy ?? "Unknown"))} value={f.creators} onChange={(v) => set({ creators: v })} />
+          <DateRangeFilter label="Form date" from={f.from} to={f.to} onChange={(r) => set({ from: r.from, to: r.to })} />
+          <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => set({ custom: v })} />
+          <input
+            type="search"
+            placeholder="Search number, name, template"
+            value={f.search}
+            onChange={(e) => set({ search: e.target.value })}
+            className="min-h-9 w-56 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 text-xs"
           />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Open3DButton build={() => formsUniverse(forms, now, locations)} />
+            <PdfButton
+              build={(includeRegister, maxRegisterRows) =>
+                applyLayoutToReport(
+                  buildFormsReport({
+                    forms,
+                    filters: f,
+                    projectNames: Object.fromEntries(dataset.projects.map((p) => [p.id, p.name])),
+                    now,
+                    includeRegister,
+                    maxRegisterRows,
+                    layout,
+                  }),
+                  layout,
+                )
+              }
+            />
+          </div>
+          {forms.length !== all.length ? (
+            <button type="button" className="text-xs text-[color:var(--brand-secondary)] underline" onClick={() => setF(EMPTY_FORM_FILTERS)}>
+              Reset filters ({forms.length} of {all.length})
+            </button>
+          ) : null}
         </div>
-        {forms.length !== all.length ? (
-          <button type="button" className="text-xs text-[color:var(--brand-secondary)] underline" onClick={() => setF(EMPTY_FORM_FILTERS)}>
-            Reset filters ({forms.length} of {all.length})
-          </button>
-        ) : null}
-      </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Tile label="Forms" value={k.total} />
-        <Tile label="Open" value={k.open} />
-        <Tile label="Overdue" value={k.overdue} alert={k.overdue > 0} />
-        <Tile label="Due in 7 days" value={k.dueSoon} />
-        <Tile label="Templates in use" value={k.templates} />
-      </div>
+        <Hideable id="kpis" title="Key figures">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <Tile label="Forms" value={k.total} />
+            <Tile label="Open" value={k.open} />
+            <Tile label="Overdue" value={k.overdue} alert={k.overdue > 0} />
+            <Tile label="Due in 7 days" value={k.dueSoon} />
+            <Tile label="Templates in use" value={k.templates} />
+          </div>
+        </Hideable>
 
-      {locations ? (
-        <Panel title="Projects on the map">
-          <ProjectGlobe
-            noun="forms"
-            {...globePoints(forms, dataset.projects, locations, isFormOpen)}
-            selected={f.projectIds}
-            onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })}
-          />
-        </Panel>
-      ) : null}
-
-      <Panel title="Forms by template (click to filter)">
-        <Treemap data={tree} selected={f.templates} onSelect={(v) => set({ templates: toggle(f.templates, v) })} />
-      </Panel>
-
-      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-        <Panel title="Forms by status">
-          <Donut data={donut} centreLabel="forms" />
-        </Panel>
-        <Panel title="Open and closed by project (click a project to filter)">
-          <OpenClosedBars rows={projectRows} selected={f.projectIds} onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })} />
-        </Panel>
-        <Panel title="Forms over time by status (form date)">
-          <StackedArea rows={statusMonths.rows} categories={statusMonths.categories} />
-        </Panel>
-        <Panel title="Forms per month (by form date)">
-          <TrendChart data={trend} series={[{ key: "count", label: "Forms", colour: "var(--series-1)" }]} ariaLabel="Forms per month" />
-        </Panel>
-        <div className="lg:col-span-2">
-          <Panel title="Top 10 most overdue open forms">
-            <OverdueTable
-              ownerLabel="Created by"
-              rows={overdue.map(({ item, due, daysOverdue }) => ({
-                key: item.key,
-                title: item.name,
-                href: formUrl(item.projectId, item.templateId, item.id),
-                project: item.projectName,
-                number: item.formNum,
-                ...(item.createdBy ? { owner: item.createdBy } : {}),
-                due,
-                daysOverdue,
-              }))}
+        {locations ? (
+          <Panel id="map" title="Projects on the map">
+            <ProjectGlobe
+              noun="forms"
+              {...globePoints(forms, dataset.projects, locations, isFormOpen)}
+              selected={f.projectIds}
+              onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })}
             />
           </Panel>
-        </div>
-        <Panel title="Overdue forms by template">
-          <BarList data={overdueByTemplate} />
+        ) : null}
+
+        <Panel id="template" title="Forms by template (click to filter)">
+          <Treemap data={tree} selected={f.templates} onSelect={(v) => set({ templates: toggle(f.templates, v) })} />
         </Panel>
-        <Panel title="Forms by creator">
-          <BarList data={byCreator} />
+
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+          <Panel id="status" title="Forms by status">
+            <Donut data={donut} centreLabel="forms" />
+          </Panel>
+          <Panel id="projects" title="Open and closed by project (click a project to filter)">
+            <OpenClosedBars rows={projectRows} selected={f.projectIds} onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })} />
+          </Panel>
+          <Panel id="status-month" title="Forms over time by status (form date)">
+            <StackedArea rows={statusMonths.rows} categories={statusMonths.categories} />
+          </Panel>
+          <Panel id="trend" title="Forms per month (by form date)">
+            <TrendChart data={trend} series={[{ key: "count", label: "Forms", colour: "var(--series-1)" }]} ariaLabel="Forms per month" />
+          </Panel>
+          <div className="lg:col-span-2">
+            <Panel id="overdue" title="Top 10 most overdue open forms">
+              <OverdueTable
+                ownerLabel="Created by"
+                rows={overdue.map(({ item, due, daysOverdue }) => ({
+                  key: item.key,
+                  title: item.name,
+                  href: formUrl(item.projectId, item.templateId, item.id),
+                  project: item.projectName,
+                  number: item.formNum,
+                  ...(item.createdBy ? { owner: item.createdBy } : {}),
+                  due,
+                  daysOverdue,
+                }))}
+              />
+            </Panel>
+          </div>
+          <Panel id="overdue-template" title="Overdue forms by template">
+            <BarList data={overdueByTemplate} />
+          </Panel>
+          <Panel id="creator" title="Forms by creator">
+            <BarList data={byCreator} />
+          </Panel>
+        </div>
+
+        <Panel id="register" title={`Form register (${forms.length})`}>
+          <RegisterTable
+            columns={columns}
+            items={forms}
+            rowKey={(x) => x.key}
+            noun="forms"
+            layout={layout}
+            onLayoutChange={setLayout}
+            defaultSort={FORM_DEFAULT_SORT}
+          />
         </Panel>
       </div>
-
-      <Panel title={`Form register (${forms.length})`}>
-        <FormsTable forms={forms} now={now} />
-      </Panel>
-    </div>
+    </PanelLayoutContext.Provider>
   );
 }

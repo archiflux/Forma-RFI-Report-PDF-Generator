@@ -1,5 +1,6 @@
 "use client";
 
+import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import Link from "next/link";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
@@ -11,7 +12,7 @@ import { SharePanel } from "@/components/dashboard/share-panel";
 import { redactForms } from "@/lib/forms/snapshot";
 
 function FormsDashboard() {
-  const sel = useProjectSelection();
+  const { layout, setLayout, sel } = useDashLayout("forms", useProjectSelection());
   const { hubId, chosen } = sel;
   const { dataset, loading, total } = useFormsData(chosen);
   const locations = useProjectLocations(chosen);
@@ -57,9 +58,10 @@ function FormsDashboard() {
           </p>
         ) : (
           <>
-            <FormsView dataset={dataset} now={now} locations={locations} />
+            <FormsView dataset={dataset} now={now} locations={locations} layout={layout} onLayoutChange={setLayout} />
             <SharePanel
               kind="forms"
+              layout={layout}
               itemCount={dataset.forms.length}
               defaultTitle="Forms dashboard"
               redactionNote="replace people's names with Person 1, Person 2."

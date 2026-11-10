@@ -9,6 +9,7 @@ import { DEMO_LOCATIONS, demoDataset } from "@/lib/dashboard/demo";
 import { parseSnapshot } from "@/lib/dashboard/snapshot";
 import { parseFormsDataset } from "@/lib/forms/snapshot";
 import { loadShared } from "@/lib/share/client";
+import { EMPTY_LAYOUT, type DashLayout } from "@/lib/layout/layout";
 import { withBase } from "@/lib/base-path";
 import type { DashboardDataset } from "@/lib/dashboard/types";
 import type { FormsDataset } from "@/lib/forms/types";
@@ -20,12 +21,15 @@ import type { ReviewRecord } from "@/lib/reviews/normalise";
 import { rfisConfig, type RfiRecord } from "@/lib/rfis-dash/config";
 import { submittalsConfig, type SubmittalRecord } from "@/lib/submittals/config";
 
-type Loaded =
+// `layout` comes with a hosted link: the sharer's hidden panels and
+// register columns and sort.
+type Loaded = { layout?: DashLayout } & (
   | { kind: "issues"; title: string; takenAt: string; expiresAt?: string; data: DashboardDataset }
   | { kind: "forms"; title: string; takenAt: string; expiresAt?: string; data: FormsDataset }
   | { kind: "reviews"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<ReviewRecord> }
   | { kind: "rfis"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<RfiRecord> }
-  | { kind: "submittals"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<SubmittalRecord> };
+  | { kind: "submittals"; title: string; takenAt: string; expiresAt?: string; data: GenericDataset<SubmittalRecord> }
+);
 
 // Public viewer. No Autodesk sign-in: data comes from a hosted link
 // (?s=<id>), a snapshot file the viewer opens, or the built-in demo.
@@ -34,13 +38,14 @@ function Viewer() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(sharedId));
+  const [demoLayout, setDemoLayout] = useState<DashLayout>(EMPTY_LAYOUT);
   const now = useMemo(() => (loaded ? new Date(loaded.takenAt) : new Date()), [loaded]);
 
   useEffect(() => {
     if (!sharedId) return;
     loadShared(sharedId)
       .then((snap) => {
-        const base = { title: snap.title, takenAt: snap.createdAt, expiresAt: snap.expiresAt };
+        const base = { title: snap.title, takenAt: snap.createdAt, expiresAt: snap.expiresAt, ...(snap.layout ? { layout: snap.layout } : {}) };
         if (snap.kind === "issues") setLoaded({ kind: "issues", ...base, data: parseSnapshot(snap.data) });
         else if (snap.kind === "forms") setLoaded({ kind: "forms", ...base, data: parseFormsDataset(snap.data) });
         else if (snap.kind === "reviews") setLoaded({ kind: "reviews", ...base, data: parseGenericDataset<ReviewRecord>(snap.data) });
@@ -83,15 +88,20 @@ function Viewer() {
       </header>
       <main className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-10">
         {loaded?.kind === "issues" ? (
-          <DashboardView dataset={loaded.data} now={now} {...(loaded.data.hubId === "demo" ? { locations: DEMO_LOCATIONS } : {})} />
+          loaded.data.hubId === "demo" ? (
+            // The demo can be rearranged, to try hiding panels and register columns.
+            <DashboardView dataset={loaded.data} now={now} locations={DEMO_LOCATIONS} layout={demoLayout} onLayoutChange={setDemoLayout} />
+          ) : (
+            <DashboardView dataset={loaded.data} now={now} {...(loaded.layout ? { layout: loaded.layout } : {})} />
+          )
         ) : loaded?.kind === "forms" ? (
-          <FormsView dataset={loaded.data} now={now} />
+          <FormsView dataset={loaded.data} now={now} {...(loaded.layout ? { layout: loaded.layout } : {})} />
         ) : loaded?.kind === "reviews" ? (
-          <GenericView cfg={reviewsConfig} dataset={loaded.data} now={now} title={loaded.title} />
+          <GenericView cfg={reviewsConfig} dataset={loaded.data} now={now} title={loaded.title} {...(loaded.layout ? { layout: loaded.layout } : {})} />
         ) : loaded?.kind === "rfis" ? (
-          <GenericView cfg={rfisConfig} dataset={loaded.data} now={now} title={loaded.title} />
+          <GenericView cfg={rfisConfig} dataset={loaded.data} now={now} title={loaded.title} {...(loaded.layout ? { layout: loaded.layout } : {})} />
         ) : loaded?.kind === "submittals" ? (
-          <GenericView cfg={submittalsConfig} dataset={loaded.data} now={now} title={loaded.title} />
+          <GenericView cfg={submittalsConfig} dataset={loaded.data} now={now} title={loaded.title} {...(loaded.layout ? { layout: loaded.layout } : {})} />
         ) : loading ? (
           <p className="text-sm text-[color:var(--brand-muted)]">Loading shared dashboard…</p>
         ) : (

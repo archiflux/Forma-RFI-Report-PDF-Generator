@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/store";
 import { deleteShare, listMyShares, publishSnapshot, shareUrl } from "@/lib/share/client";
 import { EXPIRY_DAYS, type SnapshotKind, type SnapshotMeta } from "@/lib/share/types";
+import type { DashLayout } from "@/lib/layout/layout";
 
 // Publishes the current dashboard data as a hosted snapshot anyone with the
 // link can open (no sign-in) until it expires, and lists the user's links.
@@ -14,12 +15,15 @@ export function SharePanel({
   defaultTitle,
   buildData,
   redactionNote,
+  layout,
 }: {
   kind: SnapshotKind;
   itemCount: number;
   defaultTitle: string;
   buildData: (redacted: boolean) => unknown;
   redactionNote: string;
+  // The dashboard layout; the link shows the same panels and register.
+  layout?: DashLayout;
 }) {
   const ensureFreshToken = useAuth((s) => s.ensureFreshToken);
   const [title, setTitle] = useState("");
@@ -96,6 +100,7 @@ export function SharePanel({
                 expiresInDays: days,
                 itemCount,
                 data: buildData(redacted),
+                ...(layout ? { layout } : {}),
               });
               await copy(meta.id);
               await refresh();

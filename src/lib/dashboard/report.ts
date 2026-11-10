@@ -1,11 +1,13 @@
 import { issueUrl } from "@/lib/aps/links";
-import { capRows, describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
+import { describeFilters, PDF_SERIES, type DashboardReport } from "@/lib/report/dashboard/model";
+import { EMPTY_LAYOUT, type DashLayout } from "@/lib/layout/layout";
+import { registerSection } from "@/lib/layout/register";
+import { issueColumns, ISSUE_DEFAULT_SORT } from "./register";
 import {
   ageing,
   BUCKET_LABEL,
   countBy,
   isOutstanding,
-  isOverdue,
   kpis,
   monthlyTrend,
   statusByProject,
@@ -30,15 +32,13 @@ export function buildIssuesReport(input: {
   // Register row cap; the PDF uses the default, CSV passes Infinity.
   maxRegisterRows?: number;
   title?: string;
+  // Register columns and sort chosen on screen.
+  layout?: DashLayout;
 }): DashboardReport {
   const { issues, filters: f, now } = input;
   const k = kpis(issues, now);
   const late = topOverdue(issues, isOutstanding, (i) => i.dueDate, now);
   const projects = statusByProject(issues, now);
-  const register = capRows(
-    [...issues].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    input.maxRegisterRows,
-  );
   return {
     title: input.title ?? "Issues dashboard",
     subtitle: `${issues.length} issues across ${input.projectCount} project${input.projectCount === 1 ? "" : "s"}`,
@@ -64,6 +64,7 @@ export function buildIssuesReport(input: {
     sections: [
       {
         kind: "trend",
+        id: "trend",
         title: "Created vs closed per month",
         series: [
           { key: "created", label: "Created", colour: PDF_SERIES[0] },
@@ -71,14 +72,15 @@ export function buildIssuesReport(input: {
         ],
         data: monthlyTrend(issues).map((p) => ({ ...p })),
       },
-      { kind: "bars", title: "Age of outstanding issues", data: ageing(issues, now) },
-      { kind: "bars", title: "Issues by type", data: countBy(issues, (i) => i.typeName) },
-      { kind: "bars", title: "Issues by status", data: countBy(issues, (i) => statusLabel(i.status), 12) },
-      { kind: "bars", title: "Open workload by assignee", data: countBy(issues.filter(isOutstanding), (i) => i.assignee?.name ?? "Unassigned") },
-      { kind: "bars", title: "Issues by root cause", data: countBy(issues, (i) => i.rootCause) },
-      { kind: "bars", title: "Issues by location", data: countBy(issues, (i) => i.location ?? "Not set") },
+      { kind: "bars", id: "ages", title: "Age of outstanding issues", data: ageing(issues, now) },
+      { kind: "bars", id: "type", title: "Issues by type", data: countBy(issues, (i) => i.typeName) },
+      { kind: "bars", id: "status", title: "Issues by status", data: countBy(issues, (i) => statusLabel(i.status), 12) },
+      { kind: "bars", id: "workload", title: "Open workload by assignee", data: countBy(issues.filter(isOutstanding), (i) => i.assignee?.name ?? "Unassigned") },
+      { kind: "bars", id: "cause", title: "Issues by root cause", data: countBy(issues, (i) => i.rootCause) },
+      { kind: "bars", id: "location", title: "Issues by location", data: countBy(issues, (i) => i.location ?? "Not set") },
       {
         kind: "table",
+        id: "overdue",
         title: "Top 10 most overdue open issues",
         columns: ["Title", "Project", "#", "Assigned to", "Due", "Days overdue"],
         widths: [3, 2, 0.6, 1.6, 1, 0.9],
@@ -87,6 +89,7 @@ export function buildIssuesReport(input: {
       },
       {
         kind: "table",
+        id: "status-by-project",
         title: "Status by project",
         columns: ["Project", ...STATUS_BUCKETS.map((b) => BUCKET_LABEL[b]), "Overdue", "Total"],
         rows: projects.map((p) => [
@@ -98,25 +101,14 @@ export function buildIssuesReport(input: {
       },
       ...(input.includeRegister
         ? [
-            {
-              kind: "table" as const,
+            registerSection({
               title: `Issue register (${issues.length})`,
-              columns: ["Title", "Project", "#", "Type", "Status", "Assigned to", "Due", "Created"],
-              widths: [3.2, 2, 0.5, 1.3, 1, 1.4, 1.3, 1],
-              rows: register.rows.map((i) => [
-                i.title,
-                i.projectName,
-                i.displayId,
-                i.subtypeName,
-                statusLabel(i.status),
-                i.assignee?.name ?? "Unassigned",
-                `${day(i.dueDate)}${isOverdue(i, now) ? " (overdue)" : ""}`,
-                day(i.createdAt),
-              ]),
-              links: register.rows.map((i) => (i.projectId.startsWith("demo-") ? undefined : issueUrl(i.projectId, i.id))),
-              totalRows: register.totalRows,
-              isRegister: true,
-            },
+              all: issueColumns(issues, now),
+              items: issues,
+              layout: input.layout ?? EMPTY_LAYOUT,
+              defaultSort: ISSUE_DEFAULT_SORT,
+              ...(input.maxRegisterRows !== undefined ? { maxRows: input.maxRegisterRows } : {}),
+            }),
           ]
         : []),
     ],

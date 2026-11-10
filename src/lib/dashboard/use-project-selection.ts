@@ -7,6 +7,7 @@ import { useApsClient } from "@/lib/aps/use-client";
 import { listProjects } from "@/lib/aps/projects";
 import { getUserProfile } from "@/lib/aps/user-profile";
 import { useProjectSets } from "./use-project-sets";
+import type { ProjectSet } from "./project-sets";
 
 // Shared by every multi-project dashboard: the hub's projects, the ids
 // selected in the URL (?p=a,b,c) and the user's saved project sets.
@@ -24,7 +25,7 @@ export function useProjectSelection() {
     enabled: Boolean(hubId),
   });
   const meQ = useQuery({ queryKey: ["user-profile"], queryFn: () => getUserProfile(client), staleTime: Infinity });
-  const { sets, save, remove } = useProjectSets(meQ.data?.userId);
+  const { sets, save, remove, setLayout } = useProjectSets(meQ.data?.userId);
 
   const setSelected = useCallback(
     (ids: string[]) => {
@@ -38,6 +39,12 @@ export function useProjectSelection() {
 
   const all = useMemo(() => projectsQ.data ?? [], [projectsQ.data]);
   const chosen = useMemo(() => all.filter((p) => selected.includes(p.id)), [all, selected]);
+  // The saved set whose projects are exactly the current selection, if any.
+  const activeSet = useMemo(() => {
+    if (!selected.length) return undefined;
+    const want = [...selected].sort().join(",");
+    return sets.find((s) => s.hubId === hubId && s.projects.map((p) => p.id).sort().join(",") === want);
+  }, [sets, selected, hubId]);
 
   return {
     hubId,
@@ -48,7 +55,10 @@ export function useProjectSelection() {
     setSelected,
     sets,
     canSave: Boolean(meQ.data?.userId),
-    saveSet: (name: string) => save({ name, hubId, projects: chosen.map((p) => ({ id: p.id, name: p.name })) }),
+    activeSet,
+    saveSet: (name: string, layouts?: ProjectSet["layouts"]) =>
+      save({ name, hubId, projects: chosen.map((p) => ({ id: p.id, name: p.name })), ...(layouts ? { layouts } : {}) }),
     removeSet: remove,
+    setSetLayout: setLayout,
   };
 }

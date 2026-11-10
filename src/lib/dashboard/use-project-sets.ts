@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { deleteSet, loadSets, saveSet, type ProjectSet } from "./project-sets";
+import { deleteSet, loadSets, saveSet, updateSetLayout, type ProjectSet } from "./project-sets";
+import type { DashKind, DashLayout } from "@/lib/layout/layout";
 
 export function useProjectSets(userId: string | undefined) {
   const [sets, setSets] = useState<ProjectSet[]>([]);
@@ -20,5 +21,11 @@ export function useProjectSets(userId: string | undefined) {
     },
     [userId],
   );
-  return { sets, save, remove };
+  const setLayout = useCallback(
+    (id: string, kind: DashKind, layout: DashLayout) => {
+      if (userId) setSets(updateSetLayout(userId, id, kind, layout));
+    },
+    [userId],
+  );
+  return { sets, save, remove, setLayout };
 }
