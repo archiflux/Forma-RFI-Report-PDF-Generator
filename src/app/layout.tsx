@@ -26,9 +26,14 @@ export const metadata: Metadata = {
   title: "Bailey Partnership Siteboard",
   description:
     "Keep your projects in sight. Read-only dashboards for Issues, RFIs, Forms and Reviews across Autodesk Forma projects.",
+  // Siteboard "S" mark: favicon.ico for browser tabs, a PNG for browsers
+  // that prefer one, and a 180px icon for phone home screens.
   icons: {
-    icon: withBase("/icon-colour.png"),
-    apple: withBase("/icon-colour.png"),
+    icon: [
+      { url: withBase("/favicon.ico"), sizes: "any" },
+      { url: withBase("/siteboard-icon.png"), type: "image/png", sizes: "256x256" },
+    ],
+    apple: withBase("/apple-touch-icon.png"),
   },
 };
 
