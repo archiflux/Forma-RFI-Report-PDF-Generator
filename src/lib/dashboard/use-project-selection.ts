@@ -7,16 +7,18 @@ import { useApsClient } from "@/lib/aps/use-client";
 import { listProjects } from "@/lib/aps/projects";
 import { getUserProfile } from "@/lib/aps/user-profile";
 import { useProjectSets } from "./use-project-sets";
+import { readSelection, writeSelection } from "./selection-url";
 import type { ProjectSet } from "./project-sets";
 
 // Shared by every multi-project dashboard: the hub's projects, the ids
-// selected in the URL (?p=a,b,c) and the user's saved project sets.
+// selected in the URL (?p=a,b,c, or ?sel=key for long lists; see
+// selection-url.ts) and the user's saved project sets.
 export function useProjectSelection() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const hubId = params.get("hubId") ?? "";
-  const selected = useMemo(() => (params.get("p") ?? "").split(",").filter(Boolean), [params]);
+  const selected = useMemo(() => readSelection(params), [params]);
   const client = useApsClient();
 
   const projectsQ = useQuery({
@@ -30,8 +32,7 @@ export function useProjectSelection() {
   const setSelected = useCallback(
     (ids: string[]) => {
       const next = new URLSearchParams(params.toString());
-      if (ids.length) next.set("p", ids.join(","));
-      else next.delete("p");
+      writeSelection(next, ids);
       router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     },
     [params, pathname, router],
