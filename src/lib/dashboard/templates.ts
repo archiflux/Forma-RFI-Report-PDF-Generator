@@ -13,7 +13,7 @@ export interface DashboardTemplate {
   probeAreas: string[];
   // Kept in code but not shown in the catalogue or nav.
   hidden?: boolean;
-  href?: (hubId: string) => string;
+  href?: string;
 }
 
 export const TEMPLATES: DashboardTemplate[] = [
@@ -24,7 +24,7 @@ export const TEMPLATES: DashboardTemplate[] = [
     scope: ["Project", "Hub"],
     status: "live",
     probeAreas: ["Issues (BCF)"],
-    href: (h) => `/dashboard?hubId=${encodeURIComponent(h)}`,
+    href: "/dashboard",
   },
   {
     id: "rfi-dashboard",
@@ -33,7 +33,7 @@ export const TEMPLATES: DashboardTemplate[] = [
     scope: ["Project", "Hub"],
     status: "live",
     probeAreas: ["RFIs"],
-    href: (h) => `/rfis-dashboard?hubId=${encodeURIComponent(h)}`,
+    href: "/rfis-dashboard",
   },
   {
     id: "forms",
@@ -42,7 +42,7 @@ export const TEMPLATES: DashboardTemplate[] = [
     scope: ["Project", "Hub"],
     status: "live",
     probeAreas: ["Forms"],
-    href: (h) => `/forms-dashboard?hubId=${encodeURIComponent(h)}`,
+    href: "/forms-dashboard",
   },
   {
     id: "reviews",
@@ -51,7 +51,7 @@ export const TEMPLATES: DashboardTemplate[] = [
     scope: ["Project", "Hub"],
     status: "live",
     probeAreas: ["Reviews"],
-    href: (h) => `/reviews-dashboard?hubId=${encodeURIComponent(h)}`,
+    href: "/reviews-dashboard",
   },
   {
     id: "submittals",
@@ -62,6 +62,6 @@ export const TEMPLATES: DashboardTemplate[] = [
     scope: ["Project", "Hub"],
     status: "live",
     probeAreas: ["Submittals"],
-    href: (h) => `/submittals-dashboard?hubId=${encodeURIComponent(h)}`,
+    href: "/submittals-dashboard",
   },
 ];

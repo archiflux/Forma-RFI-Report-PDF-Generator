@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useApsClient } from "@/lib/aps/use-client";
 import { listHubs } from "@/lib/aps/hubs";
+import { useCanProbe } from "@/lib/auth/use-can-probe";
 import { loadPublicConfig } from "@/lib/aps/config";
 import type { Hub, HubKind } from "@/lib/aps/types";
 
@@ -36,19 +37,16 @@ export default function HubsPage() {
     queryFn: () => listHubs(client),
   });
 
+  const { allowed: canProbe } = useCanProbe();
   const groups = useMemo(() => (q.data ? groupByKind(q.data) : null), [q.data]);
   const noAccHubs = groups !== null && groups.acc.length === 0;
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-secondary)]">
-        Step 1 of 2
-      </p>
-      <h2 className="mt-1 text-2xl font-semibold text-[color:var(--brand-primary)]">
-        Choose a hub
-      </h2>
+      <h2 className="text-2xl font-semibold text-[color:var(--brand-primary)]">Your Forma hubs</h2>
       <p className="mt-1 text-sm text-[color:var(--brand-muted)]">
-        Pick the Forma hub (account) whose projects you want to report on.
+        The dashboards list projects from all of these together.{" "}
+        {canProbe ? "Click a hub to run the data probe on it." : <Link href="/templates" className="underline">Go to the dashboards</Link>}
       </p>
 
       {q.isLoading ? (
@@ -63,7 +61,7 @@ export default function HubsPage() {
 
           {groups
             ? KIND_ORDER.filter((k) => groups[k].length > 0).map((kind) => (
-                <HubGroup key={kind} kind={kind} hubs={groups[kind]} />
+                <HubGroup key={kind} kind={kind} hubs={groups[kind]} canProbe={canProbe} />
               ))
             : null}
 
@@ -78,7 +76,7 @@ export default function HubsPage() {
   );
 }
 
-function HubGroup({ kind, hubs }: { kind: HubKind; hubs: Hub[] }) {
+function HubGroup({ kind, hubs, canProbe }: { kind: HubKind; hubs: Hub[]; canProbe: boolean }) {
   const hint = KIND_HINT[kind];
   return (
     <div className="mt-6">
@@ -93,7 +91,7 @@ function HubGroup({ kind, hubs }: { kind: HubKind; hubs: Hub[] }) {
         {hubs.map((hub) => (
           <li key={hub.id}>
             <Link
-              href={`/templates?hubId=${encodeURIComponent(hub.id)}`}
+              href={canProbe ? `/probe?hubId=${encodeURIComponent(hub.id)}` : "/templates"}
               aria-disabled={kind === "personal"}
               className={
                 kind === "acc"

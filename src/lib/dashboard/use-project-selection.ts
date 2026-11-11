@@ -4,7 +4,9 @@ import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useApsClient } from "@/lib/aps/use-client";
-import { listProjects } from "@/lib/aps/projects";
+import { listAllProjects } from "@/lib/aps/projects";
+
+export const ALL_HUBS = "all";
 import { getUserProfile } from "@/lib/aps/user-profile";
 import { useProjectSets } from "./use-project-sets";
 import { readSelection, writeSelection } from "./selection-url";
@@ -17,14 +19,15 @@ export function useProjectSelection() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const hubId = params.get("hubId") ?? "";
+  // Projects come from every hub the user can access; saved sets and the
+  // dataset use this marker in place of a single hub id.
+  const hubId = ALL_HUBS;
   const selected = useMemo(() => readSelection(params), [params]);
   const client = useApsClient();
 
   const projectsQ = useQuery({
-    queryKey: ["projects", hubId],
-    queryFn: () => listProjects(client, hubId),
-    enabled: Boolean(hubId),
+    queryKey: ["projects", "all-hubs"],
+    queryFn: () => listAllProjects(client),
   });
   const meQ = useQuery({ queryKey: ["user-profile"], queryFn: () => getUserProfile(client), staleTime: Infinity });
   const { sets, save, remove, setLayout } = useProjectSets(meQ.data?.userId);
@@ -38,17 +41,20 @@ export function useProjectSelection() {
     [params, pathname, router],
   );
 
-  const all = useMemo(() => projectsQ.data ?? [], [projectsQ.data]);
+  const all = useMemo(() => projectsQ.data?.projects ?? [], [projectsQ.data]);
+  const multiHub = (projectsQ.data?.hubs.length ?? 0) > 1;
   const chosen = useMemo(() => all.filter((p) => selected.includes(p.id)), [all, selected]);
   // The saved set whose projects are exactly the current selection, if any.
   const activeSet = useMemo(() => {
     if (!selected.length) return undefined;
     const want = [...selected].sort().join(",");
-    return sets.find((s) => s.hubId === hubId && s.projects.map((p) => p.id).sort().join(",") === want);
-  }, [sets, selected, hubId]);
+    return sets.find((s) => s.projects.map((p) => p.id).sort().join(",") === want);
+  }, [sets, selected]);
 
   return {
     hubId,
+    multiHub,
+    failedHubs: projectsQ.data?.failedHubs ?? [],
     projectsQ,
     all,
     selected,

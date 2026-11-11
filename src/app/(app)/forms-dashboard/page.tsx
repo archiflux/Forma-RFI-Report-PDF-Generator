@@ -14,16 +14,12 @@ import { redactForms } from "@/lib/forms/snapshot";
 
 function FormsDashboard() {
   const { layout, setLayout, sel } = useDashLayout("forms", useProjectSelection());
-  const { hubId, chosen } = sel;
+  const { chosen } = sel;
   const { dataset, loading, total, retryFailed } = useFormsData(chosen);
   const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
   const failed = dataset.projects.filter((p) => p.error);
   const skipped = dataset.projects.filter((p) => p.formsUnavailable);
-
-  if (!hubId) {
-    return <p className="text-sm">Pick a hub first - <Link href="/hubs" className="underline">choose hub</Link>.</p>;
-  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -37,7 +33,7 @@ function FormsDashboard() {
               {loading ? ` Loading ${total - loading} of ${total}…` : ""}
             </p>
           </div>
-          <Link href={`/templates?hubId=${encodeURIComponent(hubId)}`} className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
+          <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
             All templates
           </Link>
         </div>
