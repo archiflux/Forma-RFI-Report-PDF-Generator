@@ -1,3 +1,4 @@
+import { createLimiter } from "@/lib/generic/limit";
 import { APS_BROWSER_BASE } from "./config";
 import { ApsError } from "./types";
 
@@ -18,6 +19,13 @@ export function isReadOnlyRequest(method: string, path: string): boolean {
 
 export interface ApsClientOptions {
   getAccessToken: () => string | null;
+  // Returns a token, refreshing it first if it's about to expire. Long loads
+  // (hundreds of projects) can outlast an access token's hour.
+  getFreshToken?: () => Promise<string | null>;
+  // Most requests in flight at once from this browser, across every client
+  // (default 8; 0 = no limit). Selecting hundreds of projects otherwise fires
+  // thousands of requests together and APS throttles most of them.
+  maxConcurrent?: number;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   // Override the sleep used by the 429 retry loop. Tests inject a synchronous
@@ -37,7 +45,11 @@ export interface ApsRequestInit {
   signal?: AbortSignal;
 }
 
-const DEFAULT_MAX_RETRIES = 5;
+const DEFAULT_MAX_RETRIES = 6;
+const DEFAULT_CONCURRENCY = 8;
+// Shared by every ApsClient in the page, so all dashboards' loads queue
+// through the same few slots.
+let sharedLimit: ReturnType<typeof createLimiter> | null = null;
 const RETRY_BASE_MS = 500;
 const RETRY_CAP_MS = 30_000;
 
@@ -95,6 +107,8 @@ export class ApsClient {
   private readonly fetchImpl: typeof fetch;
   private readonly sleepImpl: (ms: number) => Promise<void>;
   private readonly maxRetries: number;
+  private readonly getFreshToken: (() => Promise<string | null>) | undefined;
+  private readonly limit: (<T>(fn: () => Promise<T>) => Promise<T>) | undefined;
 
   constructor(opts: ApsClientOptions) {
     this.baseUrl = opts.baseUrl ?? APS_BROWSER_BASE;
@@ -107,9 +121,19 @@ export class ApsClient {
     this.sleepImpl =
       opts.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.getFreshToken = opts.getFreshToken;
+    const max = opts.maxConcurrent ?? DEFAULT_CONCURRENCY;
+    if (max > 0) {
+      if (opts.maxConcurrent === undefined) this.limit = (sharedLimit ??= createLimiter(DEFAULT_CONCURRENCY));
+      else this.limit = createLimiter(max);
+    }
   }
 
-  async request<T>(init: ApsRequestInit): Promise<T> {
+  request<T>(init: ApsRequestInit): Promise<T> {
+    return this.limit ? this.limit(() => this.send<T>(init)) : this.send<T>(init);
+  }
+
+  private async send<T>(init: ApsRequestInit): Promise<T> {
     const method: HttpMethod = init.method ?? "GET";
 
     if (!isReadOnlyRequest(method, init.path)) {
@@ -120,7 +144,7 @@ export class ApsClient {
       );
     }
 
-    const token = this.getAccessToken();
+    const token = (this.getFreshToken ? await this.getFreshToken() : null) ?? this.getAccessToken();
     if (!token) {
       throw new ApsError("Not authenticated: no access token available.", 401);
     }

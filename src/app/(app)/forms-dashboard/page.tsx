@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedNotice } from "@/components/dashboard/project-notices";
 import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import Link from "next/link";
 import { Suspense, useMemo } from "react";
@@ -14,7 +15,7 @@ import { redactForms } from "@/lib/forms/snapshot";
 function FormsDashboard() {
   const { layout, setLayout, sel } = useDashLayout("forms", useProjectSelection());
   const { hubId, chosen } = sel;
-  const { dataset, loading, total } = useFormsData(chosen);
+  const { dataset, loading, total, retryFailed } = useFormsData(chosen);
   const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
   const failed = dataset.projects.filter((p) => p.error);
@@ -40,12 +41,7 @@ function FormsDashboard() {
             All templates
           </Link>
         </div>
-        {failed.length ? (
-          <details className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-            <summary className="cursor-pointer font-medium">{failed.length} project{failed.length === 1 ? "" : "s"} failed to load</summary>
-            <ul className="mt-1 list-disc pl-5">{failed.map((p) => <li key={p.id}>{p.name}: {p.error}</li>)}</ul>
-          </details>
-        ) : null}
+        <FailedNotice failed={failed} onRetry={retryFailed} />
         {skipped.length ? (
           <details className="rounded-lg border border-[color:var(--brand-border)] bg-white px-3 py-2 text-xs">
             <summary className="cursor-pointer font-medium">{skipped.length} project{skipped.length === 1 ? "" : "s"} skipped: the Forms tool isn&apos;t switched on</summary>

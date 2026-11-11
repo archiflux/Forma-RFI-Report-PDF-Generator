@@ -78,5 +78,9 @@ export function useGenericData<T extends BaseRecord>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, projects, loading]);
 
-  return { dataset, loading, fetching, total: projects.length };
+  // Reloads just the projects that failed (e.g. after Autodesk throttled us).
+  const retryFailed = () => {
+    for (const r of results) if (r.isError) void r.refetch();
+  };
+  return { dataset, loading, fetching, total: projects.length, retryFailed };
 }

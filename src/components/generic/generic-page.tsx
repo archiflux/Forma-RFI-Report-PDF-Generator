@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedNotice } from "@/components/dashboard/project-notices";
 import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
@@ -43,7 +44,7 @@ export function GenericPage<T extends BaseRecord>({
     (id: string, done: number, total: number) => setProgress((p) => ({ ...p, [id]: { done, total } })),
     [],
   );
-  const { dataset, loading, fetching, total } = useGenericData(cfg.kind, loader, chosen, full, onProgress);
+  const { dataset, loading, fetching, total, retryFailed } = useGenericData(cfg.kind, loader, chosen, full, onProgress);
   const detail = Object.entries(progress).filter(([id]) => chosen.some((p) => p.id === id));
   const detailDone = detail.reduce((s, [, v]) => s + v.done, 0);
   const detailTotal = detail.reduce((s, [, v]) => s + v.total, 0);
@@ -88,7 +89,7 @@ export function GenericPage<T extends BaseRecord>({
             )}
           </div>
         ) : null}
-        <Notice tone="error" summary={`${failed.length} project${failed.length === 1 ? "" : "s"} failed to load`} items={failed.map((p) => `${p.name}: ${p.error}`)} />
+        <FailedNotice failed={failed} onRetry={retryFailed} />
         <Notice tone="info" summary={`${skipped.length} project${skipped.length === 1 ? "" : "s"} skipped: this tool isn't switched on`} items={skipped.map((p) => p.name)} />
         {chosen.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[color:var(--brand-border)] p-10 text-center text-sm text-[color:var(--brand-muted)]">

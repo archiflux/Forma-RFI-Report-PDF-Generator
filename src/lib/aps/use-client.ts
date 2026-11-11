@@ -6,5 +6,6 @@ import { useAuth } from "@/lib/auth/store";
 
 export function useApsClient(): ApsClient {
   const getAccessToken = useAuth((s) => s.getAccessToken);
-  return useMemo(() => new ApsClient({ getAccessToken }), [getAccessToken]);
+  const getFreshToken = useAuth((s) => s.ensureFreshToken);
+  return useMemo(() => new ApsClient({ getAccessToken, getFreshToken }), [getAccessToken, getFreshToken]);
 }
