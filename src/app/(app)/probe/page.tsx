@@ -48,7 +48,7 @@ function Probe() {
     setRunning(false);
   }
 
-  if (!hubId) return <p className="text-sm">Pick a hub first - <Link href="/hubs" className="underline">choose hub</Link>.</p>;
+  if (!hubId) return <p className="text-sm">Pick a hub to probe - <Link href="/hubs" className="underline">choose hub</Link>.</p>;
 
   return (
     <section className="space-y-4">

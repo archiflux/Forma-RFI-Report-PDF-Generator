@@ -1,5 +1,6 @@
 import type { ApsClient } from "./client";
-import type { Project } from "./types";
+import type { Hub, Project } from "./types";
+import { listHubs } from "./hubs";
 
 interface RawProjectsResponse {
   data?: Array<{
@@ -22,6 +23,30 @@ export async function listProjects(
       name: p.attributes?.name ?? p.id,
     })),
   );
+}
+
+// Every project the signed-in user can see, across all their Forma/ACC hubs
+// (personal and unknown-type hubs are left out unless there are no others).
+// Each project is tagged with its hub so the picker can show it. A hub that
+// fails to list doesn't stop the others.
+export async function listAllProjects(client: ApsClient): Promise<{ projects: Project[]; hubs: Hub[]; failedHubs: string[] }> {
+  const all = await listHubs(client);
+  const acc = all.filter((h) => h.kind === "acc");
+  const hubs = acc.length ? acc : all.filter((h) => h.kind !== "personal");
+  const failedHubs: string[] = [];
+  const lists = await Promise.all(
+    hubs.map((h) =>
+      listProjects(client, h.id)
+        .then((ps) => ps.map((p) => ({ ...p, hubName: h.name, ...(h.region ? { hubRegion: h.region } : {}) })))
+        .catch(() => {
+          failedHubs.push(h.name);
+          return [] as Project[];
+        }),
+    ),
+  );
+  const seen = new Set<string>();
+  const projects = sortByName(lists.flat().filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true))));
+  return { projects, hubs, failedHubs };
 }
 
 // Alphabetical, numbers in natural order ("9 - X" before "10 - Y"),

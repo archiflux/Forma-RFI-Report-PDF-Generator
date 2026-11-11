@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { useCanProbe } from "@/lib/auth/use-can-probe";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ export default function AuthedLayout({
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
-          <Suspense fallback={<Brand href="/hubs" />}>
+          <Suspense fallback={<Brand href="/templates" />}>
             <HomeLink />
           </Suspense>
           <Suspense fallback={null}>
@@ -64,12 +64,9 @@ export default function AuthedLayout({
   );
 }
 
-// Hub-scoped navigation. Only shown once a hub is in the URL.
+// Main navigation. Dashboards cover every hub the user can access.
 function HubNav() {
-  const hubId = useSearchParams().get("hubId");
   const { allowed: canProbe } = useCanProbe();
-  if (!hubId) return null;
-  const q = `?hubId=${encodeURIComponent(hubId)}`;
   const links = [
     ["Templates", "/templates"],
     ["Issues", "/dashboard"],
@@ -77,12 +74,12 @@ function HubNav() {
     ["Reviews", "/reviews-dashboard"],
     ["RFIs", "/rfis-dashboard"],
     // Submittals is hidden until a project uses it; see templates.ts.
-    ...(canProbe ? ([["Data probe", "/probe"]] as const) : []),
+    ...(canProbe ? ([["Data probe", "/hubs"]] as const) : []),
   ] as const;
   return (
     <nav className="ml-auto hidden gap-4 text-sm md:flex">
       {links.map(([label, href]) => (
-        <Link key={href} href={`${href}${q}`} className="font-medium text-[color:var(--brand-secondary)] hover:text-[color:var(--brand-primary)]">
+        <Link key={href} href={href} className="font-medium text-[color:var(--brand-secondary)] hover:text-[color:var(--brand-primary)]">
           {label}
         </Link>
       ))}
@@ -113,9 +110,7 @@ function Brand({ href }: { href: string }) {
   );
 }
 
-// Logo returns to the template catalogue for the current hub, or to the hub
-// picker when no hub is selected yet.
+// Logo returns to the template catalogue.
 function HomeLink() {
-  const hubId = useSearchParams().get("hubId");
-  return <Brand href={hubId ? `/templates?hubId=${encodeURIComponent(hubId)}` : "/hubs"} />;
+  return <Brand href="/templates" />;
 }

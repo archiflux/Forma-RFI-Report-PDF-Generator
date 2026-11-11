@@ -19,14 +19,6 @@ function Dashboard() {
   const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
 
-  if (!hubId) {
-    return (
-      <p className="text-sm">
-        Pick a hub first - <Link href="/hubs" className="underline">choose hub</Link>.
-      </p>
-    );
-  }
-
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <SelectionSidebar sel={sel} />
@@ -39,7 +31,7 @@ function Dashboard() {
               {loading ? ` Loading ${total - loading} of ${total}…` : ""}
             </p>
           </div>
-          <Link href={`/templates?hubId=${encodeURIComponent(hubId)}`} className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
+          <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
             All templates
           </Link>
         </div>

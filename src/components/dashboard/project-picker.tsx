@@ -7,7 +7,8 @@ import type { ProjectSet } from "@/lib/dashboard/project-sets";
 import { sortByName } from "@/lib/aps/projects";
 
 export interface PickerProps {
-  hubId: string;
+  // Show each project's hub (when projects come from several hubs).
+  showHub: boolean;
   projects: Project[];
   selected: string[];
   onChange: (ids: string[]) => void;
@@ -17,14 +18,17 @@ export interface PickerProps {
   canSave: boolean;
 }
 
-export function ProjectPicker({ hubId, projects, selected, onChange, sets, onSaveSet, onDeleteSet, canSave }: PickerProps) {
+export function ProjectPicker({ showHub, projects, selected, onChange, sets, onSaveSet, onDeleteSet, canSave }: PickerProps) {
   const [q, setQ] = useState("");
   const [name, setName] = useState("");
   const shown = useMemo(
-    () => projects.filter((p) => p.name.toLowerCase().includes(q.trim().toLowerCase())),
+    () => {
+      const needle = q.trim().toLowerCase();
+      return projects.filter((p) => p.name.toLowerCase().includes(needle) || (p.hubName ?? "").toLowerCase().includes(needle));
+    },
     [projects, q],
   );
-  const hubSets = sortByName(sets.filter((s) => s.hubId === hubId));
+  const hubSets = sortByName(sets);
 
   return (
     <div className="space-y-4">
@@ -84,7 +88,7 @@ export function ProjectPicker({ hubId, projects, selected, onChange, sets, onSav
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter projects"
+          placeholder={showHub ? "Filter projects or hubs" : "Filter projects"}
           className="mt-1 min-h-8 w-full rounded-lg border border-[color:var(--brand-border)] px-2 text-xs"
         />
         <ul className="mt-2 max-h-[50vh] space-y-0.5 overflow-auto pr-1">
@@ -97,7 +101,10 @@ export function ProjectPicker({ hubId, projects, selected, onChange, sets, onSav
                   checked={selected.includes(p.id)}
                   onChange={(e) => onChange(e.target.checked ? [...selected, p.id] : selected.filter((id) => id !== p.id))}
                 />
-                <span>{p.name}</span>
+                <span>
+                  {p.name}
+                  {showHub && p.hubName ? <span className="block text-[10px] text-[color:var(--brand-muted)]">{p.hubName}</span> : null}
+                </span>
               </label>
             </li>
           ))}

@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
 import { TEMPLATES, type TemplateStatus } from "@/lib/dashboard/templates";
 import { useCanProbe } from "@/lib/auth/use-can-probe";
 
 const BADGE: Record<TemplateStatus, string> = { live: "Dashboard", planned: "Planned" };
 
 function Catalogue() {
-  const hubId = useSearchParams().get("hubId") ?? "";
   const { allowed: canProbe } = useCanProbe();
   const templates = TEMPLATES.filter((t) => !t.hidden);
   return (
@@ -21,12 +19,10 @@ function Catalogue() {
             Pick a dashboard, then tick the projects you want to include.
           </p>
         </div>
-        {hubId && canProbe ? (
-          <Link href={`/probe?hubId=${encodeURIComponent(hubId)}`} className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
+        {canProbe ? (
+          <Link href="/hubs" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
             Run the data probe
           </Link>
-        ) : !hubId ? (
-          <Link href="/hubs" className="text-sm underline">Choose a hub first</Link>
         ) : null}
       </div>
       <ul className="mt-6 grid gap-4 md:grid-cols-2">
@@ -45,8 +41,8 @@ function Catalogue() {
             </div>
             <p className="mt-3 flex-1 text-sm text-[color:var(--brand-ink-soft)]">{t.description}</p>
             <p className="mt-2 text-xs text-[color:var(--brand-muted)]">Data: {t.probeAreas.join(", ")}</p>
-            {t.href && hubId ? (
-              <Link href={t.href(hubId)} className="mt-4 inline-flex w-fit rounded-lg bg-[color:var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[color:var(--brand-secondary)]">
+            {t.href ? (
+              <Link href={t.href} className="mt-4 inline-flex w-fit rounded-lg bg-[color:var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[color:var(--brand-secondary)]">
                 Open
               </Link>
             ) : null}

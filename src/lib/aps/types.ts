@@ -12,6 +12,9 @@ export interface Project {
   id: string;
   hubId: string;
   name: string;
+  // The hub's display name, shown when projects from several hubs are listed.
+  hubName?: string;
+  hubRegion?: string;
 }
 
 export type CustomAttributeType =

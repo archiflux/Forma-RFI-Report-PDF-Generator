@@ -37,7 +37,7 @@ export function GenericPage<T extends BaseRecord>({
   enrich?: { label: string; note: string };
 }) {
   const { layout, setLayout, sel } = useDashLayout(cfg.kind, useProjectSelection());
-  const { hubId, chosen } = sel;
+  const { chosen } = sel;
   const [full, setFull] = useState(false);
   const [progress, setProgress] = useState<Record<string, { done: number; total: number }>>({});
   const onProgress = useCallback(
@@ -53,7 +53,6 @@ export function GenericPage<T extends BaseRecord>({
   const failed = dataset.projects.filter((p) => p.error);
   const skipped = dataset.projects.filter((p) => p.unavailable);
 
-  if (!hubId) return <p className="text-sm">Pick a hub first - <Link href="/hubs" className="underline">choose hub</Link>.</p>;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -67,7 +66,7 @@ export function GenericPage<T extends BaseRecord>({
               {loading ? ` Loading ${total - loading} of ${total}…` : ""}
             </p>
           </div>
-          <Link href={`/templates?hubId=${encodeURIComponent(hubId)}`} className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
+          <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
             All templates
           </Link>
         </div>

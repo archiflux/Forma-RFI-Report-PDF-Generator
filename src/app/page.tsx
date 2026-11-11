@@ -19,13 +19,13 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
   useEffect(() => {
     if (accessToken) {
-      router.replace("/hubs");
+      router.replace("/templates");
       return;
     }
     let live = true;
     ensureFreshToken()
       .then((t) => {
-        if (t && live) router.replace("/hubs");
+        if (t && live) router.replace("/templates");
       })
       .finally(() => {
         if (live) setChecking(false);
@@ -39,7 +39,7 @@ export default function LandingPage() {
     setError(null);
     setBusy(true);
     try {
-      await beginSignIn("/hubs");
+      await beginSignIn("/templates");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBusy(false);

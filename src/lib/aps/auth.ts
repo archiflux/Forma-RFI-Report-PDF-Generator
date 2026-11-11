@@ -40,7 +40,7 @@ export interface TokenSet {
   scope: string;
 }
 
-export async function beginSignIn(returnTo = "/hubs"): Promise<void> {
+export async function beginSignIn(returnTo = "/templates"): Promise<void> {
   const cfg = loadPublicConfig();
   if (!cfg.clientId) {
     throw new Error("NEXT_PUBLIC_APS_CLIENT_ID is not set. See .env.example.");
@@ -230,7 +230,7 @@ export async function signOut(accessToken: string | null): Promise<void> {
 }
 
 export function consumeReturnTo(): string {
-  const v = sessionStorage.getItem(SS_RETURN_TO) ?? "/hubs";
+  const v = sessionStorage.getItem(SS_RETURN_TO) ?? "/templates";
   sessionStorage.removeItem(SS_RETURN_TO);
   return v;
 }
