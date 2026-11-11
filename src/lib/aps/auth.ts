@@ -1,10 +1,36 @@
 import { APS_OAUTH, assertReadOnlyScopes, loadPublicConfig } from "./config";
+import { withBase } from "@/lib/base-path";
 import { deriveCodeChallenge, generateCodeVerifier, generateState } from "./pkce";
 
 const SS_VERIFIER = "aps.pkce.verifier";
 const SS_STATE = "aps.pkce.state";
 const SS_RETURN_TO = "aps.pkce.returnTo";
 const SS_REFRESH = "aps.refreshToken";
+// Set on sign-out so the next sign-in asks Autodesk for the login screen
+// (to switch account) instead of reusing the Autodesk session silently.
+const LS_FORCE_LOGIN = "aps.forceLogin";
+
+// The server keeps the refresh token in an HttpOnly cookie so sign-in
+// survives closing the tab (see lib/auth/session-handlers.ts). Static
+// hosting has no server; then it falls back to this tab's storage.
+const SESSION_HEADERS = { "Content-Type": "application/json", "x-siteboard": "1" };
+
+async function sessionCall(path: string, init: RequestInit): Promise<Response | null> {
+  try {
+    const res = await fetch(withBase(path), { ...init, credentials: "same-origin", headers: SESSION_HEADERS });
+    return res.status === 404 || res.status === 405 ? null : res;
+  } catch {
+    return null;
+  }
+}
+
+function local(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 export interface TokenSet {
   accessToken: string;
@@ -37,7 +63,12 @@ export async function beginSignIn(returnTo = "/hubs"): Promise<void> {
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
-  url.searchParams.set("prompt", "login");
+  // Normally reuse the Autodesk session ("Stay signed in" and 2FA are then
+  // honoured); force the login screen only straight after signing out.
+  if (local()?.getItem(LS_FORCE_LOGIN)) {
+    url.searchParams.set("prompt", "login");
+    local()?.removeItem(LS_FORCE_LOGIN);
+  }
 
   window.location.assign(url.toString());
 }
@@ -116,15 +147,22 @@ export async function completeSignIn(params: URLSearchParams): Promise<TokenSet>
   };
 
   if (tokens.refreshToken) {
-    sessionStorage.setItem(SS_REFRESH, tokens.refreshToken);
+    const kept = await sessionCall("/api/auth/session", { method: "POST", body: JSON.stringify({ refreshToken: tokens.refreshToken }) });
+    if (!kept?.ok) sessionStorage.setItem(SS_REFRESH, tokens.refreshToken);
   }
-  return tokens;
+  return { ...tokens, refreshToken: undefined };
 }
 
 export async function refreshTokens(): Promise<TokenSet | null> {
   const cfg = loadPublicConfig();
   const refreshToken = sessionStorage.getItem(SS_REFRESH);
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    // The usual path: the server swaps the remembered session for a token.
+    const res = await sessionCall("/api/auth/refresh", { method: "POST" });
+    if (!res?.ok) return null;
+    const t = (await res.json()) as { accessToken: string; expiresIn: number; tokenType: string; scope: string };
+    return { accessToken: t.accessToken, expiresAt: Date.now() + t.expiresIn * 1000, tokenType: t.tokenType, scope: t.scope };
+  }
 
   const body = new URLSearchParams({
     grant_type: "refresh_token",
@@ -168,6 +206,8 @@ export async function signOut(accessToken: string | null): Promise<void> {
   const refreshToken = sessionStorage.getItem(SS_REFRESH);
   sessionStorage.removeItem(SS_REFRESH);
   sessionStorage.removeItem(SS_RETURN_TO);
+  local()?.setItem(LS_FORCE_LOGIN, "1");
+  await sessionCall("/api/auth/session", { method: "DELETE" });
 
   const revokeIfPresent = async (token: string | null, hint: "access_token" | "refresh_token") => {
     if (!token) return;
