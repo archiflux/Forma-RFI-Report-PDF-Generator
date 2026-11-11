@@ -59,8 +59,8 @@ async function loadProject(
   };
 }
 
-// Loads Issues for every selected project in parallel (TanStack Query caps
-// nothing here, but the ApsClient retries 429s with backoff) and merges them
+// Loads Issues for every selected project (the ApsClient caps requests in
+// flight and retries 429s with backoff) and merges them
 // into one DashboardDataset. A project that fails is reported, not fatal.
 export function useDashboardData(hubId: string, projects: Array<{ id: string; name: string }>) {
   const client = useApsClient();
@@ -98,5 +98,9 @@ export function useDashboardData(hubId: string, projects: Array<{ id: string; na
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, hubId, projects, loading]);
 
-  return { dataset, loading, total: projects.length };
+  // Reloads just the projects that failed (e.g. after Autodesk throttled us).
+  const retryFailed = () => {
+    for (const r of results) if (r.isError) void r.refetch();
+  };
+  return { dataset, loading, total: projects.length, retryFailed };
 }

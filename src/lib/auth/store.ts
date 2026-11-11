@@ -14,6 +14,8 @@ interface AuthState {
 
 const REFRESH_SKEW_MS = 60_000;
 
+let refreshing: ReturnType<typeof refreshTokens> | null = null;
+
 export const useAuth = create<AuthState>((set, get) => ({
   tokens: null,
 
@@ -26,7 +28,12 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (current && current.expiresAt - REFRESH_SKEW_MS > Date.now()) {
       return current.accessToken;
     }
-    const refreshed = await refreshTokens();
+    // Many requests can notice expiry at once; refresh tokens are single
+    // use, so they all share one refresh.
+    refreshing ??= refreshTokens().finally(() => {
+      refreshing = null;
+    });
+    const refreshed = await refreshing;
     if (refreshed) {
       set({ tokens: refreshed });
       return refreshed.accessToken;

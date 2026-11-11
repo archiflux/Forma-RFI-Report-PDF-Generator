@@ -15,7 +15,7 @@ import { ProjectNotices } from "@/components/dashboard/project-notices";
 function Dashboard() {
   const { layout, setLayout, sel } = useDashLayout("issues", useProjectSelection());
   const { hubId, chosen } = sel;
-  const { dataset, loading, total } = useDashboardData(hubId, chosen);
+  const { dataset, loading, total, retryFailed } = useDashboardData(hubId, chosen);
   const locations = useProjectLocations(chosen);
   const now = useMemo(() => new Date(), []);
 
@@ -43,7 +43,7 @@ function Dashboard() {
             All templates
           </Link>
         </div>
-        <ProjectNotices projects={dataset.projects} />
+        <ProjectNotices projects={dataset.projects} onRetry={retryFailed} />
         {chosen.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[color:var(--brand-border)] p-10 text-center text-sm text-[color:var(--brand-muted)]">
             Tick one or more projects, or load a saved set, to build the dashboard.
