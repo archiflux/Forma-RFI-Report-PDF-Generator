@@ -14,9 +14,26 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const ensureFreshToken = useAuth((s) => s.ensureFreshToken);
+  // Remembered session (closed tab, new day)? Go straight in.
+  const [checking, setChecking] = useState(true);
   useEffect(() => {
-    if (accessToken) router.replace("/hubs");
-  }, [accessToken, router]);
+    if (accessToken) {
+      router.replace("/hubs");
+      return;
+    }
+    let live = true;
+    ensureFreshToken()
+      .then((t) => {
+        if (t && live) router.replace("/hubs");
+      })
+      .finally(() => {
+        if (live) setChecking(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [accessToken, ensureFreshToken, router]);
 
   async function onSignIn() {
     setError(null);
@@ -59,8 +76,8 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Button size="lg" onClick={onSignIn} disabled={busy}>
-            {busy ? "Redirecting…" : "Sign in with Autodesk"}
+          <Button size="lg" onClick={onSignIn} disabled={busy || checking}>
+            {busy ? "Redirecting…" : checking ? "Checking sign-in…" : "Sign in with Autodesk"}
           </Button>
           <a
             href="https://aps.autodesk.com/en/docs/oauth/v2/tutorials/get-3-legged-token-pkce"
