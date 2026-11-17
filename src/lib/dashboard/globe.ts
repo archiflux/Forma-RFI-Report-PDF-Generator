@@ -39,6 +39,41 @@ export function globePoints<T extends { projectId: string }>(
   return { points, unmapped };
 }
 
+// Site-level points for records that carry a postcode (Forms): one pin per
+// postcode, named after the location it came from. Records without a
+// mapped postcode fall back to their project's pin. Site pins have ids
+// "pc:<postcode>" so a click can filter by site rather than project.
+export function sitePoints<T extends { projectId: string; postcode?: string; location?: string }>(
+  items: T[],
+  projects: Array<{ id: string; name: string }>,
+  projectLocations: Record<string, ProjectLocation | null>,
+  postcodeLocations: Record<string, { lat: number; lon: number; approx?: true } | null>,
+  isOpen: (t: T) => boolean,
+): { points: GlobePoint[]; unmapped: number; sites: number } {
+  const sites = new Map<string, GlobePoint>();
+  const rest: T[] = [];
+  for (const t of items) {
+    const pc = t.postcode;
+    const loc = pc ? postcodeLocations[pc] : null;
+    if (!pc || !loc) {
+      rest.push(t);
+      continue;
+    }
+    const id = `pc:${pc}`;
+    let p = sites.get(id);
+    if (!p) {
+      // The location's own name (last part of the path) reads best.
+      const label = t.location?.split(" > ").pop() ?? pc;
+      p = { id, name: label.includes(pc) ? label : `${label} (${pc})`, lat: loc.lat, lon: loc.lon, total: 0, open: 0 };
+      sites.set(id, p);
+    }
+    p.total++;
+    if (isOpen(t)) p.open++;
+  }
+  const fallback = globePoints(rest, projects, projectLocations, isOpen);
+  return { points: [...sites.values(), ...fallback.points], unmapped: fallback.unmapped, sites: sites.size };
+}
+
 // Initial view: centre on the points and zoom so the furthest sits about
 // 80% of the way to the rim. Angles in radians.
 export function fitView(points: Array<{ lat: number; lon: number }>): { lon: number; lat: number; zoom: number } {

@@ -2,6 +2,7 @@
 
 import { FailedNotice } from "@/components/dashboard/project-notices";
 import { useDashLayout } from "@/lib/layout/use-dash-layout";
+import { usePostcodeLocations } from "@/lib/geo/use-postcode-locations";
 import Link from "next/link";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
@@ -17,6 +18,9 @@ function FormsDashboard() {
   const { chosen } = sel;
   const { dataset, loading, total, retryFailed } = useFormsData(chosen);
   const locations = useProjectLocations(chosen);
+  // Site pins: coordinates for postcodes found in the forms' Forma locations.
+  const postcodes = useMemo(() => dataset.forms.flatMap((x) => (x.postcode ? [x.postcode] : [])), [dataset.forms]);
+  const postcodeLocations = usePostcodeLocations(postcodes);
   const now = useMemo(() => new Date(), []);
   const failed = dataset.projects.filter((p) => p.error);
   const skipped = dataset.projects.filter((p) => p.formsUnavailable);
@@ -50,7 +54,7 @@ function FormsDashboard() {
           </p>
         ) : (
           <>
-            <FormsView dataset={dataset} now={now} locations={locations} layout={layout} onLayoutChange={setLayout} />
+            <FormsView dataset={dataset} now={now} locations={locations} postcodeLocations={postcodeLocations} layout={layout} onLayoutChange={setLayout} />
             <SharePanel
               kind="forms"
               layout={layout}

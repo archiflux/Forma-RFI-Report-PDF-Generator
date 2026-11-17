@@ -1,11 +1,14 @@
 import type { FormRecord } from "./types";
 import { asText } from "@/lib/generic/text";
+import { findPostcode } from "@/lib/geo/postcode";
 
 export interface FormsContext {
   projectId: string;
   projectName: string;
   templates: Record<string, string>;
   people: Map<string, string>;
+  // Location id -> path name, from the project's locations tree.
+  locations?: Record<string, string>;
 }
 
 interface RawForm {
@@ -20,6 +23,27 @@ interface RawForm {
   updatedAt?: string;
   formTemplate?: { id?: string; name?: string; templateType?: string } | string | null;
   customValues?: unknown;
+  // Linked location. Not confirmed against a live payload, so the common
+  // shapes are all accepted.
+  locationId?: string | null;
+  location?: { id?: string; name?: string } | string | null;
+  locationIds?: unknown;
+}
+
+function locationOf(r: RawForm, names: Record<string, string> | undefined): string | undefined {
+  const id =
+    str(r.locationId) ??
+    (typeof r.location === "object" && r.location ? str(r.location.id) : undefined) ??
+    (Array.isArray(r.locationIds) ? str(r.locationIds[0]) : undefined) ??
+    (typeof r.location === "string" ? r.location : undefined);
+  const inline = typeof r.location === "object" && r.location ? str(r.location.name) : undefined;
+  return (id ? names?.[id] : undefined) ?? inline;
+}
+
+// Where to pin a form: a postcode in its location (most reliable), else in
+// its name, else in any answer.
+export function formPostcode(location: string | undefined, name: string | undefined, custom: Record<string, string>): string | undefined {
+  return findPostcode(location) ?? findPostcode(name) ?? Object.values(custom).map(findPostcode).find(Boolean);
 }
 
 // customValues holds one entry per answered question. The value sits in a
@@ -60,6 +84,9 @@ export function normaliseForm(raw: unknown, ctx: FormsContext): FormRecord | nul
   const templateName = ctx.templates[templateId] ?? str((tpl as { name?: string }).name) ?? "Unknown template";
   const createdBy = str(r.createdBy);
   const templateType = str((tpl as { templateType?: string }).templateType);
+  const custom = formCustom(r.customValues);
+  const location = locationOf(r, ctx.locations);
+  const postcode = formPostcode(location, r.name, custom);
   return {
     key: `${ctx.projectId}:${r.id}`,
     id: r.id,
@@ -76,7 +103,9 @@ export function normaliseForm(raw: unknown, ctx: FormsContext): FormRecord | nul
     ...(createdBy ? { createdBy: ctx.people.get(createdBy) ?? `Unknown user (${createdBy.slice(0, 6)})` } : {}),
     createdAt: r.createdAt ?? "",
     ...(str(r.updatedAt) ? { updatedAt: r.updatedAt } : {}),
-    custom: formCustom(r.customValues),
+    custom,
+    ...(location ? { location } : {}),
+    ...(postcode ? { postcode } : {}),
   };
 }
 

@@ -13,6 +13,8 @@ export interface FormFilters {
   custom: CustomFilters;
   from?: string;
   to?: string;
+  // Map sites (postcodes) clicked on the map or picked in the Site filter.
+  postcodes?: string[];
 }
 
 export const EMPTY_FORM_FILTERS: FormFilters = { projectIds: [], templates: [], statuses: [], creators: [], search: "", custom: {} };
@@ -25,9 +27,10 @@ export function applyFormFilters(forms: FormRecord[], f: FormFilters): FormRecor
       (!f.templates.length || f.templates.includes(x.templateName)) &&
       (!f.statuses.length || f.statuses.includes(x.status)) &&
       (!f.creators?.length || f.creators.includes(x.createdBy ?? "Unknown")) &&
+      (!f.postcodes?.length || f.postcodes.includes(x.postcode ?? "")) &&
       inDateRange(x.formDate ?? x.createdAt, f.from, f.to) &&
       matchesCustom(x.custom, f.custom ?? {}) &&
-      (!q || `${x.formNum} ${x.name} ${x.templateName}`.toLowerCase().includes(q)),
+      (!q || `${x.formNum} ${x.name} ${x.templateName} ${x.location ?? ""} ${x.postcode ?? ""}`.toLowerCase().includes(q)),
   );
 }
 

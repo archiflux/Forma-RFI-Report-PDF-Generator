@@ -28,12 +28,16 @@ export function ProjectGlobe({
   selected = [],
   onSelect,
   noun,
+  per = "project",
 }: {
   points: GlobePoint[];
   unmapped: number;
   selected?: string[];
   onSelect?: (projectId: string) => void;
   noun: string;
+  // What a pin stands for in the help text: "project", or "site or project"
+  // when pins come from postcodes too.
+  per?: string;
 }) {
   const [land, setLand] = useState<Land | null>(null);
   // Fill the panel: width from the container, height in proportion.
@@ -294,7 +298,7 @@ export function ProjectGlobe({
             </div>
           </div>
           <p>
-            Dot size shows total {noun} per project. Drag to spin, scroll or use +/− to zoom{onSelect ? ", click a project to filter" : ""}. On a
+            Dot size shows total {noun} per {per}. Drag to spin, scroll or use +/− to zoom{onSelect ? `, click a ${per === "project" ? "project" : "pin"} to filter` : ""}. On a
             phone, pinch with two fingers to zoom.
           </p>
           {unmapped ? (

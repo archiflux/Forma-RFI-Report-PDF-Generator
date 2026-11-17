@@ -15,7 +15,7 @@ import { MultiSelect } from "@/components/dashboard/multi-select";
 import { Panel } from "@/components/dashboard/panel";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import type { ProjectLocation } from "@/lib/aps/project-location";
-import { globePoints } from "@/lib/dashboard/globe";
+import { sitePoints } from "@/lib/dashboard/globe";
 import { ProjectGlobe } from "@/components/dashboard/project-globe";
 import { RegisterTable } from "@/components/dashboard/register-table";
 import { Hideable } from "@/components/dashboard/panel";
@@ -55,12 +55,15 @@ export function FormsView({
   dataset,
   now,
   locations,
+  postcodeLocations,
   layout: layoutIn,
   onLayoutChange,
 }: {
   dataset: FormsDataset;
   now: Date;
   locations?: Record<string, ProjectLocation | null>;
+  // Postcode -> coordinates for the site pins (signed-in dashboard only).
+  postcodeLocations?: Record<string, { lat: number; lon: number; approx?: true } | null>;
   layout?: DashLayout;
   onLayoutChange?: (l: DashLayout) => void;
 }) {
@@ -69,6 +72,17 @@ export function FormsView({
   const all = dataset.forms;
   const forms = useMemo(() => applyFormFilters(all, f), [all, f]);
   const customs = useMemo(() => all.map((x) => x.custom), [all]);
+  // Sites: forms whose location (or name/answers) holds a UK postcode get
+  // their own map pin and can be filtered by site.
+  const siteLabels = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of all) if (x.postcode && !m.has(x.postcode)) m.set(x.postcode, x.location?.split(" > ").pop() ?? x.postcode);
+    return m;
+  }, [all]);
+  const mapped = useMemo(
+    () => (locations ? sitePoints(forms, dataset.projects, locations, postcodeLocations ?? {}, isFormOpen) : null),
+    [forms, dataset.projects, locations, postcodeLocations],
+  );
   const donut = useMemo(() => countBy(forms, (x) => formStatusLabel(x.status), 6), [forms]);
   const tree = useMemo(() => countBy(forms, (x) => x.templateName, 20), [forms]);
   const statusMonths = useMemo(() => monthlyByCategory(forms, (x) => x.formDate ?? x.createdAt, (x) => formStatusLabel(x.status)), [forms]);
@@ -101,6 +115,16 @@ export function FormsView({
           <MultiSelect label="Template" options={opts(all.map((x) => x.templateName))} value={f.templates} onChange={(v) => set({ templates: v })} />
           <MultiSelect label="Status" options={opts(all.map((x) => x.status), formStatusLabel)} value={f.statuses} onChange={(v) => set({ statuses: v })} />
           <MultiSelect label="Created by" options={opts(all.map((x) => x.createdBy ?? "Unknown"))} value={f.creators} onChange={(v) => set({ creators: v })} />
+          {siteLabels.size ? (
+            <MultiSelect
+              label="Site"
+              options={[...siteLabels.entries()]
+                .map(([pc, label]) => ({ value: pc, label: label.includes(pc) ? label : `${label} (${pc})` }))
+                .sort((a, b) => a.label.localeCompare(b.label, "en-GB", { numeric: true }))}
+              value={f.postcodes ?? []}
+              onChange={(v) => set({ postcodes: v })}
+            />
+          ) : null}
           <DateRangeFilter label="Form date" from={f.from} to={f.to} onChange={(r) => set({ from: r.from, to: r.to })} />
           <CustomFieldFilter customs={customs} value={f.custom} onChange={(v) => set({ custom: v })} />
           <input
@@ -146,13 +170,17 @@ export function FormsView({
           </div>
         </Hideable>
 
-        {locations ? (
-          <Panel id="map" title="Projects on the map">
+        {mapped ? (
+          <Panel id="map" title={mapped.sites ? "Sites and projects on the map" : "Projects on the map"}>
             <ProjectGlobe
               noun="forms"
-              {...globePoints(forms, dataset.projects, locations, isFormOpen)}
-              selected={f.projectIds}
-              onSelect={(id) => set({ projectIds: toggle(f.projectIds, id) })}
+              points={mapped.points}
+              unmapped={mapped.unmapped}
+              per={mapped.sites ? "site (from postcodes in Forma locations) or project" : "project"}
+              selected={[...f.projectIds, ...(f.postcodes ?? []).map((pc) => `pc:${pc}`)]}
+              onSelect={(id) =>
+                id.startsWith("pc:") ? set({ postcodes: toggle(f.postcodes ?? [], id.slice(3)) }) : set({ projectIds: toggle(f.projectIds, id) })
+              }
             />
           </Panel>
         ) : null}

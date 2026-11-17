@@ -35,6 +35,8 @@ export function formColumns(forms: FormRecord[], now: Date): Array<RegisterColum
     { id: "created", label: "Created", value: (f) => day(f.createdAt), sortValue: (f) => f.createdAt, width: 1 },
     { id: "updated", label: "Last updated", value: (f) => day(f.updatedAt), sortValue: (f) => f.updatedAt ?? "", width: 1 },
     { id: "templateType", label: "Template type", value: (f) => f.templateType ?? "", width: 1.2 },
+    { id: "location", label: "Location", value: (f) => f.location ?? "", width: 2 },
+    { id: "postcode", label: "Postcode", value: (f) => f.postcode ?? "", width: 0.9 },
   ];
   for (const k of customKeys(forms.map((f) => f.custom))) {
     cols.push({ id: `custom:${k}`, label: k, value: (f) => f.custom?.[k] ?? "", width: 1.2 });
