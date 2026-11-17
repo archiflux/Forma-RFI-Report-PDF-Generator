@@ -32,6 +32,8 @@ const FormSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string().optional(),
   custom: z.record(z.string()).optional(),
+  location: z.string().optional(),
+  postcode: z.string().optional(),
 });
 
 const DatasetSchema = z.object({

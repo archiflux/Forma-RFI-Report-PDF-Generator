@@ -8,6 +8,7 @@ import { getProjectDirectory } from "@/lib/aps/users";
 import type { ApsClient } from "@/lib/aps/client";
 import { ApsError } from "@/lib/aps/types";
 import { normaliseForm } from "./normalise";
+import { getLocationNames } from "@/lib/aps/issues-meta";
 import type { FormRecord, FormsDataset, FormsProject } from "./types";
 
 const STALE_MS = 10 * 60_000;
@@ -26,11 +27,13 @@ async function loadProject(
     }
     throw e;
   }
-  const [templates, directory] = await Promise.all([
+  const [templates, directory, locations] = await Promise.all([
     getFormTemplateNames(client, project.id),
     getProjectDirectory(client, project.id).catch(() => ({ people: new Map<string, string>() })),
+    // Location names carry site postcodes for the map; optional.
+    getLocationNames(client, project.id).catch(() => ({})),
   ]);
-  const ctx = { projectId: project.id, projectName: project.name, templates, people: directory.people };
+  const ctx = { projectId: project.id, projectName: project.name, templates, people: directory.people, locations };
   const forms = raw.flatMap((r) => {
     const f = normaliseForm(r, ctx);
     return f ? [f] : [];

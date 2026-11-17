@@ -37,6 +37,7 @@ export function buildFormsReport(input: {
     filters: describeFilters([
       ["Projects", f.projectIds.map((id) => input.projectNames[id] ?? id)],
       ["Template", f.templates],
+      ["Site postcode", f.postcodes ?? []],
       ["Status", f.statuses.map(formStatusLabel)],
       ["Created by", f.creators ?? []],
       ["Form date from", f.from],
