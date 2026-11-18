@@ -1,6 +1,7 @@
 "use client";
 
 import { Open3DButton } from "@/components/three-d/open-3d-button";
+import { StatTile as Tile } from "@/components/ui/stat-tile";
 import { formsUniverse } from "@/lib/three-d/things";
 import { useMemo, useState } from "react";
 import { formStatusLabel } from "@/lib/forms/normalise";
@@ -38,17 +39,6 @@ function opts(values: string[], fmt: (v: string) => string = (v) => v) {
 
 function toggle(list: string[], v: string): string[] {
   return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
-}
-
-function Tile({ label, value, alert }: { label: string; value: number; alert?: boolean }) {
-  return (
-    <div className="rounded-xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)]">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${alert ? "text-[color:var(--status-critical)]" : "text-[color:var(--brand-primary)]"}`}>
-        {value}
-      </p>
-    </div>
-  );
 }
 
 export function FormsView({
@@ -162,11 +152,11 @@ export function FormsView({
 
         <Hideable id="kpis" title="Key figures">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <Tile label="Forms" value={k.total} />
-            <Tile label="Open" value={k.open} />
-            <Tile label="Overdue" value={k.overdue} alert={k.overdue > 0} />
-            <Tile label="Due in 7 days" value={k.dueSoon} />
-            <Tile label="Templates in use" value={k.templates} />
+            <Tile index={0} label="Forms" value={k.total} />
+            <Tile index={1} label="Open" value={k.open} />
+            <Tile index={2} label="Overdue" value={k.overdue} alert={k.overdue > 0} />
+            <Tile index={3} label="Due in 7 days" value={k.dueSoon} />
+            <Tile index={4} label="Templates in use" value={k.templates} />
           </div>
         </Hideable>
 

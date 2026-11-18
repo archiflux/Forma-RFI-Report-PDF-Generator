@@ -33,7 +33,7 @@ export function ProjectPicker({ showHub, projects, selected, onChange, sets, onS
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)]">My project sets</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-teal)]">My project sets</p>
         {hubSets.length === 0 ? (
           <p className="mt-1 text-xs text-[color:var(--brand-muted)]">None saved yet. Tick some projects and save them below.</p>
         ) : (
@@ -76,7 +76,7 @@ export function ProjectPicker({ showHub, projects, selected, onChange, sets, onS
 
       <div>
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-teal)]">
             Projects ({selected.length}/{projects.length})
           </p>
           <span className="flex gap-2 text-xs">

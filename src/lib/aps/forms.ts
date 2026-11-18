@@ -3,29 +3,17 @@
 //   /construction/forms/v1/projects/:p/form-templates
 
 import type { ApsClient } from "./client";
+import { scrapePaged } from "./paged";
 import { normaliseProjectIdForRfi } from "./projects";
 
-const PAGE = 50;
 const MAX_TOTAL = 10000;
 
 function base(projectId: string): string {
   return `/construction/forms/v1/projects/${encodeURIComponent(normaliseProjectIdForRfi(projectId))}`;
 }
 
-async function scrape(client: ApsClient, path: string): Promise<unknown[]> {
-  const out: unknown[] = [];
-  let offset = 0;
-  for (;;) {
-    const res = await client.request<{ data?: unknown[]; results?: unknown[] }>({
-      path,
-      query: { limit: PAGE, offset },
-    });
-    const page = res.data ?? res.results ?? [];
-    out.push(...page);
-    if (page.length < PAGE || out.length >= MAX_TOTAL) break;
-    offset += PAGE;
-  }
-  return out;
+function scrape(client: ApsClient, path: string): Promise<unknown[]> {
+  return scrapePaged(client, path, { page: 50, max: MAX_TOTAL });
 }
 
 export function scrapeRawForms(client: ApsClient, projectId: string): Promise<unknown[]> {

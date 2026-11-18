@@ -1,6 +1,6 @@
 "use client";
 
-import type { Map as MlMap, StyleSpecification } from "maplibre-gl";
+import type { GeoJSONSource, Map as MlMap, StyleSpecification } from "maplibre-gl";
 import { withBase } from "@/lib/base-path";
 
 // Shared set-up for Siteboard's street maps: OpenFreeMap vector tiles
@@ -132,5 +132,113 @@ export function tip(title: string, rows: Array<[string, string]>, dark = false):
     r.append(a, b);
     el.appendChild(r);
   }
+  return el;
+}
+
+// Every pin and cluster shows how many records it holds (its "total"), not
+// how many pins merged: 1,012 up to 9,999, then 12k.
+export const COUNT_TEXT = [
+  "case",
+  [">=", ["get", "total"], 10000],
+  ["concat", ["to-string", ["round", ["/", ["get", "total"], 1000]]], "k"],
+  ["number-format", ["get", "total"], {}],
+];
+
+export function addCountLayer(map: MlMap, source: string, id = "counts") {
+  if (!map.getStyle().glyphs) return;
+  map.addLayer({
+    id,
+    type: "symbol",
+    source,
+    layout: {
+      "text-field": COUNT_TEXT as never,
+      "text-size": ["interpolate", ["linear"], ["get", "total"], 1, 10, 1000, 12] as never,
+      "text-font": ["Noto Sans Bold"],
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+    },
+    paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0,0,0,0.35)", "text-halo-width": 1 },
+  });
+}
+
+// Radius from a pin's record count: big enough for its number.
+export function countRadius(maxTotal: number, min = 11, max = 26) {
+  return ["interpolate", ["linear"], ["sqrt", ["get", "total"]], 1, min, Math.sqrt(Math.max(2, maxTotal)), max];
+}
+
+// The properties of the pins under a tapped feature: itself, or every pin
+// a cluster holds.
+export async function pinsUnder(src: GeoJSONSource, props: Record<string, unknown>): Promise<Array<Record<string, unknown>>> {
+  if (!props.cluster) return [props];
+  const leaves = await src.getClusterLeaves(props.cluster_id as number, Infinity, 0);
+  return leaves.map((f) => (f.properties ?? {}) as Record<string, unknown>);
+}
+
+export async function zoomInto(map: MlMap, src: GeoJSONSource, props: Record<string, unknown>, at: [number, number]) {
+  const zoom = props.cluster ? await src.getClusterExpansionZoom(props.cluster_id as number) : Math.max(map.getZoom() + 3, 14);
+  map.easeTo({ center: at, zoom: Math.min(zoom, 18) });
+}
+
+export interface DetailsPlace {
+  id: string;
+  name: string;
+  total: number;
+  open: number;
+}
+
+// Sticky card for a tapped pin or cluster on the 2D map: totals, the places
+// it holds (tap one to filter to it), and actions.
+export function detailsCard(o: {
+  title: string;
+  rows: Array<[string, string]>;
+  places: DetailsPlace[];
+  onPlace?: (id: string) => void;
+  actions: Array<{ label: string; run: () => void }>;
+  close: () => void;
+}): HTMLElement {
+  const el = tip(o.title, o.rows);
+  el.classList.add("relative", "min-w-[14rem]", "pr-5");
+  const x = document.createElement("button");
+  x.type = "button";
+  x.textContent = "×";
+  x.setAttribute("aria-label", "Close");
+  x.className = "absolute right-2 top-1 text-base leading-none text-[color:var(--brand-muted)] hover:text-[color:var(--brand-primary)]";
+  x.onclick = o.close;
+  el.prepend(x);
+  if (o.places.length) {
+    const list = document.createElement("ul");
+    list.className = "mt-2 max-h-48 overflow-y-auto border-t border-[color:var(--brand-border)] pt-1";
+    for (const pl of o.places) {
+      const li = document.createElement("li");
+      const b = document.createElement(o.onPlace ? "button" : "div");
+      b.className = `flex w-full justify-between gap-3 rounded px-1 py-1 text-left tabular-nums${o.onPlace ? " hover:bg-[color:var(--brand-canvas)]" : ""}`;
+      const name = document.createElement("span");
+      name.className = "min-w-0 truncate";
+      name.textContent = pl.name;
+      const n = document.createElement("span");
+      n.className = "shrink-0 text-[color:var(--brand-muted)]";
+      n.textContent = `${pl.total.toLocaleString("en-GB")} (${pl.open.toLocaleString("en-GB")} open)`;
+      b.append(name, n);
+      if (o.onPlace) {
+        (b as HTMLButtonElement).type = "button";
+        b.title = "Filter to this";
+        b.onclick = () => o.onPlace?.(pl.id);
+      }
+      li.appendChild(b);
+      list.appendChild(li);
+    }
+    el.appendChild(list);
+  }
+  const bar = document.createElement("div");
+  bar.className = "mt-2 flex flex-wrap gap-1.5";
+  for (const a of o.actions) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = a.label;
+    b.className = "rounded-full border border-[color:var(--brand-border)] px-2.5 py-1 font-medium text-[color:var(--brand-secondary)] hover:border-[color:var(--brand-secondary)]";
+    b.onclick = a.run;
+    bar.appendChild(b);
+  }
+  el.appendChild(bar);
   return el;
 }

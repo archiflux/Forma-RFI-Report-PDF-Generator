@@ -735,9 +735,32 @@ export async function scrapeAllRfis(
   signal?: AbortSignal,
 ): Promise<Rfi[]> {
   const limit = DEFAULT_PAGE_SIZE;
-  let offset = 0;
   const out: Rfi[] = [];
+  const first = await searchRfisPage(client, projectId, { limit, offset: 0, filter, sort });
+  out.push(...first.results);
+  onProgress?.({ loaded: out.length, total: first.pagination.totalResults });
+  if (first.results.length < limit) return out;
+  // The first page gives the total: request the rest at once (the client
+  // caps requests in flight) rather than one after another.
+  const total = first.pagination.totalResults;
+  if (total !== undefined) {
+    const offsets: number[] = [];
+    for (let off = limit; off < Math.min(total, MAX_TOTAL); off += limit) offsets.push(off);
+    let loaded = out.length;
+    const pages = await Promise.all(
+      offsets.map(async (off) => {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        const page = await searchRfisPage(client, projectId, { limit, offset: off, filter, sort });
+        loaded += page.results.length;
+        onProgress?.({ loaded, total });
+        return page;
+      }),
+    );
+    for (const pg of pages) out.push(...pg.results);
+    return out.slice(0, MAX_TOTAL);
+  }
 
+  let offset = limit;
   for (;;) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const page = await searchRfisPage(client, projectId, { limit, offset, filter, sort });
