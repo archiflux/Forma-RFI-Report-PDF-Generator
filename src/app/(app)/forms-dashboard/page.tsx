@@ -4,6 +4,7 @@ import { FailedNotice } from "@/components/dashboard/project-notices";
 import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import { usePostcodeLocations } from "@/lib/geo/use-postcode-locations";
 import Link from "next/link";
+import { DashTitle, DashboardSkeleton } from "@/components/dashboard/loading-status";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useFormsData } from "@/lib/forms/use-forms-data";
@@ -29,18 +30,19 @@ function FormsDashboard() {
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <SelectionSidebar sel={sel} />
       <div className="min-w-0 space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold text-[color:var(--brand-primary)]">Forms dashboard</h2>
-            <p className="text-sm text-[color:var(--brand-muted)]">
-              Forms across {chosen.length || "no"} selected project{chosen.length === 1 ? "" : "s"}.
-              {loading ? ` Loading ${total - loading} of ${total}…` : ""}
-            </p>
-          </div>
-          <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
-            All templates
-          </Link>
-        </div>
+        <DashTitle
+          title="Forms dashboard"
+          intro={<>Forms across {chosen.length || "no"} selected project{chosen.length === 1 ? "" : "s"}.</>}
+          aside={
+            <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
+              All templates
+            </Link>
+          }
+          loading={loading}
+          total={total}
+          records={dataset.forms.length}
+          noun="forms"
+        />
         <FailedNotice failed={failed} onRetry={retryFailed} />
         {skipped.length ? (
           <details className="rounded-lg border border-[color:var(--brand-border)] bg-white px-3 py-2 text-xs">
@@ -54,7 +56,11 @@ function FormsDashboard() {
           </p>
         ) : (
           <>
-            <FormsView dataset={dataset} now={now} locations={locations} postcodeLocations={postcodeLocations} layout={layout} onLayoutChange={setLayout} />
+            {loading && dataset.forms.length === 0 ? (
+              <DashboardSkeleton />
+            ) : (
+              <FormsView dataset={dataset} now={now} locations={locations} postcodeLocations={postcodeLocations} layout={layout} onLayoutChange={setLayout} />
+            )}
             <SharePanel
               kind="forms"
               layout={layout}

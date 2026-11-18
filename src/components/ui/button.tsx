@@ -11,9 +11,9 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-[color:var(--brand-primary)] text-white shadow-sm hover:bg-[color:var(--brand-secondary)] focus-visible:ring-[color:var(--brand-primary)]",
+    "bg-[color:var(--brand-primary)] text-white shadow-sm hover:bg-[color:var(--brand-teal)] hover:shadow-[0_8px_20px_-8px_rgba(0,104,129,0.6)] focus-visible:ring-[color:var(--brand-primary)]",
   secondary:
-    "bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] border border-[color:var(--brand-border)] hover:border-[color:var(--brand-primary)] hover:bg-[color:var(--brand-canvas)] focus-visible:ring-[color:var(--brand-primary)]",
+    "bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] border border-[color:var(--brand-border)] hover:border-[color:var(--brand-teal)] hover:bg-[color:var(--brand-teal-soft)] focus-visible:ring-[color:var(--brand-primary)]",
   ghost:
     "bg-transparent text-[color:var(--brand-primary)] hover:bg-[color:var(--brand-canvas)] focus-visible:ring-[color:var(--brand-primary)]",
 };
@@ -33,7 +33,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors",
+        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 active:scale-[0.97]",
         "disabled:opacity-50 disabled:pointer-events-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         variantStyles[variant],

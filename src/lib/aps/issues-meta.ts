@@ -9,6 +9,7 @@
 //   /construction/issues/v1/projects/:p/issue-root-cause-categories?include=rootcauses
 
 import type { ApsClient } from "./client";
+import { scrapePaged } from "./paged";
 import { normaliseProjectIdForRfi } from "./projects";
 import { ApsError } from "./types";
 
@@ -80,20 +81,8 @@ export async function scrapeRawIssues(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<unknown[]> {
-  const out: unknown[] = [];
-  let offset = 0;
-  for (;;) {
-    const res = await client.request<{ results?: unknown[] }>({
-      path: `${base(projectId)}/issues`,
-      query: { limit: PAGE, offset },
-      signal,
-    });
-    const page = res.results ?? [];
-    out.push(...page);
-    if (page.length < PAGE || out.length >= MAX_TOTAL) break;
-    offset += PAGE;
-  }
-  return out;
+  // Issues pages go up to 200; the rest of a project's pages load in parallel.
+  return scrapePaged(client, `${base(projectId)}/issues`, { page: 200, fallbackPage: PAGE, max: MAX_TOTAL, ...(signal ? { signal } : {}) });
 }
 
 interface RawLocationNode {

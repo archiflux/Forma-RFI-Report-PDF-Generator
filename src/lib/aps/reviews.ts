@@ -3,6 +3,7 @@
 //   /construction/reviews/v1/projects/:p/workflows
 
 import type { ApsClient } from "./client";
+import { scrapePaged } from "./paged";
 import { normaliseProjectIdForRfi } from "./projects";
 
 const PAGE = 50;
@@ -12,17 +13,8 @@ function base(projectId: string): string {
   return `/construction/reviews/v1/projects/${encodeURIComponent(normaliseProjectIdForRfi(projectId))}`;
 }
 
-async function scrape(client: ApsClient, path: string): Promise<unknown[]> {
-  const out: unknown[] = [];
-  let offset = 0;
-  for (;;) {
-    const res = await client.request<{ results?: unknown[] }>({ path, query: { limit: PAGE, offset } });
-    const page = res.results ?? [];
-    out.push(...page);
-    if (page.length < PAGE || out.length >= MAX_TOTAL) break;
-    offset += PAGE;
-  }
-  return out;
+function scrape(client: ApsClient, path: string): Promise<unknown[]> {
+  return scrapePaged(client, path, { page: 200, fallbackPage: PAGE, max: MAX_TOTAL });
 }
 
 export function scrapeRawReviews(client: ApsClient, projectId: string): Promise<unknown[]> {

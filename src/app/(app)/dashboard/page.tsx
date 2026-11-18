@@ -2,6 +2,7 @@
 
 import { useDashLayout } from "@/lib/layout/use-dash-layout";
 import Link from "next/link";
+import { DashTitle, DashboardSkeleton } from "@/components/dashboard/loading-status";
 import { Suspense, useMemo } from "react";
 import { useProjectSelection } from "@/lib/dashboard/use-project-selection";
 import { useDashboardData } from "@/lib/dashboard/use-dashboard-data";
@@ -23,18 +24,19 @@ function Dashboard() {
     <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <SelectionSidebar sel={sel} />
       <div className="min-w-0 space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold text-[color:var(--brand-primary)]">Issues dashboard</h2>
-            <p className="text-sm text-[color:var(--brand-muted)]">
-              BCF issue workflow across {chosen.length || "no"} selected project{chosen.length === 1 ? "" : "s"}.
-              {loading ? ` Loading ${total - loading} of ${total}…` : ""}
-            </p>
-          </div>
-          <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
-            All templates
-          </Link>
-        </div>
+        <DashTitle
+          title="Issues dashboard"
+          intro={<>BCF issue workflow across {chosen.length || "no"} selected project{chosen.length === 1 ? "" : "s"}.</>}
+          aside={
+            <Link href="/templates" className="text-sm font-medium text-[color:var(--brand-secondary)] underline-offset-4 hover:underline">
+              All templates
+            </Link>
+          }
+          loading={loading}
+          total={total}
+          records={dataset.issues.length}
+          noun="issues"
+        />
         <ProjectNotices projects={dataset.projects} onRetry={retryFailed} />
         {chosen.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[color:var(--brand-border)] p-10 text-center text-sm text-[color:var(--brand-muted)]">
@@ -42,7 +44,11 @@ function Dashboard() {
           </p>
         ) : (
           <>
-            <DashboardView dataset={dataset} now={now} locations={locations} layout={layout} onLayoutChange={setLayout} />
+            {loading && dataset.issues.length === 0 ? (
+              <DashboardSkeleton />
+            ) : (
+              <DashboardView dataset={dataset} now={now} locations={locations} layout={layout} onLayoutChange={setLayout} />
+            )}
             <SharePanel
               kind="issues"
               layout={layout}

@@ -27,6 +27,8 @@ async function loadProject(
     }
     throw e;
   }
+  // No forms: skip the lookups.
+  if (raw.length === 0) return { project: { id: project.id, name: project.name, formCount: 0 }, forms: [] };
   const [templates, directory, locations] = await Promise.all([
     getFormTemplateNames(client, project.id),
     getProjectDirectory(client, project.id).catch(() => ({ people: new Map<string, string>() })),

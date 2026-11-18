@@ -32,6 +32,9 @@ async function loadProject(
     }
     throw e;
   }
+  // Nothing to label: skip the four lookups (a big share of the requests
+  // when many selected projects have no issues).
+  if (raw.length === 0) return { project: { id: project.id, name: project.name, issueCount: 0 }, issues: [] };
   const emptyDir: ProjectDirectory = { people: new Map(), companies: new Map(), roles: new Map() };
   const [lookups, directory, attrs, locations] = await Promise.all([
     getIssueLookups(client, project.id),

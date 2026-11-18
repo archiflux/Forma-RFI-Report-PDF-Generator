@@ -27,15 +27,7 @@ import { PanelLayoutContext, useViewLayout } from "@/components/dashboard/layout
 import { genericColumns, genericDefaultSort } from "@/lib/generic/register";
 import { applyLayoutToReport, type DashLayout } from "@/lib/layout/layout";
 import { CustomFieldFilter } from "@/components/dashboard/custom-field-filter";
-
-function Tile({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
-  return (
-    <div className="rounded-xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)]">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${alert ? "text-[color:var(--status-critical)]" : "text-[color:var(--brand-primary)]"}`}>{value}</p>
-    </div>
-  );
-}
+import { StatTile as Tile } from "@/components/ui/stat-tile";
 
 export function GenericView<T extends BaseRecord>({
   cfg,
@@ -150,8 +142,8 @@ export function GenericView<T extends BaseRecord>({
 
         <Hideable id="kpis" title="Key figures">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            {kpis.map((k) => (
-              <Tile key={k.label} label={k.label} value={k.value} alert={k.alert} />
+            {kpis.map((k, i) => (
+              <Tile key={k.label} index={i} label={k.label} value={k.value} alert={k.alert} />
             ))}
           </div>
         </Hideable>

@@ -1,4 +1,5 @@
 import type { ApsClient } from "./client";
+import { scrapePaged } from "./paged";
 import { ApsError } from "./types";
 import { normaliseProjectIdForRfi } from "./projects";
 
@@ -91,30 +92,14 @@ function tryFetchUsers(client: ApsClient, path: string): Promise<RawProjectUser[
 }
 
 async function tryFetchPaged<T>(client: ApsClient, path: string): Promise<T[] | "denied"> {
-  const out: T[] = [];
-  let offset = 0;
-  for (;;) {
-    let res: { results?: T[] };
-    try {
-      res = await client.request<{ results?: T[] }>({
-        path,
-        query: { limit: PAGE, offset },
-      });
-    } catch (e) {
-      if (e instanceof ApsError && (e.status === 401 || e.status === 403 || e.status === 404)) {
-        // 404 means the endpoint doesn't exist on this tenant — same
-        // outcome from the caller's perspective.
-        return out.length > 0 ? out : "denied";
-      }
-      throw e;
-    }
-    const page = res.results ?? [];
-    out.push(...page);
-    if (page.length < PAGE) break;
-    offset += PAGE;
-    if (out.length >= MAX_TOTAL) break;
+  try {
+    return (await scrapePaged(client, path, { page: 200, fallbackPage: PAGE, max: MAX_TOTAL })) as T[];
+  } catch (e) {
+    // 404 means the endpoint doesn't exist on this tenant: same outcome
+    // from the caller's perspective as no permission.
+    if (e instanceof ApsError && (e.status === 401 || e.status === 403 || e.status === 404)) return "denied";
+    throw e;
   }
-  return out;
 }
 
 function normalizeUser(raw: RawProjectUser): ProjectUser & { autodeskId?: string } {

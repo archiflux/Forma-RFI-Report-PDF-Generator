@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { useCanProbe } from "@/lib/auth/use-can-probe";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,8 @@ export default function AuthedLayout({
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/85 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/80 backdrop-blur-md">
+        <div className="h-[3px]" style={{ background: "var(--brand-gradient)" }} aria-hidden />
         <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
           <Suspense fallback={<Brand href="/templates" />}>
             <HomeLink />
@@ -58,7 +59,7 @@ export default function AuthedLayout({
         </div>
       </header>
       <div className="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
-        {children}
+        <PageFade>{children}</PageFade>
       </div>
     </div>
   );
@@ -67,6 +68,7 @@ export default function AuthedLayout({
 // Main navigation. Dashboards cover every hub the user can access.
 function HubNav() {
   const { allowed: canProbe } = useCanProbe();
+  const pathname = usePathname() ?? "";
   const links = [
     ["Templates", "/templates"],
     ["Issues", "/dashboard"],
@@ -77,12 +79,25 @@ function HubNav() {
     ...(canProbe ? ([["Data probe", "/hubs"]] as const) : []),
   ] as const;
   return (
-    <nav className="ml-auto hidden gap-4 text-sm md:flex">
-      {links.map(([label, href]) => (
-        <Link key={href} href={href} className="font-medium text-[color:var(--brand-secondary)] hover:text-[color:var(--brand-primary)]">
-          {label}
-        </Link>
-      ))}
+    <nav className="ml-auto hidden gap-1 text-sm md:flex">
+      {links.map(([label, href]) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={`relative rounded-full px-3 py-1.5 font-medium transition-colors duration-200 ${
+              active
+                ? "bg-[color:var(--brand-teal)] text-white shadow-[0_6px_16px_-8px_rgba(0,104,129,0.8)]"
+                : "text-[color:var(--brand-secondary)] hover:bg-[color:var(--brand-teal-soft)] hover:text-[color:var(--brand-teal)]"
+            }`}
+          >
+            {label}
+            {active ? <span className="absolute inset-x-3 -bottom-[3px] h-[3px] rounded-full bg-[#d1c800]" aria-hidden /> : null}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
@@ -113,4 +128,14 @@ function Brand({ href }: { href: string }) {
 // Logo returns to the template catalogue.
 function HomeLink() {
   return <Brand href="/templates" />;
+}
+
+// Each page fades up as you move between dashboards.
+function PageFade({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  return (
+    <div key={pathname} className="sb-enter">
+      {children}
+    </div>
+  );
 }

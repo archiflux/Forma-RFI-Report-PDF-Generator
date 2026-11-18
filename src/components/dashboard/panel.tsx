@@ -39,9 +39,12 @@ export function Panel({ id, title, children, action }: { id?: string; title: str
   const key = id ?? title;
   if (hidden.has(key)) return toggle ? <HiddenBar title={title} onShow={() => toggle(key)} /> : null;
   return (
-    <section className="flex h-full min-w-0 flex-col rounded-2xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card">
+    <section className="sb-enter flex h-full min-w-0 flex-col rounded-2xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card transition-[border-color,box-shadow] duration-300 hover:border-[rgba(0,104,129,0.3)] hover:shadow-[0_1px_2px_rgba(14,40,65,0.05),0_18px_40px_-18px_rgba(0,104,129,0.25)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[color:var(--brand-primary)]">{title}</h3>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-[color:var(--brand-primary)]">
+          <span className="h-4 w-1 rounded-full" style={{ background: "linear-gradient(180deg, #006881, #d1c800)" }} aria-hidden />
+          {title}
+        </h3>
         <div className="flex flex-wrap items-center gap-2">
           {action}
           {toggle ? <HideButton title={title} onHide={() => toggle(key)} /> : null}
