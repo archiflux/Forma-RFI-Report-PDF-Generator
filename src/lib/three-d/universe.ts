@@ -16,8 +16,26 @@ export interface Thing3D {
   projectName: string;
   month?: string; // YYYY-MM
   groups: Record<string, string>;
+  // Where the record is, when known more precisely than its project's
+  // location (a form's postcode, for example).
+  place?: Place3D;
   // Everything known about the record, for the properties panel.
   props: Array<{ label: string; value: string }>;
+}
+
+export interface Place3D {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+// The record's own place, else its project's location.
+export function placeOf(t: Thing3D, locations: Universe3D["locations"]): Place3D | null {
+  if (t.place) return t.place;
+  const loc = locations[t.projectId];
+  if (!loc || !Number.isFinite(loc.lat) || !Number.isFinite(loc.lon)) return null;
+  return { id: t.projectId, name: t.projectName, lat: loc.lat, lon: loc.lon };
 }
 
 export interface Dim3D {
@@ -40,7 +58,7 @@ export const SHAPES: Array<{ id: Shape; label: string }> = [
   { id: "ring", label: "Ring" },
   { id: "blocks", label: "Blocks" },
   { id: "timeline", label: "Timeline" },
-  { id: "globe", label: "Globe" },
+  { id: "globe", label: "Map" },
   { id: "galaxy", label: "Galaxy" },
 ];
 
@@ -459,11 +477,11 @@ export function layoutGlobe(things: Thing3D[], g: Grouping, locations: Universe3
   const loose: number[] = [];
   for (const i of g.order) {
     const t = things[i] as Thing3D;
-    const loc = locations[t.projectId];
-    if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lon)) {
-      const list = byProject.get(t.projectId) ?? [];
+    const pl = placeOf(t, locations);
+    if (pl) {
+      const list = byProject.get(pl.id) ?? [];
       list.push(i);
-      byProject.set(t.projectId, list);
+      byProject.set(pl.id, list);
     } else loose.push(i);
   }
   // The dot takes the colour of the location's most common group, and the
@@ -481,8 +499,8 @@ export function layoutGlobe(things: Thing3D[], g: Grouping, locations: Universe3
   };
   const ranked = [...byProject.entries()].sort((a, b) => b[1].length - a[1].length);
   const spread = spreadOnSphere(
-    ranked.map(([pid]) => {
-      const loc = locations[pid] as { lat: number; lon: number };
+    ranked.map(([, list]) => {
+      const loc = placeOf(things[list[0] as number] as Thing3D, locations) as Place3D;
       return latLonToXYZ(loc.lat, loc.lon, 1);
     }),
     // Only resolve heavy overlaps so dots stay close to their real place.
@@ -500,7 +518,7 @@ export function layoutGlobe(things: Thing3D[], g: Grouping, locations: Universe3
     const d = dotSize(list.length, R);
     const h = R + d / 2;
     const { rep, sub } = describe(list);
-    const name = things[list[0] as number]?.projectName ?? "";
+    const name = placeOf(things[list[0] as number] as Thing3D, locations)?.name ?? "";
     for (const i of list) {
       setPos(pos, i, nrm[0] * h, nrm[1] * h, nrm[2] * h);
       up[i * 3] = nrm[0];
@@ -583,7 +601,7 @@ export function layout(shape: Shape, u: Universe3D, g: Grouping): Layout {
 }
 
 export function hasLocations(u: Universe3D): boolean {
-  return u.things.some((t) => u.locations[t.projectId]);
+  return u.things.some((t) => placeOf(t, u.locations));
 }
 
 // ---- building the universe from each dashboard's records

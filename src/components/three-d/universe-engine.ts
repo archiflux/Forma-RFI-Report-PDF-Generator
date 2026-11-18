@@ -42,6 +42,8 @@ export interface UniverseHandle {
   resetView(): void;
   setAutoRotate(on: boolean): void;
   setMotion(m: "fly" | "fade"): void;
+  // Stop drawing while something covers the scene (the street map).
+  setPaused(on: boolean): void;
   dispose(): void;
 }
 
@@ -886,8 +888,10 @@ export function createUniverse(
   const start = performance.now();
   let lastTick = start;
   let raf = 0;
+  let paused = false;
   const tick = () => {
     raf = requestAnimationFrame(tick);
+    if (paused) return;
     const now = performance.now();
     adapt(now);
     dustMat.uniforms.uTime!.value = (now - start) / 1000;
@@ -1014,6 +1018,9 @@ export function createUniverse(
     },
     setMotion(m) {
       motion = m;
+    },
+    setPaused(on) {
+      paused = on;
     },
     setAutoRotate(on) {
       wantSpin = on;

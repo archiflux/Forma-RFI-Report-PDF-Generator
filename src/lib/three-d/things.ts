@@ -128,7 +128,14 @@ export function issuesUniverse(issues: IssueRecord[], now: Date, locations: Loca
   return { title, noun: "issues", dims, things, locations: locs(locations) };
 }
 
-export function formsUniverse(forms: FormRecord[], now: Date, locations: Locations, title = "Forms"): Universe3D {
+// Forms whose location names a postcode are placed at that postcode.
+export function formsUniverse(
+  forms: FormRecord[],
+  now: Date,
+  locations: Locations,
+  title = "Forms",
+  postcodeLocations: Record<string, { lat: number; lon: number } | null> = {},
+): Universe3D {
   const list = forms.slice(0, MAX_THINGS);
   const custom = customDims(list.map((f) => f.custom));
   const dims: Dim3D[] = [
@@ -145,6 +152,9 @@ export function formsUniverse(forms: FormRecord[], now: Date, locations: Locatio
   ];
   const things: Thing3D[] = list.map((f) => {
     const m = monthOf(f.formDate ?? f.createdAt);
+    const pc = f.postcode ? postcodeLocations[f.postcode] : null;
+    const label = f.location?.split(" > ").pop() ?? f.postcode ?? "";
+    const place = pc && f.postcode ? { id: `pc:${f.postcode}`, name: label.includes(f.postcode) ? label : `${label} (${f.postcode})`, lat: pc.lat, lon: pc.lon } : null;
     const groups: Record<string, string> = {
       status: formStatusLabel(f.status),
       template: f.templateName || "Not set",
@@ -165,6 +175,7 @@ export function formsUniverse(forms: FormRecord[], now: Date, locations: Locatio
       projectId: f.projectId,
       projectName: f.projectName,
       ...(m ? { month: m } : {}),
+      ...(place ? { place } : {}),
       groups,
       props: props(
         [
