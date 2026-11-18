@@ -2,26 +2,14 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GeoJSONSource, Map as MlMap, Popup, StyleSpecification } from "maplibre-gl";
+import type { GeoJSONSource, Map as MlMap, Popup } from "maplibre-gl";
 import { HEAT_RAMP, type GlobePoint } from "@/lib/dashboard/globe";
 import { useWidth } from "@/components/charts/use-width";
-import { withBase } from "@/lib/base-path";
+import { CLUSTER, createStreetMap, fitTo, tip } from "@/lib/map/maplibre";
 
-// Street map for "Projects on the map": OpenFreeMap vector tiles
-// (OpenStreetMap data, free, no API key), restyled to Siteboard's palette.
-// Pins close together merge into a numbered cluster that splits apart as
-// you zoom in, down to street level.
-const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
-
-// Used if the tile service can't be reached: pins on a plain background,
-// still zoomable and clickable.
-const FALLBACK_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {},
-  layers: [{ id: "background", type: "background", paint: { "background-color": "#eef2f6" } }],
-};
-
-const BRAND = { land: "#f3f5f7", water: "#d6e4f1", road: "#ffffff", accent: "#d1c800", ink: "#0e2841" };
+// Street map for "Projects on the map" (see lib/map/maplibre). Pins close
+// together merge into a numbered cluster that splits apart as you zoom in.
+const BRAND = { accent: "#d1c800" };
 
 function pointsGeoJson(points: GlobePoint[], selected: string[]) {
   return {
@@ -32,41 +20,6 @@ function pointsGeoJson(points: GlobePoint[], selected: string[]) {
       properties: { id: p.id, name: p.name, total: p.total, open: p.open, sel: selected.includes(p.id) },
     })),
   };
-}
-
-// Soften the base map towards the brand palette. Layer ids differ between
-// styles, so match on type and name.
-function restyle(map: MlMap) {
-  for (const l of map.getStyle().layers ?? []) {
-    try {
-      if (l.type === "background") map.setPaintProperty(l.id, "background-color", BRAND.land);
-      else if (l.type === "fill" && /water|ocean|sea|lake|river/.test(l.id)) map.setPaintProperty(l.id, "fill-color", BRAND.water);
-      else if (l.type === "line" && /water|river|stream/.test(l.id)) map.setPaintProperty(l.id, "line-color", BRAND.water);
-      else if (l.type === "fill" && /landuse|landcover|park|wood|grass/.test(l.id)) map.setPaintProperty(l.id, "fill-opacity", 0.35);
-    } catch {
-      // A layer that rejects the change keeps its own look.
-    }
-  }
-}
-
-function tip(title: string, rows: Array<[string, string]>): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "text-xs";
-  const h = document.createElement("p");
-  h.className = "font-semibold text-[color:var(--brand-primary)]";
-  h.textContent = title;
-  el.appendChild(h);
-  for (const [k, v] of rows) {
-    const r = document.createElement("p");
-    r.className = "mt-0.5 flex justify-between gap-4 tabular-nums";
-    const a = document.createElement("span");
-    a.textContent = k;
-    const b = document.createElement("span");
-    b.textContent = v;
-    r.append(a, b);
-    el.appendChild(r);
-  }
-  return el;
 }
 
 export function ProjectMap({
@@ -104,37 +57,21 @@ export function ProjectMap({
     let map: MlMap | null = null;
     let popup: Popup | null = null;
     (async () => {
-      const ml = await import("maplibre-gl");
-      if (cancelled || !host.current) return;
-      // MapLibre's background worker, served from our own static files: the
-      // bundler can't package it, and the CSP only allows same-origin workers.
-      ml.setWorkerUrl(withBase("/maplibre-gl-worker.mjs"));
-      let style: StyleSpecification;
-      try {
-        const res = await fetch(STYLE_URL);
-        if (!res.ok) throw new Error();
-        style = (await res.json()) as StyleSpecification;
-      } catch {
-        style = FALLBACK_STYLE;
-        setOffline(true);
-      }
-      if (cancelled || !host.current) return;
-      const m = new ml.Map({ container: host.current, style, attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
+      if (!host.current) return;
+      const made = await createStreetMap(host.current, "light", () => cancelled || !host.current);
+      if (!made) return;
+      const { ml, map: m } = made;
+      if (made.offline) setOffline(true);
       map = m;
       mapRef.current = m;
-      m.touchZoomRotate.disableRotation();
-      m.addControl(new ml.NavigationControl({ showCompass: false }), "top-left");
       popup = new ml.Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: "260px" });
 
       map.on("load", () => {
         if (!map) return;
-        restyle(map);
         map.addSource("pins", {
           type: "geojson",
           data: dataRef.current,
-          cluster: true,
-          clusterRadius: 36,
-          clusterMaxZoom: 17,
+          ...CLUSTER,
           clusterProperties: { total: ["+", ["get", "total"]], open: ["+", ["get", "open"]] },
         });
         setReady(true);
@@ -237,15 +174,11 @@ export function ProjectMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !points.length) return;
-    const lons = points.map((p) => p.lon);
-    const lats = points.map((p) => p.lat);
-    map.fitBounds(
-      [
-        [Math.min(...lons), Math.min(...lats)],
-        [Math.max(...lons), Math.max(...lats)],
-      ],
-      // Extra room on the right keeps pins clear of the legend box.
-      { padding: { top: 50, bottom: 50, left: 70, right: Math.min(300, map.getContainer().clientWidth * 0.35) }, maxZoom: 14, duration: 0 },
+    // Extra room on the right keeps pins clear of the legend box.
+    fitTo(
+      map,
+      points.map((p) => [p.lon, p.lat]),
+      { top: 50, bottom: 50, left: 70, right: Math.min(300, map.getContainer().clientWidth * 0.35) },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placesKey, ready]);

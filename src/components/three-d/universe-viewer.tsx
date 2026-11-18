@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { hasLocations, MAX_THINGS, SHAPES, type Group, type Shape, type Universe3D } from "@/lib/three-d/universe";
+import dynamic from "next/dynamic";
+import { hasLocations, MAX_THINGS, SHAPES, type Group, type Grouping, type Shape, type Universe3D } from "@/lib/three-d/universe";
 import { createUniverse, type PickInfo, type UniverseHandle } from "./universe-engine";
 
 function webglAvailable(): boolean {
@@ -38,6 +39,9 @@ function writePref(p: Pref) {
 // and leaves it zoomed, pushing the controls off screen.
 const SELECT = "min-h-9 w-full min-w-0 rounded-full border border-white/15 bg-white/10 px-3 text-base text-white sm:w-auto sm:text-xs backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800] [&>option]:text-black";
 
+// The street map (maplibre-gl) loads only when someone picks "Map".
+const UniverseMap = dynamic(() => import("./universe-map"), { ssr: false });
+
 // Keeps a dragged panel fully on screen.
 function clampTo(el: HTMLElement | null, x: number, y: number) {
   const box = el?.getBoundingClientRect();
@@ -60,11 +64,14 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   // Flying is the default whatever the device's reduce-motion setting
   // (Windows turns that on with "Animation effects" off); Fade is one tap away.
   const [motion, setMotion] = useState<Motion>(() => (pref.current.motion === "fade" ? "fade" : "fly"));
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [grouping, setGrouping] = useState<Grouping | null>(null);
+  const groups: Group[] = grouping?.groups ?? [];
   const [hover, setHover] = useState<PickInfo | null>(null);
   const [selected, setSelected] = useState<PickInfo | null>(null);
   const [legendOn, setLegendOn] = useState<number | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const onMap = shape === "globe" && !!grouping && !failed;
+  const [mapReset, setMapReset] = useState(0);
   const [keyOpen, setKeyOpen] = useState(true);
   // Where the key has been dragged to (null = its default corner).
   const [keyPos, setKeyPos] = useState<{ x: number; y: number } | null>(null);
@@ -95,11 +102,17 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   useEffect(() => {
     if (!engine.current) return;
     const g = engine.current.arrange(dim, shape);
-    setGroups(g.groups);
+    setGrouping(g);
     setLegendOn(null);
     setSelected(null);
     engine.current.highlightGroup(null);
   }, [dim, shape, failed]);
+
+  // The 3D scene stops drawing while the street map covers it.
+  useEffect(() => {
+    engine.current?.setPaused(onMap);
+    if (onMap) setHover(null);
+  }, [onMap]);
 
   useEffect(() => {
     writePref({ dim, motion });
@@ -137,6 +150,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[#030a14] text-white" role="dialog" aria-modal="true" aria-label={`${universe.title} in 3D`}>
       <div ref={host} className="absolute inset-0" />
+      {onMap && grouping ? <UniverseMap universe={universe} grouping={grouping} highlight={legendOn} resetKey={mapReset} /> : null}
 
       <header className="pointer-events-none relative z-10 flex flex-wrap items-center gap-3 bg-gradient-to-b from-[#030a14]/90 to-transparent px-4 pb-10 pt-4 sm:px-6">
         <button
@@ -161,7 +175,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
           </h2>
         </div>
         <div className="pointer-events-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <label className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-xs text-white/70 sm:flex-none">
+          <label className="flex w-full min-w-0 items-center gap-2 whitespace-nowrap text-xs text-white/70 sm:w-auto">
             Organise by
             <select value={dim} onChange={(e) => setDim(e.target.value)} className={SELECT}>
               {universe.dims.map((d) => (
@@ -322,7 +336,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
 
       <footer className="pointer-events-none relative z-10 mt-auto flex flex-wrap items-end gap-3 bg-gradient-to-t from-[#030a14]/90 to-transparent px-4 pb-4 pt-10 sm:px-6">
         <p className="text-xs text-white/50 sm:ml-auto">
-          {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}Drag to orbit · Scroll or pinch to zoom · Click a record for its properties
+          {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}{onMap ? "Drag to move · Scroll or pinch to zoom · Numbered pins split apart as you zoom in · Tap a pin for its breakdown" : "Drag to orbit · Scroll or pinch to zoom · Click a record for its properties"}
         </p>
         <div className="pointer-events-auto flex gap-2">
           <button
@@ -339,6 +353,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
           </button>
           <button
             type="button"
+            hidden={onMap}
             onClick={() => {
               const next = !spin;
               setSpin(next);
@@ -350,7 +365,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
           </button>
           <button
             type="button"
-            onClick={() => engine.current?.resetView()}
+            onClick={() => (onMap ? setMapReset((n) => n + 1) : engine.current?.resetView())}
             className="min-h-9 rounded-full border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
           >
             Reset view

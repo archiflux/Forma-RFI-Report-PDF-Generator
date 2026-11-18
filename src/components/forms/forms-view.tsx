@@ -135,7 +135,7 @@ export function FormsView({
             className="min-h-9 w-56 rounded-lg border border-[color:var(--brand-border)] bg-white px-3 text-xs"
           />
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Open3DButton build={() => formsUniverse(forms, now, locations)} />
+            <Open3DButton build={() => formsUniverse(forms, now, locations, "Forms", postcodeLocations ?? {})} />
             <PdfButton
               build={(includeRegister, maxRegisterRows) =>
                 applyLayoutToReport(
