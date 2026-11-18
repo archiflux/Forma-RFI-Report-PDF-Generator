@@ -3,9 +3,15 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MlMap, Popup } from "maplibre-gl";
-import { CLUSTER, createStreetMap, fitTo, tip } from "@/lib/map/maplibre";
+import { addCountLayer, CLUSTER, countRadius, createStreetMap, fitTo, pinsUnder, tip, zoomInto } from "@/lib/map/maplibre";
 import { placeOf, type Grouping, type Universe3D } from "@/lib/three-d/universe";
 import { mapPlaces } from "@/lib/three-d/map-places";
+
+export interface MapPick {
+  placeIds: string[];
+  title: string;
+  zoomIn: () => void;
+}
 
 // The 3D view's "Map": the same street map and splitting pins as the 2D
 // dashboard, in the 3D view's dark palette. Each pin takes the colour of
@@ -16,12 +22,17 @@ export default function UniverseMap({
   grouping,
   highlight,
   resetKey = 0,
+  onPick,
 }: {
   universe: Universe3D;
   grouping: Grouping;
   highlight: number | null;
   resetKey?: number;
+  // A tapped pin or cluster: the places it holds, and a way to zoom in.
+  onPick: (pick: MapPick) => void;
 }) {
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
   const host = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -52,16 +63,23 @@ export default function UniverseMap({
           const { title, rows } = placesRef.current.describe(p);
           popup.setLngLat(e.lngLat).setDOMContent(tip(title, rows, true)).addTo(m);
         };
-        m.on("click", "clusters", async (e) => {
-          const f = e.features?.[0];
+        // Tap a pin or cluster to list its records in the details panel.
+        const pick = async (e: { lngLat: { lng: number; lat: number }; features?: Array<{ properties?: Record<string, unknown> }> }) => {
+          const p = e.features?.[0]?.properties;
           const src = m.getSource("pins") as GeoJSONSource | undefined;
-          if (!f || !src) return;
-          const zoom = await src.getClusterExpansionZoom(f.properties?.cluster_id as number);
+          if (!p || !src) return;
           popup?.remove();
-          m.easeTo({ center: (f.geometry as unknown as { coordinates: [number, number] }).coordinates, zoom: Math.min(zoom, 18) });
-        });
-        // Tap (phones) or hover (mouse) a pin for its breakdown.
-        m.on("click", "pins", show);
+          const pins = await pinsUnder(src, p);
+          const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+          onPickRef.current({
+            placeIds: pins.map((x) => String(x.id)),
+            title: pins.length === 1 ? String(pins[0]?.name ?? "") : `${pins.length} places`,
+            zoomIn: () => void zoomInto(m, src, p, at),
+          });
+        };
+        m.on("click", "clusters", pick);
+        m.on("click", "pins", pick);
+        // Hover (mouse) for a quick breakdown.
         m.on("mousemove", "pins", show);
         m.on("mousemove", "clusters", show);
         for (const layer of ["clusters", "pins"]) {
@@ -87,12 +105,12 @@ export default function UniverseMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    for (const l of ["cluster-count", "clusters", "pins"]) if (map.getLayer(l)) map.removeLayer(l);
+    for (const l of ["counts", "clusters", "pins"]) if (map.getLayer(l)) map.removeLayer(l);
     // clusterProperties are fixed when a source is created, so rebuild it
     // when the groups change.
     if (map.getSource("pins")) map.removeSource("pins");
     map.addSource("pins", { type: "geojson", data: places.geojson, ...CLUSTER, clusterProperties: places.clusterProperties });
-    const radius = ["interpolate", ["linear"], ["sqrt", ["get", "total"]], 1, 7, Math.sqrt(places.maxTotal), 24];
+    const radius = countRadius(places.maxTotal);
     map.addLayer({
       id: "clusters",
       type: "circle",
@@ -100,23 +118,13 @@ export default function UniverseMap({
       filter: ["has", "point_count"],
       paint: {
         "circle-color": places.colour as never,
-        "circle-radius": ["+", 5, radius] as never,
+        "circle-radius": ["+", 3, radius] as never,
         "circle-stroke-color": "rgba(255,255,255,0.9)",
         "circle-stroke-width": 2.5,
         "circle-opacity": 0.92,
         "circle-blur": 0.05,
       },
     });
-    if (map.getStyle().glyphs) {
-      map.addLayer({
-        id: "cluster-count",
-        type: "symbol",
-        source: "pins",
-        filter: ["has", "point_count"],
-        layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 12, "text-font": ["Noto Sans Bold"] },
-        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0,0,0,0.35)", "text-halo-width": 1 },
-      });
-    }
     map.addLayer({
       id: "pins",
       type: "circle",
@@ -130,6 +138,7 @@ export default function UniverseMap({
         "circle-opacity": 0.95,
       },
     });
+    addCountLayer(map, "pins");
   }, [places, ready]);
 
   // Frame the pins when the set of places changes (not on every highlight).

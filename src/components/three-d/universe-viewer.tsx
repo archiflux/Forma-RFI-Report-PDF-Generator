@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import dynamic from "next/dynamic";
-import { hasLocations, MAX_THINGS, SHAPES, type Group, type Grouping, type Shape, type Universe3D } from "@/lib/three-d/universe";
+import type { MapPick } from "./universe-map";
+import { placeOf, hasLocations, MAX_THINGS, SHAPES, type Group, type Grouping, type Shape, type Universe3D } from "@/lib/three-d/universe";
 import { createUniverse, type PickInfo, type UniverseHandle } from "./universe-engine";
 
 function webglAvailable(): boolean {
@@ -72,6 +73,8 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   const [failed, setFailed] = useState<string | null>(null);
   const onMap = shape === "globe" && !!grouping && !failed;
   const [mapReset, setMapReset] = useState(0);
+  // The pin or cluster tapped on the map; its records list in the panel.
+  const [placePick, setPlacePick] = useState<MapPick | null>(null);
   const [keyOpen, setKeyOpen] = useState(true);
   // Where the key has been dragged to (null = its default corner).
   const [keyPos, setKeyPos] = useState<{ x: number; y: number } | null>(null);
@@ -103,6 +106,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
     if (!engine.current) return;
     const g = engine.current.arrange(dim, shape);
     setGrouping(g);
+    setPlacePick(null);
     setLegendOn(null);
     setSelected(null);
     engine.current.highlightGroup(null);
@@ -112,6 +116,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   useEffect(() => {
     engine.current?.setPaused(onMap);
     if (onMap) setHover(null);
+    else setPlacePick(null);
   }, [onMap]);
 
   useEffect(() => {
@@ -125,6 +130,25 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   };
 
   const total = universe.things.length;
+
+  const LIST_MAX = 300;
+  const placeRecords = useMemo(() => {
+    if (!placePick || !grouping) return [];
+    const ids = new Set(placePick.placeIds);
+    const out: Array<{ i: number; gi: number }> = [];
+    universe.things.forEach((t, i) => {
+      const gi = grouping.groupOf[i] as number;
+      if (legendOn !== null && gi !== legendOn) return;
+      const pl = placeOf(t, universe.locations);
+      if (pl && ids.has(pl.id)) out.push({ i, gi });
+    });
+    return out.sort((a, b) => a.gi - b.gi || (universe.things[a.i]?.title ?? "").localeCompare(universe.things[b.i]?.title ?? ""));
+  }, [placePick, grouping, legendOn, universe]);
+  const placeBreakdown = useMemo(() => {
+    const c = new Map<number, number>();
+    for (const r of placeRecords) c.set(r.gi, (c.get(r.gi) ?? 0) + 1);
+    return [...c.entries()].sort((a, b) => b[1] - a[1]);
+  }, [placeRecords]);
 
   const clampKey = (x: number, y: number) => clampTo(keyBox.current, x, y);
   const startDrag = (e: RPointerEvent<HTMLElement>) => {
@@ -150,7 +174,18 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[#030a14] text-white" role="dialog" aria-modal="true" aria-label={`${universe.title} in 3D`}>
       <div ref={host} className="absolute inset-0" />
-      {onMap && grouping ? <UniverseMap universe={universe} grouping={grouping} highlight={legendOn} resetKey={mapReset} /> : null}
+      {onMap && grouping ? (
+        <UniverseMap
+          universe={universe}
+          grouping={grouping}
+          highlight={legendOn}
+          resetKey={mapReset}
+          onPick={(pk) => {
+            setSelected(null);
+            setPlacePick(pk);
+          }}
+        />
+      ) : null}
 
       <header className="pointer-events-none relative z-10 flex flex-wrap items-center gap-3 bg-gradient-to-b from-[#030a14]/90 to-transparent px-4 pb-10 pt-4 sm:px-6">
         <button
@@ -225,14 +260,81 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
       <aside
         className={`absolute z-20 flex flex-col rounded-2xl border border-white/15 bg-[#0b1b2e]/90 text-sm shadow-2xl backdrop-blur-md transition duration-300
           inset-x-3 bottom-3 max-h-[55vh] sm:inset-x-auto sm:bottom-24 sm:right-4 sm:top-36 sm:max-h-none sm:w-[22rem]
-          ${selected ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
+          ${selected || placePick ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
         aria-label="Properties"
-        aria-hidden={!selected}
+        aria-hidden={!selected && !placePick}
       >
+        {!selected && placePick ? (
+          <>
+            <div className="flex items-start gap-3 border-b border-white/10 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">On the map</p>
+                <p className="mt-1 font-semibold text-white">{placePick.title}</p>
+                <p className="mt-0.5 text-xs text-white/65">
+                  {placeRecords.length.toLocaleString("en-GB")} {universe.noun}
+                  {legendOn !== null ? ` · ${groups[legendOn]?.label ?? ""} only` : ""}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {placeBreakdown.slice(0, 6).map(([gi, n]) => (
+                    <span key={gi} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/85">
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: groups[gi]?.colour }} />
+                      {groups[gi]?.label} {n.toLocaleString("en-GB")}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button type="button" onClick={() => setPlacePick(null)} className="rounded-full px-2 text-lg leading-none text-white/60 hover:text-white" aria-label="Close">
+                ×
+              </button>
+            </div>
+            <ul className="min-h-0 flex-1 overflow-y-auto px-2 py-2 text-xs">
+              {placeRecords.slice(0, LIST_MAX).map(({ i, gi }) => {
+                const t = universe.things[i];
+                const g = groups[gi];
+                if (!t || !g) return null;
+                return (
+                  <li key={t.key}>
+                    <button
+                      type="button"
+                      onClick={() => setSelected({ thing: t, group: g, x: 0, y: 0 })}
+                      className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/10"
+                    >
+                      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: g.colour }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-white/90">{t.title}</span>
+                        <span className="block truncate text-white/50">{t.subtitle}</span>
+                      </span>
+                      <span className="shrink-0 text-white/40">›</span>
+                    </button>
+                  </li>
+                );
+              })}
+              {placeRecords.length > LIST_MAX ? (
+                <li className="px-2 py-1.5 text-white/50">
+                  Showing the first {LIST_MAX}. Pick a group in the key or zoom in to narrow it down.
+                </li>
+              ) : null}
+            </ul>
+            <div className="border-t border-white/10 p-3">
+              <button
+                type="button"
+                onClick={() => placePick.zoomIn()}
+                className="inline-flex min-h-9 items-center rounded-full border border-white/15 bg-white/10 px-4 text-xs font-medium hover:bg-white/20"
+              >
+                Zoom in here
+              </button>
+            </div>
+          </>
+        ) : null}
         {selected ? (
           <>
             <div className="flex items-start gap-3 border-b border-white/10 p-4">
               <div className="min-w-0 flex-1">
+                {placePick ? (
+                  <button type="button" onClick={() => setSelected(null)} className="mb-1 text-xs text-[#d1c800] hover:underline">
+                    ‹ Back to {placePick.title}
+                  </button>
+                ) : null}
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Properties</p>
                 <p className="mt-1 font-semibold text-white">{selected.note?.title ?? selected.thing.title}</p>
                 <p className="mt-0.5 text-xs text-white/65">{selected.note?.subtitle ?? selected.thing.subtitle}</p>
@@ -336,7 +438,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
 
       <footer className="pointer-events-none relative z-10 mt-auto flex flex-wrap items-end gap-3 bg-gradient-to-t from-[#030a14]/90 to-transparent px-4 pb-4 pt-10 sm:px-6">
         <p className="text-xs text-white/50 sm:ml-auto">
-          {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}{onMap ? "Drag to move · Scroll or pinch to zoom · Numbered pins split apart as you zoom in · Tap a pin for its breakdown" : "Drag to orbit · Scroll or pinch to zoom · Click a record for its properties"}
+          {total >= MAX_THINGS ? `Showing the first ${MAX_THINGS.toLocaleString("en-GB")}. ` : ""}{onMap ? "Drag to move · Scroll or pinch to zoom · Pins merge and split as you zoom · Tap a pin to list its records" : "Drag to orbit · Scroll or pinch to zoom · Click a record for its properties"}
         </p>
         <div className="pointer-events-auto flex gap-2">
           <button

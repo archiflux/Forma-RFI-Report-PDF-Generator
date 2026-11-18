@@ -56,8 +56,8 @@ export function mapPlaces(u: Universe3D, g: Grouping, highlight: number | null) 
     const rows: Array<[string, string]> = [[noun, total.toLocaleString("en-GB")]];
     for (const [label, c] of counts.slice(0, 5)) rows.push([label, c.toLocaleString("en-GB")]);
     if (counts.length > 5) rows.push([`${counts.length - 5} more groups`, ""]);
+    rows.push(["Click for the list", ""]);
     if (p.cluster) {
-      rows.push(["Tap or click to zoom in", ""]);
       return { title: `${Number(p.point_count ?? 0).toLocaleString("en-GB")} places close together`, rows };
     }
     return { title: String(p.name ?? ""), rows };

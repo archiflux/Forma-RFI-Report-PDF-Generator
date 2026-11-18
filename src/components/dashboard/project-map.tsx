@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MlMap, Popup } from "maplibre-gl";
 import { HEAT_RAMP, type GlobePoint } from "@/lib/dashboard/globe";
 import { useWidth } from "@/components/charts/use-width";
-import { CLUSTER, createStreetMap, fitTo, tip } from "@/lib/map/maplibre";
+import { addCountLayer, CLUSTER, countRadius, createStreetMap, detailsCard, fitTo, pinsUnder, tip, zoomInto } from "@/lib/map/maplibre";
 
 // Street map for "Projects on the map" (see lib/map/maplibre). Pins close
 // together merge into a numbered cluster that splits apart as you zoom in.
@@ -55,7 +55,8 @@ export function ProjectMap({
   useEffect(() => {
     let cancelled = false;
     let map: MlMap | null = null;
-    let popup: Popup | null = null;
+    let hover: Popup | null = null;
+    let details: Popup | null = null;
     (async () => {
       if (!host.current) return;
       const made = await createStreetMap(host.current, "light", () => cancelled || !host.current);
@@ -64,7 +65,8 @@ export function ProjectMap({
       if (made.offline) setOffline(true);
       map = m;
       mapRef.current = m;
-      popup = new ml.Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: "260px" });
+      hover = new ml.Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: "260px" });
+      details = new ml.Popup({ closeButton: false, closeOnClick: true, offset: 14, maxWidth: "300px" });
 
       map.on("load", () => {
         if (!map) return;
@@ -75,62 +77,82 @@ export function ProjectMap({
           clusterProperties: { total: ["+", ["get", "total"]], open: ["+", ["get", "open"]] },
         });
         setReady(true);
-        const id = (e: { features?: Array<{ properties?: Record<string, unknown> }> }) => e.features?.[0]?.properties ?? {};
+        const props = (e: { features?: Array<{ properties?: Record<string, unknown> }> }) => e.features?.[0]?.properties ?? {};
+        const Noun = `${noun[0]?.toUpperCase()}${noun.slice(1)}`;
 
-        map.on("click", "clusters", async (e) => {
-          const f = e.features?.[0];
+        // Tap a pin or a numbered cluster for the places it holds; filter
+        // or zoom in from there.
+        const openDetails = async (e: { lngLat: { lng: number; lat: number }; features?: Array<{ properties?: Record<string, unknown> }> }) => {
+          const p = props(e);
           const src = map?.getSource("pins") as GeoJSONSource | undefined;
-          if (!f || !src || !map) return;
-          const zoom = await src.getClusterExpansionZoom(f.properties?.cluster_id as number);
-          map.easeTo({ center: (f.geometry as unknown as { coordinates: [number, number] }).coordinates, zoom: Math.min(zoom, 18) });
-        });
-        map.on("click", "pins", (e) => {
-          const p = id(e);
-          if (typeof p.id === "string") onSelectRef.current?.(p.id);
-        });
+          if (!map || !src || !details) return;
+          hover?.remove();
+          const pins = (await pinsUnder(src, p)).sort((x, y) => Number(y.total) - Number(x.total));
+          const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+          const m = map;
+          const d = details;
+          d.setLngLat(at)
+            .setDOMContent(
+              detailsCard({
+                title: pins.length === 1 ? String(pins[0]?.name ?? "") : `${pins.length} places`,
+                rows: [
+                  [Noun, Number(p.total).toLocaleString("en-GB")],
+                  ["Open", Number(p.open).toLocaleString("en-GB")],
+                ],
+                places: pins.length > 1 ? pins.map((x) => ({ id: String(x.id), name: String(x.name), total: Number(x.total), open: Number(x.open) })) : [],
+                onPlace: onSelectRef.current
+                  ? (id) => {
+                      d.remove();
+                      onSelectRef.current?.(id);
+                    }
+                  : undefined,
+                actions: [
+                  ...(pins.length === 1 && onSelectRef.current
+                    ? [{ label: per === "site" ? "Filter to this site" : "Filter to this project", run: () => onSelectRef.current?.(String(pins[0]?.id)) }]
+                    : []),
+                  { label: "Zoom in", run: () => void zoomInto(m, src, p, at) },
+                ],
+                close: () => d.remove(),
+              }),
+            )
+            .addTo(m);
+        };
+        map.on("click", "clusters", openDetails);
+        map.on("click", "pins", openDetails);
         for (const layer of ["clusters", "pins"]) {
           map.on("mouseenter", layer, () => {
             if (map) map.getCanvas().style.cursor = "pointer";
           });
           map.on("mouseleave", layer, () => {
             if (map) map.getCanvas().style.cursor = "";
-            popup?.remove();
+            hover?.remove();
           });
         }
-        map.on("mousemove", "pins", (e) => {
-          const p = id(e);
-          if (!map || !popup) return;
-          popup
-            .setLngLat(e.lngLat)
-            .setDOMContent(tip(String(p.name ?? ""), [[`${noun[0]?.toUpperCase()}${noun.slice(1)}`, String(p.total)], ["Open", String(p.open)]]))
-            .addTo(map);
-        });
-        map.on("mousemove", "clusters", (e) => {
-          const p = id(e);
-          if (!map || !popup) return;
-          popup
-            .setLngLat(e.lngLat)
-            .setDOMContent(tip(`${p.point_count} pins close together`, [[`${noun[0]?.toUpperCase()}${noun.slice(1)}`, String(p.total)], ["Open", String(p.open)], ["Click to zoom in", ""]]))
-            .addTo(map);
-        });
+        const showHover = (title: string, p: Record<string, unknown>, extra: Array<[string, string]>, at: { lng: number; lat: number }) => {
+          if (!map || !hover || details?.isOpen()) return;
+          hover.setLngLat(at).setDOMContent(tip(title, [[Noun, Number(p.total).toLocaleString("en-GB")], ["Open", Number(p.open).toLocaleString("en-GB")], ...extra])).addTo(map);
+        };
+        map.on("mousemove", "pins", (e) => showHover(String(props(e).name ?? ""), props(e), [["Click for details", ""]], e.lngLat));
+        map.on("mousemove", "clusters", (e) => showHover(`${props(e).point_count} places close together`, props(e), [["Click for details", ""]], e.lngLat));
       });
     })();
     return () => {
       cancelled = true;
-      popup?.remove();
+      hover?.remove();
+      details?.remove();
       map?.remove();
       mapRef.current = null;
     };
-  }, [noun]);
+  }, [noun, per]);
 
   // Layers depend on the data's range, so (re)build them when it changes.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     (map.getSource("pins") as GeoJSONSource | undefined)?.setData(data);
-    for (const l of ["cluster-count", "clusters", "pins"]) if (map.getLayer(l)) map.removeLayer(l);
+    for (const l of ["counts", "clusters", "pins"]) if (map.getLayer(l)) map.removeLayer(l);
     const colour = ["interpolate", ["linear"], ["sqrt", ["/", ["get", "open"], maxOpen]], 0, HEAT_RAMP[0], 0.25, HEAT_RAMP[1], 0.5, HEAT_RAMP[2], 0.75, HEAT_RAMP[3], 1, HEAT_RAMP[4]];
-    const radius = ["interpolate", ["linear"], ["sqrt", ["get", "total"]], 1, 7, Math.sqrt(maxTotal), 22];
+    const radius = countRadius(maxTotal);
     map.addLayer({
       id: "clusters",
       type: "circle",
@@ -138,22 +160,12 @@ export function ProjectMap({
       filter: ["has", "point_count"],
       paint: {
         "circle-color": colour as never,
-        "circle-radius": ["+", 4, radius] as never,
+        "circle-radius": ["+", 3, radius] as never,
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 3,
         "circle-opacity": 0.92,
       },
     });
-    if (map.getStyle().glyphs) {
-      map.addLayer({
-        id: "cluster-count",
-        type: "symbol",
-        source: "pins",
-        filter: ["has", "point_count"],
-        layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 12, "text-font": ["Noto Sans Bold"] },
-        paint: { "text-color": "#ffffff" },
-      });
-    }
     map.addLayer({
       id: "pins",
       type: "circle",
@@ -167,6 +179,7 @@ export function ProjectMap({
         "circle-opacity": 0.95,
       },
     });
+    addCountLayer(map, "pins");
   }, [data, ready, maxOpen, maxTotal]);
 
   // Frame the pins whenever the set of places changes.
@@ -201,8 +214,8 @@ export function ProjectMap({
           </div>
         </div>
         <p>
-          Dot size shows total {noun} per {per}. Numbered dots are pins close together: zoom in or click one to split it apart
-          {onSelect ? ". Click a pin to filter" : ""}.
+          Dot size and number show the {noun} at each place. Dots close together merge, and split apart as you zoom in. Tap a dot for details
+          {onSelect ? " or to filter" : ""}.
         </p>
         {unmapped ? (
           <p className="text-[color:var(--brand-muted)]">
