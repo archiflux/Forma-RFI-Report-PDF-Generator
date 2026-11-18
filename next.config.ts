@@ -30,7 +30,8 @@ const headers: NextConfig["headers"] = async () => [
           "font-src 'self' data:",
           // data: lets @react-pdf/renderer load its inlined WebAssembly
           // (yoga layout) instead of falling back after a CSP refusal.
-          `connect-src 'self' data: ${APS}`,
+          // OpenFreeMap: street map tiles, glyphs and sprites for the maps.
+          `connect-src 'self' data: ${APS} https://tiles.openfreemap.org`,
           "frame-ancestors 'none'",
           "base-uri 'self'",
           "form-action 'self' https://developer.api.autodesk.com",
