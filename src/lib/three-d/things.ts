@@ -19,8 +19,9 @@ function locs(l: Locations): Universe3D["locations"] {
   return out;
 }
 
-// The most-used custom fields become extra "Organise by" options.
-function customDims(customs: Array<Record<string, string> | undefined>, limit = 6): Dim3D[] {
+// Every custom field in use becomes an extra "Organise by" option, most-used
+// first (fields with many values fold into "Other" past 11 groups).
+function customDims(customs: Array<Record<string, string> | undefined>, limit = 200): Dim3D[] {
   const m = new Map<string, number>();
   for (const c of customs) for (const [k, v] of Object.entries(c ?? {})) if (v) m.set(k, (m.get(k) ?? 0) + 1);
   return [...m.entries()]
@@ -63,10 +64,13 @@ export function issuesUniverse(issues: IssueRecord[], now: Date, locations: Loca
     { id: "status", label: "Status" },
     { id: "bucket", label: "Status group" },
     { id: "type", label: "Type" },
+    { id: "subtype", label: "Subtype" },
     { id: "assignee", label: "Assignee" },
+    { id: "createdBy", label: "Created by" },
     { id: "due", label: "Due date" },
     { id: "cause", label: "Root cause" },
     { id: "location", label: "Location" },
+    { id: "pinned", label: "Pinned to model" },
     { id: "project", label: "Project" },
     MONTH_DIM,
     ...custom,
@@ -76,7 +80,10 @@ export function issuesUniverse(issues: IssueRecord[], now: Date, locations: Loca
       status: statusLabel(i.status),
       bucket: BUCKET_LABEL[statusBucket(i.status)],
       type: i.typeName || "Not set",
+      subtype: i.subtypeName || "Not set",
       assignee: i.assignee?.name ?? "Unassigned",
+      createdBy: i.createdBy || "Not set",
+      pinned: i.hasViewpoint ? "Yes" : "No",
       due: dueStatus(i.dueDate, isOutstanding(i), now),
       cause: i.rootCause || "Not set",
       location: i.location ?? "Not set",
@@ -127,9 +134,11 @@ export function formsUniverse(forms: FormRecord[], now: Date, locations: Locatio
   const dims: Dim3D[] = [
     { id: "status", label: "Status" },
     { id: "template", label: "Template" },
+    { id: "templateType", label: "Template type" },
     { id: "due", label: "Due date" },
     { id: "creator", label: "Created by" },
     { id: "site", label: "Site (postcode)" },
+    { id: "location", label: "Location" },
     { id: "project", label: "Project" },
     { id: "month", label: "Month (form date)" },
     ...custom,
@@ -139,6 +148,8 @@ export function formsUniverse(forms: FormRecord[], now: Date, locations: Locatio
     const groups: Record<string, string> = {
       status: formStatusLabel(f.status),
       template: f.templateName || "Not set",
+      templateType: f.templateType || "Not set",
+      location: f.location || "Not set",
       due: dueStatus(f.dueDate, isFormOpen(f), now),
       creator: f.createdBy || "Not set",
       site: f.postcode ?? "No postcode",

@@ -33,10 +33,17 @@ export function Open3DButton({ build }: { build: () => Universe3D }) {
     window.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // three.js places the pinch-zoom centre using page coordinates, which
+    // include the dashboard's scroll; scrolled down, every pinch zoomed
+    // towards a point below the fingers. Sit at the top while 3D is open and
+    // return to the same place afterwards.
+    const { scrollX, scrollY } = window;
+    window.scrollTo(0, 0);
     return () => {
       window.removeEventListener("popstate", onPop);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = overflow;
+      window.scrollTo(scrollX, scrollY);
     };
   }, [universe, close]);
 

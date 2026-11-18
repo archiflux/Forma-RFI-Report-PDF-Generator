@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { hasLocations, MAX_THINGS, SHAPES, type Group, type Shape, type Universe3D } from "@/lib/three-d/universe";
 import { createUniverse, type PickInfo, type UniverseHandle } from "./universe-engine";
 
@@ -34,7 +34,17 @@ function writePref(p: Pref) {
   }
 }
 
-const SELECT = "min-h-9 rounded-full border border-white/15 bg-white/10 px-3 text-xs text-white backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800] [&>option]:text-black";
+// 16px on phones: iOS zooms the whole page into any smaller select it focuses
+// and leaves it zoomed, pushing the controls off screen.
+const SELECT = "min-h-9 w-full min-w-0 rounded-full border border-white/15 bg-white/10 px-3 text-base text-white sm:w-auto sm:text-xs backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800] [&>option]:text-black";
+
+// Keeps a dragged panel fully on screen.
+function clampTo(el: HTMLElement | null, x: number, y: number) {
+  const box = el?.getBoundingClientRect();
+  const w = box?.width ?? 240;
+  const h = box?.height ?? 40;
+  return { x: Math.min(Math.max(8, x), window.innerWidth - w - 8), y: Math.min(Math.max(8, y), window.innerHeight - h - 8) };
+}
 
 // Full-screen 3D dashboard: every record is a cube that flies into towers,
 // a ring, blocks, a timeline, a globe or a galaxy, grouped by the chosen
@@ -56,6 +66,10 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
   const [legendOn, setLegendOn] = useState<number | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [keyOpen, setKeyOpen] = useState(true);
+  // Where the key has been dragged to (null = its default corner).
+  const [keyPos, setKeyPos] = useState<{ x: number; y: number } | null>(null);
+  const keyBox = useRef<HTMLElement | null>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
   const [spin, setSpin] = useState(true);
   const empty = universe.things.length === 0;
 
@@ -99,6 +113,27 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
 
   const total = universe.things.length;
 
+  const clampKey = (x: number, y: number) => clampTo(keyBox.current, x, y);
+  const startDrag = (e: RPointerEvent<HTMLElement>) => {
+    const box = keyBox.current?.getBoundingClientRect();
+    if (!box) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { dx: e.clientX - box.left, dy: e.clientY - box.top };
+  };
+  const moveDrag = (e: RPointerEvent<HTMLElement>) => {
+    if (!drag.current) return;
+    setKeyPos(clampKey(e.clientX - drag.current.dx, e.clientY - drag.current.dy));
+  };
+  const endDrag = () => {
+    drag.current = null;
+  };
+  useEffect(() => {
+    const onResize = () => setKeyPos((p) => (p ? clampTo(keyBox.current, p.x, p.y) : p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[#030a14] text-white" role="dialog" aria-modal="true" aria-label={`${universe.title} in 3D`}>
       <div ref={host} className="absolute inset-0" />
@@ -126,7 +161,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
           </h2>
         </div>
         <div className="pointer-events-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <label className="flex items-center gap-2 text-xs text-white/70">
+          <label className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-xs text-white/70 sm:flex-none">
             Organise by
             <select value={dim} onChange={(e) => setDim(e.target.value)} className={SELECT}>
               {universe.dims.map((d) => (
@@ -136,7 +171,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
               ))}
             </select>
           </label>
-          <div className="flex flex-wrap gap-1 rounded-full border border-white/15 bg-white/5 p-1 backdrop-blur-md" role="radiogroup" aria-label="Shape">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-full border border-white/15 bg-white/5 p-1 backdrop-blur-md [scrollbar-width:none] sm:flex-wrap" role="radiogroup" aria-label="Shape">
             {shapes.map((s) => (
               <button
                 key={s.id}
@@ -144,7 +179,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
                 role="radio"
                 aria-checked={shape === s.id}
                 onClick={() => setShape(s.id)}
-                className={`min-h-7 rounded-full px-3 text-xs transition ${shape === s.id ? "bg-[#d1c800] font-semibold text-[#0e2841]" : "text-white/80 hover:bg-white/10"}`}
+                className={`min-h-7 shrink-0 rounded-full px-3 text-xs transition ${shape === s.id ? "bg-[#d1c800] font-semibold text-[#0e2841]" : "text-white/80 hover:bg-white/10"}`}
               >
                 {s.label}
               </button>
@@ -229,19 +264,41 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
         ) : null}
       </aside>
 
+      {/* The key sits bottom-left on phones (clear of the controls at the top)
+          and top-left on larger screens; drag the grip to move it anywhere. */}
       <section
-        className="pointer-events-auto absolute left-4 top-36 z-10 w-[15rem] max-w-[calc(100%-2rem)] rounded-2xl border border-white/10 bg-[#0b1b2e]/75 text-xs shadow-xl backdrop-blur-md sm:left-6 sm:top-28"
+        ref={keyBox}
+        className={`pointer-events-auto absolute z-10 w-[15rem] max-w-[calc(100%-1.5rem)] rounded-2xl border border-white/10 bg-[#0b1b2e]/75 text-xs shadow-xl backdrop-blur-md ${
+          keyPos ? "" : "bottom-40 left-3 sm:bottom-auto sm:left-6 sm:top-36"
+        }`}
+        style={keyPos ? { left: keyPos.x, top: keyPos.y } : undefined}
         aria-label="Colour key"
       >
-        <button type="button" onClick={() => setKeyOpen((v) => !v)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left" aria-expanded={keyOpen}>
-          <span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Key</span>
-            <span className="ml-2 text-white/85">{universe.dims.find((d) => d.id === dim)?.label}</span>
+        <div className="flex items-center">
+          <span
+            onPointerDown={startDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onDoubleClick={() => setKeyPos(null)}
+            className="flex h-10 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-white/40 hover:text-white/80 active:cursor-grabbing"
+            title="Drag to move the key (double-click to put it back)"
+            aria-hidden
+          >
+            <svg width="10" height="16" viewBox="0 0 10 16">
+              {[2, 8].map((x) => [2, 8, 14].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="currentColor" />))}
+            </svg>
           </span>
-          <span className="text-white/50">{keyOpen ? "–" : "+"}</span>
-        </button>
+          <button type="button" onClick={() => setKeyOpen((v) => !v)} className="flex min-h-10 min-w-0 flex-1 items-center justify-between gap-2 py-2 pr-3 text-left" aria-expanded={keyOpen}>
+            <span className="min-w-0 truncate">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Key</span>
+              <span className="ml-2 text-white/85">{universe.dims.find((d) => d.id === dim)?.label}</span>
+            </span>
+            <span className="text-white/50">{keyOpen ? "–" : "+"}</span>
+          </button>
+        </div>
         {keyOpen ? (
-          <ul className="max-h-[40vh] overflow-y-auto px-1.5 pb-1.5">
+          <ul className="max-h-[30vh] overflow-y-auto px-1.5 pb-1.5 sm:max-h-[40vh]">
             {groups.map((g, i) => (
               <li key={g.label}>
                 <button
