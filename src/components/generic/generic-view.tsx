@@ -20,7 +20,7 @@ import { PdfButton } from "@/components/dashboard/pdf-button";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import type { ProjectLocation } from "@/lib/aps/project-location";
 import { globePoints } from "@/lib/dashboard/globe";
-import { ProjectGlobe } from "@/components/dashboard/project-globe";
+import { ProjectMap } from "@/components/dashboard/project-map";
 import { RegisterTable } from "@/components/dashboard/register-table";
 import { Hideable } from "@/components/dashboard/panel";
 import { PanelLayoutContext, useViewLayout } from "@/components/dashboard/layout-context";
@@ -158,7 +158,7 @@ export function GenericView<T extends BaseRecord>({
 
         {locations ? (
           <Panel id="map" title="Projects on the map">
-            <ProjectGlobe
+            <ProjectMap
               noun={cfg.noun}
               {...globePoints(items, dataset.projects, locations, cfg.isOpen)}
               selected={f.projectIds}

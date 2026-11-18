@@ -28,7 +28,7 @@ import { KpiTiles } from "./kpi-tiles";
 import { MultiSelect } from "./multi-select";
 import type { ProjectLocation } from "@/lib/aps/project-location";
 import { globePoints } from "@/lib/dashboard/globe";
-import { ProjectGlobe } from "@/components/dashboard/project-globe";
+import { ProjectMap } from "@/components/dashboard/project-map";
 import { Panel } from "./panel";
 import { Treemap } from "@/components/charts/treemap";
 import { Donut } from "@/components/charts/donut";
@@ -162,7 +162,7 @@ export function DashboardView({
 
         {locations ? (
           <Panel id="map" title="Projects on the map">
-            <ProjectGlobe
+            <ProjectMap
               noun="issues"
               {...globePoints(issues, dataset.projects, locations, isOutstanding)}
               selected={f.projectIds}

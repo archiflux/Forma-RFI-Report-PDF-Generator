@@ -16,7 +16,7 @@ import { Panel } from "@/components/dashboard/panel";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import type { ProjectLocation } from "@/lib/aps/project-location";
 import { sitePoints } from "@/lib/dashboard/globe";
-import { ProjectGlobe } from "@/components/dashboard/project-globe";
+import { ProjectMap } from "@/components/dashboard/project-map";
 import { RegisterTable } from "@/components/dashboard/register-table";
 import { Hideable } from "@/components/dashboard/panel";
 import { PanelLayoutContext, useViewLayout } from "@/components/dashboard/layout-context";
@@ -172,7 +172,7 @@ export function FormsView({
 
         {mapped ? (
           <Panel id="map" title={mapped.sites ? "Sites and projects on the map" : "Projects on the map"}>
-            <ProjectGlobe
+            <ProjectMap
               noun="forms"
               points={mapped.points}
               unmapped={mapped.unmapped}
