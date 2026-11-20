@@ -14,7 +14,12 @@ import {
   rfisHaveCustomAttributes,
 } from "./rfis";
 import { getProjectName } from "./projects";
-import { buildUserRoster, getProjectUsers } from "./users";
+import {
+  buildUserRoster,
+  getProjectUsers,
+  mergeRosters,
+  scrapeMentionRoster,
+} from "./users";
 import { useApsClient } from "./use-client";
 import { readHydrated, writeHydrated } from "./hydration-cache";
 import type { Rfi } from "./types";
@@ -84,9 +89,17 @@ export function useIssuesData(projectId: string, hubId?: string) {
   const baseItems = itemsQ.data ?? [];
   const baseOrHydrated = hydratedQ.data ?? baseItems;
 
-  const userRoster = useMemo(
+  const adminRoster = useMemo(
     () => buildUserRoster(usersQ.data ?? []),
     [usersQ.data],
+  );
+  const mentionRoster = useMemo(
+    () => scrapeMentionRoster(baseOrHydrated),
+    [baseOrHydrated],
+  );
+  const userRoster = useMemo(
+    () => mergeRosters(adminRoster, mentionRoster),
+    [adminRoster, mentionRoster],
   );
   const items = useMemo(
     () => applyUserRoster(baseOrHydrated, userRoster),

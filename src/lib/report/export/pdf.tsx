@@ -27,6 +27,7 @@ export interface PdfBuildInput {
   totalAfterFilter: number;
   itemKind?: "rfi" | "issue";
   logoDataUri?: string;
+  logoWhiteDataUri?: string;
 }
 
 function makeStyles(
@@ -335,6 +336,7 @@ export function ReportPdf({
   totalAfterFilter,
   itemKind = "rfi",
   logoDataUri,
+  logoWhiteDataUri,
 }: PdfBuildInput) {
   const itemNoun = itemKind === "issue" ? "Issue" : "RFI";
   const itemNounPlural = itemKind === "issue" ? "Issues" : "RFIs";
@@ -360,7 +362,10 @@ export function ReportPdf({
   const filterLines = describeFilter(template, customAttributes);
   const generatedLabel = generatedAt.toISOString().slice(0, 10);
 
-  const PageHeader = (
+  // Header / footer are rendered via fresh JSX each time — reusing a single
+  // JSX const across multiple <Page>s confuses @react-pdf's `fixed` prop
+  // reconciler and intermittently drops the element from later pages.
+  const renderHeader = () => (
     <View style={styles.pageHeader} fixed>
       {logoDataUri ? (
         <Image src={logoDataUri} style={styles.pageHeaderLogo} />
@@ -371,7 +376,7 @@ export function ReportPdf({
     </View>
   );
 
-  const PageFooter = (
+  const renderFooter = () => (
     <View style={styles.footer} fixed>
       <Text style={styles.footerLeft}>{template.name}</Text>
       <Text
@@ -398,8 +403,11 @@ export function ReportPdf({
         style={[styles.page, { paddingTop: 0, paddingHorizontal: 0 }]}
       >
         <View style={styles.coverHero}>
-          {logoDataUri ? (
-            <Image src={logoDataUri} style={styles.coverLogo} />
+          {logoWhiteDataUri || logoDataUri ? (
+            <Image
+              src={logoWhiteDataUri ?? (logoDataUri as string)}
+              style={styles.coverLogo}
+            />
           ) : null}
           <View style={styles.coverAccentBar} />
           <Text style={styles.coverTitle}>{template.name}</Text>
@@ -440,12 +448,12 @@ export function ReportPdf({
           </View>
         </View>
 
-        {PageFooter}
+        {renderFooter()}
       </Page>
 
       {/* Data pages */}
       <Page size={size} orientation={orientation} style={styles.page}>
-        {PageHeader}
+        {renderHeader()}
 
         {totalAfterFilter === 0 ? (
           <Text style={styles.noRows}>
@@ -485,7 +493,7 @@ export function ReportPdf({
           ))
         )}
 
-        {PageFooter}
+        {renderFooter()}
       </Page>
     </Document>
   );

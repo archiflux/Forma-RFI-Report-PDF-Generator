@@ -15,6 +15,7 @@ import type { CustomAttributeDef, Rfi } from "@/lib/aps/types";
 import type { Brand } from "@/lib/brands";
 import { DEFAULT_BRAND } from "@/lib/brands";
 import { issueUrl, rfiUrl } from "@/lib/aps/links";
+import { renderCommentBody } from "@/lib/aps/users";
 import {
   BUILTIN_COLUMNS,
   formatCustomAttributeValue,
@@ -54,6 +55,10 @@ export interface DetailPdfInput {
   // pipeline so @react-pdf can embed it without a runtime network call.
   // Optional — falls back to a typographic header when missing.
   logoDataUri?: string;
+  // White/reversed variant of the wordmark, used on the navy cover hero
+  // band where the colour variant disappears into the background. Falls
+  // back to the colour variant, then to text, when missing.
+  logoWhiteDataUri?: string;
 }
 
 const PAGE_DIMENSIONS = {
@@ -344,6 +349,7 @@ export function DetailPdf({
   totalAfterFilter,
   itemKind = "rfi",
   logoDataUri,
+  logoWhiteDataUri,
 }: DetailPdfInput) {
   const styles = makeStyles(brand);
   const size: "A4" | "A3" = template.pageSize === "A3" ? "A3" : "A4";
@@ -364,7 +370,10 @@ export function DetailPdf({
     (f) => f !== "question" && f !== "officialResponse" && f !== "suggestedAnswer",
   );
 
-  const PageHeader = (
+  // Header / footer are rendered via fresh JSX each time — reusing a single
+  // JSX const across multiple <Page>s confuses @react-pdf's `fixed` prop
+  // reconciler and intermittently drops the element from later pages.
+  const renderHeader = () => (
     <View style={styles.pageHeader} fixed>
       {logoDataUri ? (
         <Image src={logoDataUri} style={styles.pageHeaderLogo} />
@@ -375,7 +384,7 @@ export function DetailPdf({
     </View>
   );
 
-  const PageFooter = (
+  const renderFooter = () => (
     <View style={styles.footer} fixed>
       <Text style={styles.footerLeft}>{template.name}</Text>
       <Text
@@ -403,8 +412,11 @@ export function DetailPdf({
         style={[styles.page, { paddingTop: 0, paddingHorizontal: 0 }]}
       >
         <View style={styles.coverHero}>
-          {logoDataUri ? (
-            <Image src={logoDataUri} style={styles.coverLogo} />
+          {logoWhiteDataUri || logoDataUri ? (
+            <Image
+              src={logoWhiteDataUri ?? (logoDataUri as string)}
+              style={styles.coverLogo}
+            />
           ) : null}
           <View style={styles.coverAccentBar} />
           <Text style={styles.coverTitle}>{template.name}</Text>
@@ -438,13 +450,13 @@ export function DetailPdf({
           </View>
         </View>
 
-        {PageFooter}
+        {renderFooter()}
       </Page>
 
       {/* Empty-state page when filters exclude everything. */}
       {totalAfterFilter === 0 ? (
         <Page size={size} orientation={orientation} style={styles.page}>
-          {PageHeader}
+          {renderHeader()}
           <Text
             style={{
               marginTop: 30,
@@ -455,7 +467,7 @@ export function DetailPdf({
           >
             No {itemNounPlural.toLowerCase()} match the current filters.
           </Text>
-          {PageFooter}
+          {renderFooter()}
         </Page>
       ) : null}
 
@@ -476,7 +488,7 @@ export function DetailPdf({
               style={styles.page}
               wrap
             >
-              {PageHeader}
+              {renderHeader()}
 
               {showGroupHeading ? (
                 <Text style={styles.sectionHeading}>
@@ -576,13 +588,15 @@ export function DetailPdf({
                           <Text style={styles.officialBadge}>OFFICIAL RESPONSE</Text>
                         ) : null}
                       </Text>
-                      <Text style={styles.commentBody}>{c.body}</Text>
+                      <Text style={styles.commentBody}>
+                        {renderCommentBody(c.body)}
+                      </Text>
                     </View>
                   ))}
                 </View>
               ) : null}
 
-              {PageFooter}
+              {renderFooter()}
             </Page>
           );
         }),

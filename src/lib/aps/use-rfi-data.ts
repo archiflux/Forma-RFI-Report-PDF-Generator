@@ -12,7 +12,12 @@ import {
   scrapeAllRfis,
 } from "./rfis";
 import { getProjectName } from "./projects";
-import { buildUserRoster, getProjectUsers } from "./users";
+import {
+  buildUserRoster,
+  getProjectUsers,
+  mergeRosters,
+  scrapeMentionRoster,
+} from "./users";
 import { getWorkflow } from "./workflow";
 import { useApsClient } from "./use-client";
 import { readHydrated, writeHydrated } from "./hydration-cache";
@@ -98,9 +103,21 @@ export function useRfiData(projectId: string, hubId?: string) {
   const baseOrHydrated = hydratedQ.data ?? baseRfis;
 
   // Fold the user roster into RFIs once both queries have settled.
-  const userRoster = useMemo(
+  // The admin-endpoint roster is the primary source; the mention-scrape
+  // roster fills in for users who have been removed from the project
+  // (ACC retains their mentions in comment bodies but drops them from
+  // /users), so their comments still render with a real name.
+  const adminRoster = useMemo(
     () => buildUserRoster(usersQ.data ?? []),
     [usersQ.data],
+  );
+  const mentionRoster = useMemo(
+    () => scrapeMentionRoster(baseOrHydrated),
+    [baseOrHydrated],
+  );
+  const userRoster = useMemo(
+    () => mergeRosters(adminRoster, mentionRoster),
+    [adminRoster, mentionRoster],
   );
   const rfis = useMemo(
     () => applyUserRoster(baseOrHydrated, userRoster),

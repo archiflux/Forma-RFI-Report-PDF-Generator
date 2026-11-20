@@ -1,5 +1,5 @@
 import type { ApsClient } from "./client";
-import { ApsError } from "./types";
+import { ApsError, type Rfi } from "./types";
 import { normaliseProjectIdForRfi } from "./projects";
 
 export interface ProjectUser {
@@ -108,6 +108,87 @@ export function buildUserRoster(users: ProjectUser[]): Map<string, string> {
     if (enriched.email && !out.has(enriched.email)) {
       out.set(enriched.email, enriched.name);
     }
+  }
+  return out;
+}
+
+// Scrape display names out of @{...} mentions embedded in comment bodies.
+//
+// ACC renders @-mentions in comments by inlining a JSON blob like
+//   @{"type": "user", "id": "NBM2Z2GMMZBK6RR4", "name": "Richard Bowdler"}
+// When a user is later removed from the project, the admin user-roster
+// endpoint drops them, so comments they left render as the raw UUID (or
+// "Unknown"). Their name is still readable in every mention that another
+// user made of them — this walks every comment body and harvests a
+// fallback id → name map we merge into the main roster.
+const MENTION_RE = /@\{[^}]*\}/g;
+
+interface MentionShape {
+  type?: string;
+  id?: string;
+  name?: string;
+  displayName?: string;
+}
+
+export function scrapeMentionRoster(rfis: Rfi[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rfis) {
+    const comments = r.comments;
+    if (!comments || comments.length === 0) continue;
+    for (const c of comments) {
+      const body = c.body;
+      if (!body) continue;
+      const matches = body.match(MENTION_RE);
+      if (!matches) continue;
+      for (const raw of matches) {
+        // raw looks like '@{"type":"user","id":"...","name":"..."}'
+        const json = raw.slice(1);
+        let parsed: MentionShape;
+        try {
+          parsed = JSON.parse(json) as MentionShape;
+        } catch {
+          continue;
+        }
+        const id = parsed?.id;
+        const name = parsed?.name ?? parsed?.displayName;
+        if (typeof id === "string" && id && typeof name === "string" && name) {
+          if (!out.has(id)) out.set(id, name);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// Render a comment body with its inline @{...} JSON mention blobs replaced
+// by human-readable "@Name" tokens. Falls back to "@<id>" when the mention
+// payload omits a name, and strips the blob entirely for malformed JSON.
+export function renderCommentBody(body: string | undefined): string {
+  if (!body) return "";
+  return body.replace(MENTION_RE, (raw) => {
+    const json = raw.slice(1);
+    try {
+      const parsed = JSON.parse(json) as MentionShape;
+      const name = parsed?.name ?? parsed?.displayName;
+      if (typeof name === "string" && name) return `@${name}`;
+      if (typeof parsed?.id === "string" && parsed.id) return `@${parsed.id}`;
+    } catch {
+      // Not a mention blob — drop it rather than leak raw JSON.
+    }
+    return "";
+  });
+}
+
+// Combine two rosters; the primary (passed first) wins on key collisions.
+// Used to layer the mention-scraped fallback under the admin-endpoint
+// roster without letting a stale mention overwrite an authoritative name.
+export function mergeRosters(
+  primary: ReadonlyMap<string, string>,
+  fallback: ReadonlyMap<string, string>,
+): Map<string, string> {
+  const out = new Map(primary);
+  for (const [k, v] of fallback) {
+    if (!out.has(k)) out.set(k, v);
   }
   return out;
 }
