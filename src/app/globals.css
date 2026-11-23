@@ -358,3 +358,9 @@ input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--brand-teal);
 }
+
+/* The guide's pause button freezes its reveals mid-way. */
+.sb-paused *,
+.sb-paused *::after {
+  animation-play-state: paused !important;
+}
