@@ -507,7 +507,7 @@ function IsoCube({ x, y, colour, s = 14, glow = false }: { x: number; y: number;
 function ExploreIn3D({ t }: SceneProps) {
   const path: Waypoint[] = [
     { t: 0, x: 560, y: 380 },
-    { t: 4300, x: 260, y: 214, click: true },
+    { t: 4300, x: 152, y: 230, click: true },
     { t: 6600, x: 200, y: 360 },
   ];
   const picked = t >= 4300;
@@ -577,97 +577,224 @@ function ExploreIn3D({ t }: SceneProps) {
 
 // ---- 7. Share and report
 
-function ShareAndReport({ t }: SceneProps) {
+function Toast({ children, tone = "#10b981", style }: { children: React.ReactNode; tone?: string; style?: React.CSSProperties }) {
+  return (
+    <p className="border-l-[3px] bg-white px-2.5 py-1.5 text-[8px]" style={{ borderColor: tone, color: INK, boxShadow: "0 18px 40px -12px rgba(0,40,50,0.3)", ...style }}>
+      {children}
+    </p>
+  );
+}
+
+function Toolbar({ register = true }: { register?: boolean }) {
+  return (
+    <div className="absolute flex items-center gap-1.5" style={{ right: 16, top: 40 }}>
+      <span className="flex h-[18px] items-center px-2 text-[7.5px] font-semibold text-white" style={{ background: DEEP }}>
+        3D view
+      </span>
+      <span className="relative flex h-[18px] items-center gap-1 pl-4 pr-1 text-[7.5px]" style={{ color: INK }}>
+        <Tick t={0} at={register ? -1 : null} x={0} y={3} />
+        Include register
+      </span>
+      {["Download PDF report", "Download CSV"].map((b) => (
+        <span key={b} className="flex h-[18px] items-center border bg-white px-2 text-[7.5px] font-semibold" style={{ borderColor: "#c9d2d6", color: INK }}>
+          {b}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ---- 7. PDF reports
+
+function PdfReports({ t }: SceneProps) {
   const sheet = ramp(t, 1500, 900);
-  const sheetOut = ramp(t, 3500, 600);
   const path: Waypoint[] = [
-    { t: 0, x: 120, y: 360 },
-    { t: 1300, x: 470, y: 49, click: true },
-    { t: 4300, x: 592, y: 49, click: true },
-    { t: 6600, x: 400, y: 330 },
+    { t: 0, x: 120, y: 370 },
+    { t: 1300, x: 480, y: 49, click: true },
+    { t: 3000, x: 600, y: 330 },
   ];
   return (
     <>
       <Chrome active="Issues" />
-      <div className="absolute flex gap-1.5" style={{ right: 16, top: 40 }}>
-        <span className="flex h-[18px] items-center px-2 text-[7.5px] font-semibold text-white" style={{ background: DEEP }}>
-          3D view
-        </span>
-        {["Download PDF report", "Download CSV", "Share a link"].map((b) => (
-          <span key={b} className="flex h-[18px] items-center border bg-white px-2 text-[7.5px] font-semibold" style={{ borderColor: "#c9d2d6", color: INK }}>
-            {b}
-          </span>
-        ))}
-      </div>
-      <Stat x={16} y={70} label="Issues" value="342" />
-      <Stat x={120} y={70} label="Outstanding" value="211" />
+      <Toolbar />
+      <Stat x={16} y={70} label="Issues" value="27" />
+      <Stat x={120} y={70} label="Outstanding" value="27" />
       <Stat x={224} y={70} label="Overdue" value="27" tone={CITRON} />
-      <Stat x={328} y={70} label="Closed" value="131" tone="#10b981" />
+      <span className="absolute px-1.5 text-[7px] font-semibold uppercase leading-[13px]" style={{ left: 336, top: 72, background: "#f7f5c9", color: "#2b2900", boxShadow: `inset 0 0 0 1px ${CITRON}` }}>
+        Status: Overdue
+      </span>
       <Bar x={16} y={132} w={608}>
-        <span>Issues by status</span>
+        <span>Issue register (27)</span>
       </Bar>
       <Card x={16} y={148} w={608} h={236}>
-        <Lines n={10} x={12} y={14} w={580} />
+        <Lines n={12} x={12} y={14} w={580} />
       </Card>
-      {/* The PDF report: a page shape, no text, rises and is saved. */}
-      {t >= 1500 && sheetOut < 1 ? (
+      {/* The report: A4 landscape, shapes only, so it can move. */}
+      {t >= 1500 ? (
         <div
           className="absolute bg-white"
-          style={{
-            left: 220,
-            top: 70,
-            width: 200,
-            height: 280,
-            boxShadow: "0 28px 60px -16px rgba(0,40,50,0.45)",
-            transform: `translateY(${(1 - sheet) * 340 + sheetOut * -40}px) scale(${1 - sheetOut * 0.5})`,
-            opacity: 1 - sheetOut,
-          }}
+          style={{ left: 150, top: 92, width: 340, height: 240, boxShadow: "0 28px 60px -16px rgba(0,40,50,0.45)", transform: `translateY(${(1 - sheet) * 330}px)` }}
           aria-hidden
         >
-          <span className="absolute left-3 right-3 top-3 h-[4px]" style={{ background: CITRON }} />
-          <span className="absolute left-3 top-[14px] h-[10px] w-[90px]" style={{ background: TEAL }} />
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="absolute h-[26px] w-[40px] border-t-[3px] bg-[#f4f7f8]" style={{ left: 12 + i * 45, top: 34, borderColor: [TEAL, TEAL, CITRON, "#10b981"][i] }} />
+          <span className="absolute left-4 top-4 h-[12px] w-[44px]" style={{ background: TEAL }} />
+          <span className="absolute left-4 top-[32px] h-[7px] w-[120px]" style={{ background: INK }} />
+          <span className="absolute left-4 right-4 top-[46px] h-[3px]" style={{ background: CITRON }} />
+          {[TEAL, TEAL, CITRON, "#10b981", "#7c8a90", "#7c8a90"].map((c, i) => (
+            <span key={i} className="absolute h-[24px] w-[46px] border-t-[3px]" style={{ left: 16 + i * 51, top: 56, borderColor: c, background: "#f4f7f8" }} />
           ))}
-          <span className="absolute left-3 right-3 top-[70px] h-[8px]" style={{ background: TEAL }} />
-          {Array.from({ length: 6 }, (_, i) => (
-            <span key={i} className="absolute left-3 h-[6px] origin-left" style={{ top: 86 + i * 12, width: 150, background: "#2a78d6", transform: `scaleX(${[0.9, 0.6, 0.45, 0.3, 0.22, 0.12][i]})` }} />
+          {[0, 1].map((col) => (
+            <div key={col}>
+              <span className="absolute h-[7px]" style={{ left: 16 + col * 156, top: 92, width: 148, background: TEAL }} />
+              {Array.from({ length: 5 }, (_, i) => (
+                <span key={i} className="absolute h-[5px] origin-left" style={{ left: 16 + col * 156, top: 104 + i * 9, width: 130, background: "#2a78d6", transform: `scaleX(${[0.9, 0.62, 0.48, 0.3, 0.18][i]! * ramp(t, 2300 + i * 90, 500)})` }} />
+              ))}
+            </div>
           ))}
-          <span className="absolute left-3 right-3 top-[164px] h-[8px]" style={{ background: TEAL }} />
-          {Array.from({ length: 8 }, (_, i) => (
-            <span key={i} className="absolute left-3 right-3 h-[3px]" style={{ top: 180 + i * 10, background: "#dde3e6" }} />
+          <span className="absolute left-4 right-4 top-[156px] h-[7px]" style={{ background: TEAL }} />
+          {Array.from({ length: 7 }, (_, i) => (
+            <span key={i} className="absolute left-4 right-4 h-[3px]" style={{ top: 170 + i * 8, background: "#dde3e6" }} />
           ))}
         </div>
       ) : null}
-      <Reveal t={t} at={3900} until={4300} className="absolute" style={{ left: 16, bottom: 16 }}>
-        <p className="border-l-[3px] bg-white px-2.5 py-1.5 text-[8px] font-semibold" style={{ borderColor: "#10b981", color: INK, boxShadow: "0 18px 40px -12px rgba(0,40,50,0.3)" }}>
-          Issues dashboard.pdf saved
-        </p>
-      </Reveal>
-      <Reveal t={t} at={4600} className="absolute" style={{ right: 16, top: 66, width: 250 }}>
-        <div className="bg-white p-2.5 text-[8px]" style={{ boxShadow: "0 18px 40px -12px rgba(0,40,50,0.3)", color: INK, borderTop: `3px solid ${TEAL}` }}>
-          <p className="text-[6.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#7c8a90" }}>
-            Share a link
-          </p>
-          <p className="mt-1 border px-1.5 py-1 font-mono text-[7.5px]" style={{ borderColor: "#c9d2d6" }}>
-            siteboard.baileypartnership.co.uk/view?s=4k2f9
-          </p>
-          <p className="mt-1.5" style={{ color: SLATE }}>
-            Read-only, no Forma sign-in needed. Expires in 14 days.
-          </p>
+      <Reveal t={t} at={2700} className="absolute" style={{ left: 506, top: 96, width: 118 }}>
+        <div className="space-y-1 text-[7.5px]" style={{ color: INK }}>
+          {["Bailey Partnership branding", "Your filters: Status Overdue", "Only the panels you show", "The register, if ticked"].map((x) => (
+            <p key={x} className="border-l-2 bg-white px-1.5 py-1" style={{ borderColor: TEAL }}>
+              {x}
+            </p>
+          ))}
         </div>
       </Reveal>
-      <Reveal t={t} at={5200} className="absolute" style={{ right: 16, bottom: 16 }}>
-        <p className="border-l-[3px] bg-white px-2.5 py-1.5 text-[8px] font-semibold" style={{ borderColor: "#10b981", color: INK, boxShadow: "0 18px 40px -12px rgba(0,40,50,0.3)" }}>
-          Link copied
-        </p>
+      <Reveal t={t} at={4000} className="absolute" style={{ left: 16, bottom: 16 }}>
+        <Toast>
+          <b>Issues dashboard.pdf</b> downloaded · A4 landscape
+        </Toast>
+      </Reveal>
+      <Reveal t={t} at={4700} className="absolute" style={{ right: 16, bottom: 16, width: 250 }}>
+        <Toast tone={CITRON}>PDFs show full names and details: keep them inside Bailey, or share a redacted link instead.</Toast>
       </Reveal>
       <Cursor t={t} path={path} />
     </>
   );
 }
 
-// ---- 8. Make it yours
+// ---- 8. Public links and redaction
+
+const PEOPLE = [
+  ["Clash at level 5, grid E4", "Jane Hughes"],
+  ["Fire door missing closer", "Amir Patel"],
+  ["Ceiling void not sealed", "Jane Hughes"],
+  ["Handrail height", "Tom Reid"],
+];
+
+function ShareALink({ t }: SceneProps) {
+  const open = t >= 1100;
+  const typed = "Riverside monthly".slice(0, Math.max(0, Math.floor((t - 1500) / 60)));
+  const created = t >= 3600;
+  const path: Waypoint[] = [
+    { t: 0, x: 500, y: 380 },
+    { t: 1000, x: 90, y: 68, click: true },
+    { t: 1400, x: 150, y: 120, click: true },
+    { t: 2600, x: 33, y: 151 },
+    { t: 3500, x: 44, y: 206, click: true },
+    { t: 5800, x: 600, y: 380 },
+  ];
+  return (
+    <>
+      <Chrome active="Issues" />
+      <Card x={16} y={40} w={300} h={open ? 344 : 40}>
+        <p className="absolute left-3 top-[12px] text-[9px] font-semibold" style={{ color: TEAL }}>
+          {open ? "▾" : "▸"} Share a link (no Forma sign-in needed to view)
+        </p>
+        {open ? (
+          <Reveal t={t} at={1100} curtain="#ffffff" className="absolute inset-x-3 top-[34px]">
+            <p className="text-[7.5px]" style={{ color: SLATE }}>
+              Publishes the 342 loaded records as they are now. The link does not update itself and stops working when it expires.
+            </p>
+            <span className="mt-2 flex h-[18px] items-center border px-1.5 text-[8px]" style={{ borderColor: t >= 1400 && t < 2600 ? TEAL : "#c9d2d6", color: typed ? INK : "#8a9398" }}>
+              {typed || "Issues dashboard"}
+            </span>
+            <p className="relative mt-2 pl-5 text-[7.5px]" style={{ color: INK }}>
+              <Tick t={t} at={-1} x={0} y={1} />
+              <b>Redact:</b> replace people&apos;s names with Person 1, Person 2 and leave out descriptions and custom fields.
+            </p>
+            <p className="mt-2 flex items-center gap-1.5 text-[7.5px]" style={{ color: INK }}>
+              Expires after
+              <span className="border px-1.5 py-0.5" style={{ borderColor: "#c9d2d6" }}>
+                30 days ▾
+              </span>
+            </p>
+            <span className="mt-2.5 inline-flex h-[18px] items-center px-2.5 text-[8px] font-semibold text-white" style={{ background: TEAL }}>
+              {t >= 3600 && t < 4000 ? "Publishing…" : "Create link"}
+            </span>
+            {created ? (
+              <Reveal t={t} at={4000} curtain="#ffffff" className="relative mt-4">
+                <p className="text-[8px] font-semibold" style={{ color: TEAL }}>
+                  My shared links
+                </p>
+                <p className="mt-1 border-t pt-1 text-[7.5px]" style={{ borderColor: "#dde3e6", color: INK }}>
+                  <b className="underline">Riverside monthly</b>
+                  <span style={{ color: SLATE }}> · 342 records, redacted, expires 23 Dec 2026</span>
+                </p>
+                <p className="mt-0.5 flex gap-3 text-[7.5px] underline" style={{ color: TEAL }}>
+                  <span>Copy link</span>
+                  <span style={{ color: "#b91c1c" }}>Delete</span>
+                </p>
+              </Reveal>
+            ) : null}
+          </Reveal>
+        ) : null}
+      </Card>
+
+      {/* What someone outside Bailey sees: no sign-in, names replaced. */}
+      <Reveal t={t} at={4300} className="absolute" style={{ left: 330, top: 40, width: 294, height: 344 }}>
+        <div className="absolute inset-0 bg-white" style={{ boxShadow: "0 18px 40px -12px rgba(0,40,50,0.3)" }}>
+          <div className="flex h-[16px] items-center gap-1 border-b px-2 text-[6.5px]" style={{ borderColor: "#dde3e6", background: "#f4f7f8", color: SLATE }}>
+            <span className="h-[5px] w-[5px] rounded-full bg-[#c9d2d6]" />
+            <span className="h-[5px] w-[5px] rounded-full bg-[#c9d2d6]" />
+            <span className="ml-1 truncate">siteboard.baileypartnership.co.uk/view?s=4k2f9</span>
+          </div>
+          <div className="border-t-[2px] px-2 py-1.5" style={{ borderColor: CITRON }}>
+            <p className="flex items-center gap-1 font-display text-[8px] font-semibold uppercase tracking-[0.12em]" style={{ color: TEAL }}>
+              <SiteboardMark size={10} /> Siteboard · Riverside monthly
+            </p>
+            <p className="text-[6.5px]" style={{ color: SLATE }}>
+              Data as of 23 Nov 2026. Link expires 23 Dec 2026
+            </p>
+          </div>
+          <div className="mx-2 flex text-[6.5px] font-semibold" style={{ background: "#f4f7f8", color: SLATE }}>
+            <span className="flex-[3] px-1 py-1">Title</span>
+            <span className="flex-[2] px-1 py-1">Assigned to</span>
+          </div>
+          {PEOPLE.map(([title, who], i) => {
+            const person = `Person ${["1", "2", "1", "3"][i]}`;
+            const redactedNow = t >= 5200;
+            return (
+              <div key={title} className="mx-2 flex border-b text-[7.5px]" style={{ borderColor: "#dde3e6", color: INK }}>
+                <span className="flex-[3] truncate px-1 py-1.5">{title}</span>
+                <span className="relative flex-[2] px-1 py-1.5">
+                  {redactedNow ? <b style={{ color: TEAL }}>{person}</b> : <span className="line-through decoration-[#b91c1c]">{who}</span>}
+                </span>
+              </div>
+            );
+          })}
+          <p className="mx-2 mt-2 text-[6.5px]" style={{ color: SLATE }}>
+            Descriptions and custom fields left out.
+          </p>
+        </div>
+      </Reveal>
+      <Reveal t={t} at={3900} until={6200} className="absolute" style={{ left: 330, bottom: 16 }}>
+        <Toast>Link copied. Paste it in an email or chat.</Toast>
+      </Reveal>
+      <Reveal t={t} at={6000} className="absolute" style={{ left: 330, bottom: 16, width: 294 }}>
+        <Toast tone={CITRON}>Untick Redact only for people who may see names. Delete a link to switch it off early.</Toast>
+      </Reveal>
+      <Cursor t={t} path={path} />
+    </>
+  );
+}
+
+// ---- 9. Make it yours
 
 const COLUMNS = ["Project", "#", "Title", "Status", "Assigned to", "Due", "Created"];
 
@@ -818,13 +945,22 @@ export const SCENES: Scene[] = [
     Stage: ExploreIn3D,
   },
   {
+    id: "pdf",
+    name: "PDF reports",
+    title: "Download a PDF report",
+    body: "Download PDF report turns what you're looking at into a branded A4 report: your filters, only the panels you show, and the register if Include register is ticked. Download CSV gives the register as a spreadsheet.",
+    tip: "PDFs and CSVs carry full names and details, so keep them inside Bailey. To share outside, use a redacted link.",
+    duration: 6400,
+    Stage: PdfReports,
+  },
+  {
     id: "share",
-    name: "Share",
-    title: "Share and report",
-    body: "Download a branded PDF report or a CSV of exactly what you're looking at, or share a read-only link that needs no Forma sign-in.",
-    tip: "Shared links can hide people's names if you choose.",
-    duration: 7000,
-    Stage: ShareAndReport,
+    name: "Share a link",
+    title: "Share a public link",
+    body: "Share a link publishes a snapshot anyone can open without a Forma sign-in. Redact is on by default: names become Person 1, Person 2, and descriptions and custom fields are left out. Choose 7, 30 or 90 days before it expires.",
+    tip: "A link is a snapshot of now and doesn't update. My shared links lists yours, so you can copy or delete them.",
+    duration: 8200,
+    Stage: ShareALink,
   },
   {
     id: "yours",
