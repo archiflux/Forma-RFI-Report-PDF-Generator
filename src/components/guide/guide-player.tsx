@@ -6,6 +6,7 @@ import { useWidth } from "@/components/charts/use-width";
 import { H, useClock, W } from "./kit";
 import { SCENES } from "./scenes";
 
+const WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 const GAP = 700; // pause at the end of each scene before the next starts
 
 // "How to use Siteboard": eight short animated scenes with a step track.
@@ -64,7 +65,7 @@ export function GuidePlayer() {
             <h2 className="mt-2 font-display text-3xl font-semibold leading-10 tracking-[0.01em] text-white sm:text-4xl">
               <span className="text-[color:var(--bp-citron)]">How to use</span> Siteboard
             </h2>
-            <p className="mt-1.5 text-sm text-white/75">Eight short steps, about a minute in all.</p>
+            <p className="mt-1.5 text-sm text-white/75">{WORDS[SCENES.length] ?? SCENES.length} short steps, about a minute and a half in all.</p>
           </div>
           <Link href="/templates" className="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4">
             Back to dashboards
