@@ -58,8 +58,7 @@ export function Open3DButton({ build }: { build: () => Universe3D }) {
       <button
         type="button"
         onClick={open}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-white shadow-[0_8px_20px_-10px_rgba(0,104,129,0.9)] transition-all duration-200 hover:-translate-y-px hover:brightness-110 active:scale-[0.97]"
-        style={{ background: "linear-gradient(120deg, #0e2841, #006881)" }}
+        className="sb-sheen inline-flex min-h-9 items-center gap-1.5 bg-[color:var(--bp-teal-deep)] px-3 text-xs font-semibold text-white shadow-hp-sm transition-[background-color,box-shadow,transform] duration-150 hover:bg-[color:var(--bp-teal-dark)] hover:shadow-hp-md active:scale-[0.97]"
       >
         <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
           <path d="M8 1.5 14 5v6l-6 3.5L2 11V5z M2 5l6 3.5L14 5 M8 8.5v6" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />

@@ -2,43 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Bailey Partnership brand tokens — derived from the report cover page:
-   #143644 ribbons, #d1c800 accent strips, #0e2841 titles, black body text.
-   --brand-primary mirrors the title-text colour so primary buttons read as
-   the same authoritative navy used on the cover; --brand-secondary is the
-   ribbon teal used for headers and dividers. */
+/* Holdpoint design system (Bailey Partnership's shared web-app language):
+   square, calm and practical. Deep teal for identity, one citron accent for
+   status and change, ink and cool greys for everything else. The older
+   --brand-* names are kept as aliases so every component picks it up. */
 :root {
-  --brand-primary: #0e2841;
-  --brand-secondary: #143644;
-  --brand-accent: #d1c800;
-  --brand-ink: #000000;
-  --brand-ink-soft: #2a2f36;
-  --brand-muted: #6b7280;
+  --bp-teal: #006881;
+  --bp-teal-dark: #005063;
+  --bp-teal-deep: #00394a;
+  --bp-teal-tint: #e3f0f3;
+  --bp-citron: #d1c800;
+  --bp-citron-ink: #2b2900;
+  --bp-citron-tint: #f7f5c9;
+  --bp-ink: #2b3033;
+  --bp-label: #7c8a90;
+  --bp-rule: #c9d2d6;
+  --bp-fill: #f4f7f8;
+  --bp-desk: #eef1f2;
+  --slate-200: #dde3e6;
+  --slate-600: #5c666b;
+  --slate-700: #474f53;
+  --done: #047857;
+  --done-fill: #d1fae5;
+  --done-bar: #10b981;
+  --hold: #b91c1c;
+  --shadow-sm: 0 1px 2px rgba(0, 40, 50, 0.06);
+  --shadow-md: 0 6px 18px -6px rgba(0, 40, 50, 0.2);
+  --shadow-lg: 0 18px 40px -12px rgba(0, 40, 50, 0.3);
+  --shadow-xl: 0 28px 60px -16px rgba(0, 40, 50, 0.38);
+
+  --brand-primary: var(--bp-teal);
+  --brand-secondary: var(--bp-teal-dark);
+  --brand-accent: var(--bp-citron);
+  --brand-ink: var(--bp-ink);
+  --brand-ink-soft: var(--slate-700);
+  --brand-muted: var(--slate-600);
   --brand-surface: #ffffff;
-  --brand-canvas: #f5f6f8;
-  --brand-border: #e3e6eb;
-  --brand-ring: rgba(14, 40, 65, 0.18);
-  /* Logo teal, used for pops of colour alongside the accent yellow. */
-  --brand-teal: #006881;
-  --brand-teal-bright: #0a8aa6;
-  --brand-teal-soft: #e5f2f5;
-  --brand-accent-soft: #faf8d9;
-  --brand-gradient: linear-gradient(90deg, #006881 0%, #0e2841 55%, #d1c800 100%);
+  --brand-canvas: var(--bp-desk);
+  --brand-border: var(--bp-rule);
+  --brand-ring: rgba(0, 104, 129, 0.14);
+  --brand-teal: var(--bp-teal);
+  --brand-teal-soft: var(--bp-teal-tint);
+  --brand-accent-soft: var(--bp-citron-tint);
   --font-sans:
     var(--font-figtree), "Figtree", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-chakra-petch), "Chakra Petch", var(--font-sans);
+}
+
+/* Always show the scrollbar so it never pops in while data loads. */
+html {
+  overflow-y: scroll;
 }
 
 html,
 body {
-  background:
-    radial-gradient(60rem 28rem at -10% -10%, rgba(0, 104, 129, 0.13), transparent 60%),
-    radial-gradient(50rem 24rem at 110% -5%, rgba(209, 200, 0, 0.14), transparent 60%),
-    var(--brand-canvas);
-  background-attachment: fixed;
-  color: var(--brand-ink);
+  background: var(--bp-desk);
+  color: var(--bp-ink);
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Inputs: square, slate border, teal focus ring. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  border-color: var(--bp-rule);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--bp-teal);
+  box-shadow: 0 0 0 3px rgba(0, 104, 129, 0.14);
 }
 
 * {
@@ -49,13 +85,12 @@ h1,
 h2,
 h3,
 h4 {
-  color: var(--brand-primary);
-  letter-spacing: -0.01em;
+  color: var(--bp-ink);
 }
 
 ::selection {
-  background: var(--brand-accent);
-  color: var(--brand-primary);
+  background: var(--bp-citron);
+  color: var(--bp-citron-ink);
 }
 
 /* Dashboard chart roles (dataviz reference palette, light mode; the app has
@@ -176,18 +211,56 @@ h4 {
 }
 
 
-/* ---- Motion and brand accents for the dashboards ---- */
+/* ---- Holdpoint motion ----
+   Text is never faded, moved or blurred (Windows switches its anti-aliasing
+   when an animation ends, which reads as a pop). Blocks are revealed by a
+   cover in the background colour that dissolves from the top down; only
+   things without text move (progress bars, the mark, dots, button presses). */
 
-@keyframes sb-fade-up {
+.sb-enter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--curtain, var(--bp-desk));
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 38%, #000 62%);
+  mask-image: linear-gradient(to bottom, transparent 38%, #000 62%);
+  -webkit-mask-size: 100% 300%;
+  mask-size: 100% 300%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 0 100%;
+  mask-position: 0 100%;
+  animation: sb-curtain 760ms cubic-bezier(0.45, 0, 0.25, 1) both;
+  animation-delay: calc(var(--sb-i, 0) * 80ms);
+}
+@keyframes sb-curtain {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    -webkit-mask-position: 0 100%;
+    mask-position: 0 100%;
   }
   to {
-    opacity: 1;
-    transform: none;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+    visibility: hidden;
   }
 }
+
+/* Cards styled as links lift a little. */
+.sb-lift {
+  transition:
+    box-shadow 150ms,
+    transform 150ms;
+}
+.sb-lift:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Placeholder blocks while data loads (no text in them). */
 @keyframes sb-shimmer {
   from {
     background-position: -200% 0;
@@ -196,86 +269,88 @@ h4 {
     background-position: 200% 0;
   }
 }
-@keyframes sb-indeterminate {
-  0% {
-    transform: translateX(-100%) scaleX(0.4);
-  }
-  50% {
-    transform: translateX(30%) scaleX(0.6);
-  }
-  100% {
-    transform: translateX(110%) scaleX(0.4);
-  }
+.sb-skeleton {
+  background: linear-gradient(90deg, var(--slate-200) 0%, var(--bp-fill) 50%, var(--slate-200) 100%);
+  background-size: 200% 100%;
+  animation: sb-shimmer 1.6s linear infinite;
 }
+
+/* Progress bars grow from the left. */
+.sb-bar-fill {
+  background: var(--bp-citron);
+  transform-origin: left;
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @keyframes sb-spin {
   to {
     transform: rotate(360deg);
   }
 }
-@keyframes sb-pulse-ring {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.7;
-  }
+@keyframes sb-ping {
+  75%,
   100% {
-    transform: scale(1.8);
+    transform: scale(2);
     opacity: 0;
   }
 }
-@keyframes sb-bar-glide {
-  from {
-    background-position: 0 0;
+/* The mark draws its outline, and its citron tile pulses, while loading. */
+@keyframes sb-draw {
+  0% {
+    stroke-dashoffset: 64;
   }
-  to {
-    background-position: 40px 0;
+  45%,
+  60% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -64;
+  }
+}
+@keyframes sb-tile {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
-/* Panels and tiles rise into place; --sb-i staggers siblings. */
-.sb-enter {
-  animation: sb-fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--sb-i, 0) * 45ms);
+/* Light sheen across filled buttons on hover. */
+.sb-sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.sb-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.28) 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.sb-sheen:hover:not(:disabled)::after {
+  transform: translateX(120%);
+  transition: transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Cards lift a little under the pointer. */
-.sb-lift {
-  transition:
-    transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 0.25s ease,
-    border-color 0.25s ease;
+/* Section header bar text and small labels. */
+.bp-bar {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-.sb-lift:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 1px 2px rgba(14, 40, 65, 0.05),
-    0 18px 40px -14px rgba(0, 104, 129, 0.28);
-  border-color: rgba(0, 104, 129, 0.35);
-}
-
-/* Placeholder blocks while data loads. */
-.sb-skeleton {
-  background: linear-gradient(90deg, #eceff3 0%, #f7f9fb 40%, #e5f2f5 50%, #f7f9fb 60%, #eceff3 100%);
-  background-size: 200% 100%;
-  animation: sb-shimmer 1.6s linear infinite;
-}
-
-/* Striped, gliding fill for progress bars. */
-.sb-bar-fill {
-  background-image:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0 10px, transparent 10px 20px),
-    linear-gradient(90deg, #d1c800, #e8de3a);
-  background-size:
-    40px 100%,
-    100% 100%;
-  animation: sb-bar-glide 0.9s linear infinite;
-  transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-.sb-gradient-text {
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.bp-label {
+  font-size: 11.2px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bp-label);
 }
 
 /* Tick boxes and radios in the brand teal. */

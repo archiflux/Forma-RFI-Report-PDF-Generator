@@ -42,7 +42,7 @@ export function Donut({ data, centreLabel }: { data: Count[]; centreLabel: strin
             return seg;
           })}
         </g>
-        <text x={90} y={86} textAnchor="middle" fontSize={22} fontWeight={600} fill="#0e2841">
+        <text x={90} y={86} textAnchor="middle" fontSize={22} fontWeight={600} fill="#2b3033">
           {active ? active.count : total}
         </text>
         <text x={90} y={104} textAnchor="middle" fontSize={10} fill="#6b7280">

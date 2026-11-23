@@ -14,10 +14,11 @@ const figtree = Figtree({
   display: "swap",
 });
 
-// Chakra Petch is used only for the "Siteboard" wordmark (font-wordmark).
+// Chakra Petch (Holdpoint's display face): page titles, stat numbers and the
+// SITEBOARD wordmark only, never body text.
 const chakraPetch = Chakra_Petch({
   subsets: ["latin"],
-  weight: ["600"],
+  weight: ["500", "600", "700"],
   variable: "--font-chakra-petch",
   display: "swap",
 });
@@ -26,12 +27,13 @@ export const metadata: Metadata = {
   title: "Bailey Partnership Siteboard",
   description:
     "Keep your projects in sight. Read-only dashboards for Issues, RFIs, Forms and Reviews across Autodesk Forma projects.",
-  // Siteboard "S" mark: favicon.ico for browser tabs, a PNG for browsers
-  // that prefer one, and a 180px icon for phone home screens.
+  // Siteboard mark (Holdpoint family: diamond outline, board of tiles):
+  // SVG and ICO for browser tabs, PNGs for others, 180px for phone home screens.
   icons: {
     icon: [
       { url: withBase("/favicon.ico"), sizes: "any" },
-      { url: withBase("/siteboard-icon.png"), type: "image/png", sizes: "256x256" },
+      { url: withBase("/siteboard-mark.svg"), type: "image/svg+xml" },
+      { url: withBase("/siteboard-icon.png"), type: "image/png", sizes: "512x512" },
     ],
     apple: withBase("/apple-touch-icon.png"),
   },

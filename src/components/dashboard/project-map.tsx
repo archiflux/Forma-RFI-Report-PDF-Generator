@@ -203,7 +203,7 @@ export function ProjectMap({
       <div className="pointer-events-none absolute right-3 top-3 w-60 max-w-[45%] space-y-2 rounded-lg border border-[color:var(--brand-border)] bg-white/95 p-3 text-[11px] text-[color:var(--brand-ink-soft)] shadow-card">
         <div>
           <p className="font-semibold text-[color:var(--brand-primary)]">Open {noun}</p>
-          <div className="mt-1 flex h-2 overflow-hidden rounded-full">
+          <div className="mt-1 flex h-2 overflow-hidden">
             {HEAT_RAMP.map((c) => (
               <span key={c} className="flex-1" style={{ background: c }} />
             ))}

@@ -3,6 +3,19 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
+    // Holdpoint is square: no rounding anywhere except people and live state
+    // (avatars, pulsing dots, spinners), which keep rounded-full.
+    borderRadius: {
+      none: "0",
+      sm: "0",
+      DEFAULT: "0",
+      md: "0",
+      lg: "0",
+      xl: "0",
+      "2xl": "0",
+      "3xl": "0",
+      full: "9999px",
+    },
     extend: {
       colors: {
         brand: {
@@ -21,9 +34,14 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         wordmark: ["var(--font-chakra-petch)", "var(--font-sans)", "sans-serif"],
+        display: ["var(--font-chakra-petch)", "var(--font-sans)", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(14, 40, 65, 0.04), 0 12px 32px -12px rgba(14, 40, 65, 0.12)",
+        card: "var(--shadow-sm)",
+        "hp-sm": "var(--shadow-sm)",
+        "hp-md": "var(--shadow-md)",
+        "hp-lg": "var(--shadow-lg)",
+        "hp-xl": "var(--shadow-xl)",
       },
     },
   },
