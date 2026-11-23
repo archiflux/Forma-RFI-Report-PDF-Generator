@@ -84,7 +84,7 @@ export function LoadingBanner({ loading, total, records, noun }: { loading: numb
               </div>
               <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center lg:hidden" aria-hidden>
                 <div className="flex items-center gap-2 border-l-4 border-[color:var(--bp-citron)] bg-[color:var(--bp-teal-deep)] px-3 py-2 text-xs font-semibold text-white shadow-hp-lg">
-                  <SiteboardMark size={16} loading className="[&_rect:first-child]:stroke-white" />
+                  <SiteboardMark size={16} loading tone="white" />
                   Loading projects: {done.toLocaleString("en-GB")} of {total.toLocaleString("en-GB")}
                 </div>
               </div>

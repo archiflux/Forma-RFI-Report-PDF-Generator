@@ -52,9 +52,7 @@ export default function LandingPage() {
       {/* Brand panel (Holdpoint sign-in): teal-deep ground, mark, wordmark. */}
       <section className="relative flex flex-col justify-between bg-[color:var(--bp-teal-deep)] px-8 py-10 text-white md:w-[44%] md:px-12 md:py-14">
         <div className="flex items-center gap-3 font-display text-lg font-semibold uppercase leading-7 tracking-[0.12em] text-white">
-          <span className="flex h-11 w-11 items-center justify-center bg-white">
-            <SiteboardMark size={34} />
-          </span>
+          <SiteboardMark size={40} tone="white" />
           Siteboard
         </div>
         <div className="mt-12 md:mt-0">
@@ -86,7 +84,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Button size="lg" onClick={onSignIn} disabled={busy || checking}>
-              {checking ? <SiteboardMark size={18} loading className="[&_rect:first-child]:stroke-white" /> : null}
+              {checking ? <SiteboardMark size={18} loading tone="white" /> : null}
               {busy ? "Redirecting…" : checking ? "Checking sign-in…" : "Sign in with Autodesk"}
             </Button>
           </div>
