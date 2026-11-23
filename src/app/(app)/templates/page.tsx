@@ -22,11 +22,22 @@ function Catalogue() {
             </h2>
             <p className="mt-1.5 text-sm text-white/75">Pick a dashboard, then tick the projects you want to include.</p>
           </div>
-          {canProbe ? (
-            <Link href="/hubs" className="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4">
-              Run the data probe
+          <div className="flex flex-wrap items-center gap-4">
+            {canProbe ? (
+              <Link href="/hubs" className="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4">
+                Run the data probe
+              </Link>
+            ) : null}
+            <Link
+              href="/guide"
+              className="sb-sheen inline-flex items-center gap-2 bg-[color:var(--bp-citron)] px-3.5 py-2 text-sm font-semibold text-[color:var(--bp-citron-ink)] shadow-hp-sm transition-[filter,transform] duration-150 hover:brightness-95 active:scale-[0.97]"
+            >
+              <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden>
+                <path d="M0 0l10 6-10 6z" fill="currentColor" />
+              </svg>
+              How to use Siteboard
             </Link>
-          ) : null}
+          </div>
         </div>
       </div>
 

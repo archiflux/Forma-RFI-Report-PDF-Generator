@@ -79,7 +79,7 @@ export function LoadingBanner({ loading, total, records, noun }: { loading: numb
       {!finished
         ? createPortal(
             <>
-              <div className="fixed inset-x-0 top-0 z-[60] h-1 bg-[color:var(--bp-teal)]/20" aria-hidden>
+              <div className="fixed inset-x-0 top-0 z-[60] h-1 bg-[rgba(0,104,129,0.2)]" aria-hidden>
                 <div className="sb-bar-fill h-full w-full" style={{ transform: `scaleX(${frac})` }} />
               </div>
               <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center lg:hidden" aria-hidden>
@@ -145,7 +145,7 @@ export function DashboardSkeleton() {
       <div className="grid gap-4 lg:grid-cols-2">
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i}>
-            <div className="h-[26px] bg-[color:var(--bp-teal)]/25" />
+            <div className="h-[26px] bg-[rgba(0,104,129,0.25)]" />
             <div className="bg-white p-4 shadow-hp-sm">
               <div className="flex h-40 items-end gap-2">
                 {[55, 80, 40, 95, 65, 30, 75, 50].map((h, j) => (

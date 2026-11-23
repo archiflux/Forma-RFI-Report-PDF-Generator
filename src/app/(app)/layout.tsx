@@ -79,6 +79,7 @@ function HubNav() {
     ["Forms", "/forms-dashboard"],
     ["Reviews", "/reviews-dashboard"],
     ["RFIs", "/rfis-dashboard"],
+    ["Guide", "/guide"],
     // Submittals is hidden until a project uses it; see templates.ts.
     ...(canProbe ? ([["Data probe", "/hubs"]] as const) : []),
   ] as const;
