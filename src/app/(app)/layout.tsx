@@ -9,6 +9,7 @@ import { useCanProbe } from "@/lib/auth/use-can-probe";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/store";
 import { withBase } from "@/lib/base-path";
+import { SiteboardMark } from "@/components/ui/siteboard-mark";
 
 export default function AuthedLayout({
   children,
@@ -30,16 +31,19 @@ export default function AuthedLayout({
   if (!tokens) {
     return (
       <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
-        <p className="text-sm text-neutral-500">Checking your session…</p>
+        <p className="flex items-center gap-3 text-sm text-[color:var(--slate-600)]">
+          <SiteboardMark size={28} loading />
+          Checking your session…
+        </p>
       </main>
     );
   }
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-[color:var(--brand-border)] bg-white/80 backdrop-blur-md">
-        <div className="h-[3px]" style={{ background: "var(--brand-gradient)" }} aria-hidden />
-        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
+      {/* Holdpoint app header: 4px citron rule, white at 90% with a blur. */}
+      <header className="sticky top-0 z-20 border-t-4 border-[color:var(--bp-citron)] bg-white/90 shadow-hp-sm backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6 lg:px-10">
           <Suspense fallback={<Brand href="/templates" />}>
             <HomeLink />
           </Suspense>
@@ -59,7 +63,7 @@ export default function AuthedLayout({
         </div>
       </header>
       <div className="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
-        <PageFade>{children}</PageFade>
+        {children}
       </div>
     </div>
   );
@@ -79,7 +83,7 @@ function HubNav() {
     ...(canProbe ? ([["Data probe", "/hubs"]] as const) : []),
   ] as const;
   return (
-    <nav className="ml-auto hidden gap-1 text-sm md:flex">
+    <nav className="ml-auto hidden h-full items-stretch gap-1 text-sm md:flex">
       {links.map(([label, href]) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
@@ -87,14 +91,12 @@ function HubNav() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`relative rounded-full px-3 py-1.5 font-medium transition-colors duration-200 ${
-              active
-                ? "bg-[color:var(--brand-teal)] text-white shadow-[0_6px_16px_-8px_rgba(0,104,129,0.8)]"
-                : "text-[color:var(--brand-secondary)] hover:bg-[color:var(--brand-teal-soft)] hover:text-[color:var(--brand-teal)]"
+            className={`relative px-3 py-2 font-semibold transition-colors duration-150 ${
+              active ? "text-[color:var(--bp-teal)]" : "text-[color:var(--slate-700)] hover:bg-[color:var(--bp-desk)] hover:text-[color:var(--bp-teal)]"
             }`}
           >
             {label}
-            {active ? <span className="absolute inset-x-3 -bottom-[3px] h-[3px] rounded-full bg-[#d1c800]" aria-hidden /> : null}
+            {active ? <span className="absolute inset-x-3 bottom-0 h-[3px] bg-[color:var(--bp-citron)]" aria-hidden /> : null}
           </Link>
         );
       })}
@@ -102,25 +104,24 @@ function HubNav() {
   );
 }
 
+// Bailey Partnership logo, a hairline, then the Siteboard mark and
+// wordmark (the wordmark text hides on phones to keep the header on one line).
 function Brand({ href }: { href: string }) {
   return (
-    <Link href={href} className="flex items-center gap-3" title="Back to dashboard templates">
+    <Link href={href} className="flex items-center gap-3.5" title="Back to dashboard templates">
       <Image
-        src={withBase("/icon-colour.png")}
+        src={withBase("/bailey-partnership-logo.png")}
         alt="Bailey Partnership"
-        width={36}
-        height={36}
+        width={125}
+        height={30}
         priority
-        className="h-9 w-9 rounded-md object-contain"
+        className="h-[26px] w-auto sm:h-[30px]"
       />
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
-          Bailey Partnership
-        </p>
-        <h1 className="font-wordmark text-lg font-semibold tracking-wide text-[color:var(--brand-primary)] sm:text-xl">
-          Siteboard
-        </h1>
-      </div>
+      <span className="h-[26px] w-px bg-[color:var(--bp-rule)]" aria-hidden />
+      <span className="inline-flex items-center gap-2 font-display text-lg font-semibold uppercase leading-7 tracking-[0.12em] text-[color:var(--bp-teal)]">
+        <SiteboardMark size={22} />
+        <span className="hidden sm:inline">Siteboard</span>
+      </span>
     </Link>
   );
 }
@@ -128,14 +129,4 @@ function Brand({ href }: { href: string }) {
 // Logo returns to the template catalogue.
 function HomeLink() {
   return <Brand href="/templates" />;
-}
-
-// Each page fades up as you move between dashboards.
-function PageFade({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  return (
-    <div key={pathname} className="sb-enter">
-      {children}
-    </div>
-  );
 }

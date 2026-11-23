@@ -21,7 +21,7 @@ export function Gauge({ value, unit, caption }: { value: number | null; unit: st
       <svg viewBox="0 0 200 120" className="h-auto w-full max-w-[260px]" role="img" aria-label={`${caption}: ${value.toFixed(1)} ${unit}`}>
         <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${cx + R} ${cy}`} fill="none" stroke="var(--chart-grid)" strokeWidth={16} strokeLinecap="butt" />
         <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${end.x} ${end.y}`} fill="none" stroke="var(--series-1)" strokeWidth={16} strokeLinecap="butt" />
-        <line x1={cx} y1={cy} x2={needle.x} y2={needle.y} stroke="#0e2841" strokeWidth={3} strokeLinecap="butt" />
+        <line x1={cx} y1={cy} x2={needle.x} y2={needle.y} stroke="#2b3033" strokeWidth={3} strokeLinecap="butt" />
         <text x={cx - R} y={cy + 16} textAnchor="middle" fontSize={9} fill="#6b7280">0</text>
         <text x={cx + R} y={cy + 16} textAnchor="middle" fontSize={9} fill="#6b7280">{max}</text>
       </svg>

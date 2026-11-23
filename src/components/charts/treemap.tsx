@@ -53,7 +53,7 @@ export function Treemap({ data, onSelect, selected = [] }: { data: Count[]; onSe
               <rect x={x + 1} y={y + 1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx={4} fill={fill} />
               {w > 54 && h > 34 ? (
                 <>
-                  <text x={x + 10} y={y + 20} fontSize={12} fontWeight={600} fill={dark ? "#ffffff" : "#0e2841"}>
+                  <text x={x + 10} y={y + 20} fontSize={12} fontWeight={600} fill={dark ? "#ffffff" : "#2b3033"}>
                     {item.label.length > w / 7.5 ? `${item.label.slice(0, Math.max(3, Math.floor(w / 7.5) - 1))}…` : item.label}
                   </text>
                   <text x={x + 10} y={y + 37} fontSize={12} fill={dark ? "#ffffff" : "#2a2f36"} opacity={0.9}>

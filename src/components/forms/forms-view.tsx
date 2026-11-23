@@ -154,9 +154,9 @@ export function FormsView({
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <Tile index={0} label="Forms" value={k.total} />
             <Tile index={1} label="Open" value={k.open} />
-            <Tile index={2} label="Overdue" value={k.overdue} alert={k.overdue > 0} />
-            <Tile index={3} label="Due in 7 days" value={k.dueSoon} />
-            <Tile index={4} label="Templates in use" value={k.templates} />
+            <Tile index={2} label="Overdue" value={k.overdue} tone={k.overdue > 0 ? "citron" : "slate"} />
+            <Tile index={3} label="Due in 7 days" value={k.dueSoon} tone={k.dueSoon > 0 ? "citron" : "slate"} />
+            <Tile index={4} label="Templates in use" value={k.templates} tone="slate" />
           </div>
         </Hideable>
 

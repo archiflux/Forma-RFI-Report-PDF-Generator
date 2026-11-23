@@ -103,7 +103,7 @@ export function StackedArea({
             " Z";
           return <path key={categories[ci]} d={d} fill={colour(categories[ci] as string, ci)} fillOpacity={0.85} stroke="#ffffff" strokeWidth={1.5} />;
         })}
-        {hover !== null ? <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + ih} stroke="#0e2841" strokeDasharray="3 3" /> : null}
+        {hover !== null ? <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + ih} stroke="#2b3033" strokeDasharray="3 3" /> : null}
       </svg>
     </div>
   );

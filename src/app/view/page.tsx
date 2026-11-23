@@ -11,6 +11,7 @@ import { parseFormsDataset } from "@/lib/forms/snapshot";
 import { loadShared } from "@/lib/share/client";
 import { EMPTY_LAYOUT, type DashLayout } from "@/lib/layout/layout";
 import { withBase } from "@/lib/base-path";
+import { SiteboardMark } from "@/components/ui/siteboard-mark";
 import type { DashboardDataset } from "@/lib/dashboard/types";
 import type { FormsDataset } from "@/lib/forms/types";
 import { GenericView } from "@/components/generic/generic-view";
@@ -69,17 +70,18 @@ function Viewer() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-[color:var(--brand-border)] bg-white">
-        <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-10">
-          <Image src={withBase("/icon-colour.png")} alt="Bailey Partnership" width={32} height={32} className="h-8 w-8 rounded-md object-contain" />
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-secondary)]">
-              Bailey Partnership <span className="font-wordmark normal-case tracking-wide">Siteboard</span>
-            </p>
-            <h1 className="text-base font-semibold text-[color:var(--brand-primary)]">{loaded?.title ?? "Shared dashboard"}</h1>
-          </div>
+      {/* Same header as the app: citron rule, Bailey logo, hairline, mark. */}
+      <header className="border-t-4 border-[color:var(--bp-citron)] bg-white shadow-hp-sm">
+        <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3.5 px-4 py-2.5 sm:px-6 lg:px-10">
+          <Image src={withBase("/bailey-partnership-logo.png")} alt="Bailey Partnership" width={125} height={30} className="h-[26px] w-auto sm:h-[30px]" />
+          <span className="h-[26px] w-px bg-[color:var(--bp-rule)]" aria-hidden />
+          <span className="inline-flex items-center gap-2 font-display text-lg font-semibold uppercase leading-7 tracking-[0.12em] text-[color:var(--bp-teal)]">
+            <SiteboardMark size={22} />
+            <span className="hidden sm:inline">Siteboard</span>
+          </span>
+          <h1 className="min-w-0 truncate text-sm font-semibold text-[color:var(--bp-ink)]">{loaded?.title ?? "Shared dashboard"}</h1>
           {loaded ? (
-            <p className="ml-auto text-xs text-[color:var(--brand-muted)]">
+            <p className="ml-auto text-xs text-[color:var(--slate-600)]">
               Data as of {new Date(loaded.takenAt).toLocaleString("en-GB")}
               {loaded.expiresAt ? `. Link expires ${new Date(loaded.expiresAt).toLocaleDateString("en-GB")}` : ""}
             </p>

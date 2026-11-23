@@ -38,7 +38,7 @@ function writePref(p: Pref) {
 
 // 16px on phones: iOS zooms the whole page into any smaller select it focuses
 // and leaves it zoomed, pushing the controls off screen.
-const SELECT = "min-h-9 w-full min-w-0 rounded-full border border-white/15 bg-white/10 px-3 text-base text-white sm:w-auto sm:text-xs backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800] [&>option]:text-black";
+const SELECT = "min-h-9 w-full min-w-0 border border-white/15 bg-white/10 px-3 text-base text-white sm:w-auto sm:text-xs backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800] [&>option]:text-black";
 
 // The street map (maplibre-gl) loads only when someone picks "Map".
 const UniverseMap = dynamic(() => import("./universe-map"), { ssr: false });
@@ -191,7 +191,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
         <button
           type="button"
           onClick={onBack}
-          className="pointer-events-auto inline-flex min-h-10 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 text-sm font-medium backdrop-blur-md transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800]"
+          className="pointer-events-auto inline-flex min-h-10 items-center gap-2 border border-white/15 bg-white/10 px-4 text-sm font-medium backdrop-blur-md transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d1c800]"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
             <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -220,7 +220,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
               ))}
             </select>
           </label>
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-full border border-white/15 bg-white/5 p-1 backdrop-blur-md [scrollbar-width:none] sm:flex-wrap" role="radiogroup" aria-label="Shape">
+          <div className="flex max-w-full gap-1 overflow-x-auto border border-white/15 bg-white/5 p-1 backdrop-blur-md [scrollbar-width:none] sm:flex-wrap" role="radiogroup" aria-label="Shape">
             {shapes.map((s) => (
               <button
                 key={s.id}
@@ -228,7 +228,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
                 role="radio"
                 aria-checked={shape === s.id}
                 onClick={() => setShape(s.id)}
-                className={`min-h-7 shrink-0 rounded-full px-3 text-xs transition ${shape === s.id ? "bg-[#d1c800] font-semibold text-[#0e2841]" : "text-white/80 hover:bg-white/10"}`}
+                className={`min-h-7 shrink-0 px-3 text-xs transition ${shape === s.id ? "bg-[#d1c800] font-semibold text-[#0e2841]" : "text-white/80 hover:bg-white/10"}`}
               >
                 {s.label}
               </button>
@@ -276,14 +276,14 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {placeBreakdown.slice(0, 6).map(([gi, n]) => (
-                    <span key={gi} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/85">
+                    <span key={gi} className="inline-flex items-center gap-1.5 bg-white/10 px-2 py-0.5 text-xs text-white/85">
                       <span className="h-2.5 w-2.5 rounded-sm" style={{ background: groups[gi]?.colour }} />
                       {groups[gi]?.label} {n.toLocaleString("en-GB")}
                     </span>
                   ))}
                 </div>
               </div>
-              <button type="button" onClick={() => setPlacePick(null)} className="rounded-full px-2 text-lg leading-none text-white/60 hover:text-white" aria-label="Close">
+              <button type="button" onClick={() => setPlacePick(null)} className="px-2 text-lg leading-none text-white/60 hover:text-white" aria-label="Close">
                 ×
               </button>
             </div>
@@ -319,7 +319,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
               <button
                 type="button"
                 onClick={() => placePick.zoomIn()}
-                className="inline-flex min-h-9 items-center rounded-full border border-white/15 bg-white/10 px-4 text-xs font-medium hover:bg-white/20"
+                className="inline-flex min-h-9 items-center border border-white/15 bg-white/10 px-4 text-xs font-medium hover:bg-white/20"
               >
                 Zoom in here
               </button>
@@ -338,7 +338,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Properties</p>
                 <p className="mt-1 font-semibold text-white">{selected.note?.title ?? selected.thing.title}</p>
                 <p className="mt-0.5 text-xs text-white/65">{selected.note?.subtitle ?? selected.thing.subtitle}</p>
-                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/85">
+                <p className="mt-2 inline-flex items-center gap-1.5 bg-white/10 px-2 py-0.5 text-xs text-white/85">
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: selected.group.colour }} />
                   {selected.group.label}
                 </p>
@@ -349,7 +349,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
                   setSelected(null);
                   engine.current?.clearSelection();
                 }}
-                className="rounded-full px-2 text-lg leading-none text-white/60 hover:text-white" aria-label="Close properties">
+                className="px-2 text-lg leading-none text-white/60 hover:text-white" aria-label="Close properties">
                 ×
               </button>
             </div>
@@ -370,7 +370,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
                   href={selected.thing.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-9 items-center rounded-full bg-[#d1c800] px-4 text-xs font-semibold text-[#0e2841] hover:brightness-110"
+                  className="inline-flex min-h-9 items-center bg-[#d1c800] px-4 text-xs font-semibold text-[#0e2841] hover:brightness-110"
                 >
                   Open in Forma
                 </a>
@@ -449,7 +449,7 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
               engine.current?.setMotion(next);
             }}
             title="How records move between views"
-            className="min-h-9 rounded-full border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
+            className="min-h-9 border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
           >
             Transitions: {motion === "fly" ? "Fly" : "Fade"}
           </button>
@@ -461,14 +461,14 @@ export default function UniverseViewer({ universe, onBack }: { universe: Univers
               setSpin(next);
               engine.current?.setAutoRotate(next);
             }}
-            className="min-h-9 rounded-full border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
+            className="min-h-9 border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
           >
             {spin ? "Pause rotation" : "Rotate"}
           </button>
           <button
             type="button"
             onClick={() => (onMap ? setMapReset((n) => n + 1) : engine.current?.resetView())}
-            className="min-h-9 rounded-full border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
+            className="min-h-9 border border-white/15 bg-white/10 px-3 text-xs backdrop-blur-md hover:bg-white/20"
           >
             Reset view
           </button>

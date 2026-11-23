@@ -3,13 +3,14 @@
 import { Document, Image as PdfImage, Link, Page, Polyline, StyleSheet, Svg, Text, View, pdf, Line } from "@react-pdf/renderer";
 import type { DashboardReport, ReportSection } from "./model";
 
+// Holdpoint palette: teal identity, citron accent, ink and cool greys.
 const C = {
-  primary: "#0e2841",
-  secondary: "#143644",
+  primary: "#006881",
+  secondary: "#00394a",
   accent: "#d1c800",
-  ink: "#111827",
-  muted: "#6b7280",
-  border: "#e3e6eb",
+  ink: "#2b3033",
+  muted: "#5c666b",
+  border: "#c9d2d6",
   bar: "#2a78d6",
   critical: "#d03b3b",
 };
@@ -20,18 +21,30 @@ const s = StyleSheet.create({
   logo: { width: 120, height: 34, objectFit: "contain" },
   title: { fontSize: 18, fontFamily: "Helvetica-Bold", color: C.primary },
   subtitle: { fontSize: 9, color: C.muted, marginTop: 2 },
-  accent: { height: 3, width: 60, backgroundColor: C.accent, marginVertical: 8 },
+  accent: { height: 4, width: "100%", backgroundColor: C.accent, marginVertical: 8 },
   filters: { fontSize: 7.5, color: C.muted, marginBottom: 10 },
   kpiRow: { flexDirection: "row", flexWrap: "wrap", marginBottom: 10 },
   kpi: { width: "16.66%", paddingRight: 6, marginBottom: 6 },
-  kpiBox: { borderWidth: 1, borderColor: C.border, borderRadius: 4, padding: 6 },
-  kpiLabel: { fontSize: 6.5, color: C.muted, textTransform: "uppercase" },
+  kpiBox: { borderWidth: 0.5, borderColor: C.border, borderTopWidth: 3, borderTopColor: C.primary, padding: 6 },
+  kpiLabel: { fontSize: 6.5, color: "#7c8a90", textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "Helvetica-Bold" },
   kpiValue: { fontSize: 15, fontFamily: "Helvetica-Bold", color: C.primary, marginTop: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },
   half: { width: "50%", paddingHorizontal: 5, marginBottom: 10 },
   full: { width: "100%", paddingHorizontal: 5, marginBottom: 10 },
-  panel: { borderWidth: 1, borderColor: C.border, borderRadius: 4, padding: 8 },
-  panelTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.primary, marginBottom: 6 },
+  panel: { borderWidth: 0.5, borderColor: C.border, padding: 8, paddingTop: 0 },
+  // Teal section bar across the top of each panel.
+  panelTitle: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#ffffff",
+    backgroundColor: C.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    marginHorizontal: -8,
+    marginBottom: 6,
+  },
   barRow: { flexDirection: "row", alignItems: "center", marginBottom: 3 },
   barLabel: { width: "34%", fontSize: 7, paddingRight: 4 },
   barTrack: { width: "54%", height: 6 },
@@ -177,7 +190,7 @@ export function DashboardPdf({ report, logoDataUri }: { report: DashboardReport;
         {tables.map((sec) =>
           sec.kind === "table" ? (
             <View key={sec.title} style={s.full} break>
-              <Text style={s.panelTitle}>{sec.title}</Text>
+              <Text style={[s.panelTitle, { marginHorizontal: 0 }]}>{sec.title}</Text>
               <Table section={sec} />
             </View>
           ) : null,

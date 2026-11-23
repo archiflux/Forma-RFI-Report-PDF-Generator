@@ -109,7 +109,7 @@ function HubGroup({ kind, hubs, canProbe }: { kind: HubKind; hubs: Hub[]; canPro
               {kind === "acc" ? (
                 <span
                   aria-hidden
-                  className="mt-3 inline-block h-1 w-10 rounded-full bg-[color:var(--brand-accent)] transition-all group-hover:w-16"
+                  className="mt-3 inline-block h-1 w-10 bg-[color:var(--brand-accent)] transition-all group-hover:w-16"
                 />
               ) : null}
             </Link>

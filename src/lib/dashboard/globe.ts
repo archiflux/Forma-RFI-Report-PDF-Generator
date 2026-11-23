@@ -103,7 +103,8 @@ export function fitView(points: Array<{ lat: number; lon: number }>): { lon: num
 
 // Sequential blue ramp (dataviz reference palette steps 250-650), light =
 // few open items, dark = many.
-export const HEAT_RAMP = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"] as const;
+// Holdpoint teal, light to deep.
+export const HEAT_RAMP = ["#9ccad5", "#5ea9ba", "#2a8aa0", "#006881", "#00394a"] as const;
 
 export function heatColour(open: number, maxOpen: number): string {
   if (maxOpen <= 0) return HEAT_RAMP[0];

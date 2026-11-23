@@ -2,9 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Colour stripe per tile, cycling through the brand's teal, navy and
-// yellow; alerts are red.
-const TONES = ["#006881", "#0e2841", "#d1c800", "#0a8aa6", "#143644", "#b5ad00"];
+// Holdpoint stat tile: white, a 4px top edge coloured by meaning, an
+// uppercase label and a big Chakra Petch number. Teal for actionable,
+// citron for needs attention, green for done, slate for context.
+export type StatTone = "teal" | "citron" | "done" | "slate";
+const TONE: Record<StatTone, { edge: string; ink: string }> = {
+  teal: { edge: "var(--bp-teal)", ink: "var(--bp-teal)" },
+  citron: { edge: "var(--bp-citron)", ink: "var(--bp-citron-ink)" },
+  done: { edge: "var(--done-bar)", ink: "var(--done)" },
+  slate: { edge: "#7c8a90", ink: "var(--slate-600)" },
+};
 
 // Counts a whole number up from its previous value (0 on first show).
 export function useCountUp(target: number, ms = 700): number {
@@ -39,24 +46,30 @@ function Value({ value }: { value: string | number }) {
   return <>{Number.isFinite(n) ? counted.toLocaleString("en-GB") : value}</>;
 }
 
-export function StatTile({ label, value, hint, alert, index = 0 }: { label: string; value: string | number; hint?: string; alert?: boolean; index?: number }) {
-  const tone = alert ? "var(--status-critical)" : TONES[index % TONES.length];
+export function StatTile({
+  label,
+  value,
+  hint,
+  alert,
+  tone,
+  index = 0,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  // Shorthand for tone "citron" (needs attention).
+  alert?: boolean;
+  tone?: StatTone;
+  index?: number;
+}) {
+  const t = TONE[tone ?? (alert ? "citron" : "teal")];
   return (
-    <div
-      className="sb-enter sb-lift relative overflow-hidden rounded-xl border border-[color:var(--brand-border)] bg-white p-4 shadow-card"
-      style={{ ["--sb-i" as string]: index }}
-    >
-      <span className="absolute inset-x-0 top-0 h-1" style={{ background: tone }} aria-hidden />
-      <span
-        className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full opacity-[0.08]"
-        style={{ background: tone }}
-        aria-hidden
-      />
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-muted)]">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${alert ? "text-[color:var(--status-critical)]" : "text-[color:var(--brand-primary)]"}`}>
+    <div className="sb-enter relative bg-white px-4 py-3 shadow-hp-sm" style={{ borderTop: `4px solid ${t.edge}`, ["--sb-i" as string]: index }}>
+      <p className="bp-label">{label}</p>
+      <p className="mt-1 font-display text-[30px] font-semibold leading-9 tabular-nums" style={{ color: t.ink }}>
         <Value value={value} />
       </p>
-      {hint ? <p className="mt-0.5 text-xs text-[color:var(--brand-muted)]">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-[color:var(--slate-600)]">{hint}</p> : null}
     </div>
   );
 }

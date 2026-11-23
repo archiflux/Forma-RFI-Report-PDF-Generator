@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "accent" | "secondary" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -9,13 +9,17 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: Size;
 }
 
+// Holdpoint buttons: square; teal for the main action (with a light sheen on
+// hover), citron for "next step / change", white with a slate border, ghost.
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-[color:var(--brand-primary)] text-white shadow-sm hover:bg-[color:var(--brand-teal)] hover:shadow-[0_8px_20px_-8px_rgba(0,104,129,0.6)] focus-visible:ring-[color:var(--brand-primary)]",
+    "sb-sheen bg-[color:var(--bp-teal)] text-white shadow-hp-sm hover:bg-[color:var(--bp-teal-dark)] hover:shadow-hp-md focus-visible:outline-[color:var(--bp-teal)]",
+  accent:
+    "sb-sheen bg-[color:var(--bp-citron)] text-[color:var(--bp-citron-ink)] shadow-hp-sm hover:brightness-95 hover:shadow-hp-md focus-visible:outline-[color:var(--bp-teal)]",
   secondary:
-    "bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] border border-[color:var(--brand-border)] hover:border-[color:var(--brand-teal)] hover:bg-[color:var(--brand-teal-soft)] focus-visible:ring-[color:var(--brand-primary)]",
+    "bg-white text-[color:var(--bp-ink)] border border-[color:var(--bp-rule)] hover:bg-[color:var(--bp-fill)] focus-visible:outline-[color:var(--bp-teal)]",
   ghost:
-    "bg-transparent text-[color:var(--brand-primary)] hover:bg-[color:var(--brand-canvas)] focus-visible:ring-[color:var(--brand-primary)]",
+    "bg-transparent text-[color:var(--slate-700)] hover:bg-[color:var(--bp-desk)] focus-visible:outline-[color:var(--bp-teal)]",
 };
 
 // `min-h-*` instead of `h-*` so buttons grow when their label wraps or
@@ -33,9 +37,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 active:scale-[0.97]",
+        "inline-flex items-center justify-center gap-1.5 font-semibold transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.97]",
         "disabled:opacity-50 disabled:pointer-events-none",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
         variantStyles[variant],
         sizeStyles[size],
         className,
